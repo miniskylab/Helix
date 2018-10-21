@@ -1,0 +1,26 @@
+## User-specific files
+*.suo
+*.user
+.vs/
+
+## Build results
+[Dd]ebug/
+[Rr]elease/
+[Bb]in/
+[Oo]bj/
+
+## Jetbrains
+/.idea/.idea.helix/.idea/workspace.xml
+/.idea/.idea.helix/.idea/contentModel.xml
+/.idea/.idea.helix/.idea/watcherTasks.xml
+*.DotSettings.user
+*.dotCover
+
+## NuGet
+packages/
+
+## Windows
+$RECYCLE.BIN/
+Thumbs.db
+ehthumbs.db
+Desktop.ini
