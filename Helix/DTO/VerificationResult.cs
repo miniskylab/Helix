@@ -1,11 +1,12 @@
-using System;
-
 namespace Helix
 {
     public class VerificationResult
     {
-        public bool IsInternalUrl { get; set; }
+        public bool IsInternalResource { get; set; }
+        public RawResource RawResource { get; set; }
+        public Resource Resource { get; set; }
         public int StatusCode { get; set; }
-        public Uri Uri { get; set; }
+
+        public bool IsBrokenResource => StatusCode < 0 || 400 <= StatusCode;
     }
 }

@@ -1,4 +1,3 @@
-using System;
 using System.IO;
 using System.Reflection;
 using Newtonsoft.Json.Linq;
@@ -11,7 +10,7 @@ namespace Helix
         public static int MaxCrawlerCount { get; }
         public static bool ReportBrokenLinksOnly { get; }
         public static int RequestTimeoutDuration { get; }
-        public static Uri StartUri { get; }
+        public static string StartUrl { get; }
         public static string TopLevelDomain { get; }
         public static string UserAgent { get; }
 
@@ -23,7 +22,7 @@ namespace Helix
             MaxCrawlerCount = (int) tokens.SelectToken(nameof(MaxCrawlerCount));
             ReportBrokenLinksOnly = (bool) tokens.SelectToken(nameof(ReportBrokenLinksOnly));
             RequestTimeoutDuration = (int) tokens.SelectToken(nameof(RequestTimeoutDuration));
-            StartUri = new Uri((string) tokens.SelectToken(nameof(StartUri)));
+            StartUrl = (string) tokens.SelectToken(nameof(StartUrl));
             UserAgent = (string) tokens.SelectToken(nameof(UserAgent));
 
             TopLevelDomain = (string) tokens.SelectToken(nameof(TopLevelDomain));

@@ -12,22 +12,22 @@ namespace Helix
         static readonly ConcurrentDictionary<string, bool> AlreadyVerifiedUrls = new ConcurrentDictionary<string, bool>();
         static readonly object Lock = new object();
         static readonly BlockingCollection<ResourceCollector> ResourceCollectorPool = new BlockingCollection<ResourceCollector>();
-        static readonly BlockingCollection<Resource> TobeVerifiedResources = new BlockingCollection<Resource>();
-        static readonly Verifier Verifier = new Verifier();
+        static readonly ResourceVerifier ResourceVerifier = new ResourceVerifier();
+        static readonly BlockingCollection<RawResource> TobeVerifiedRawResources = new BlockingCollection<RawResource>();
 
         static void InitializeResourceCollectorPool()
         {
             for (var resourceCollectorId = 0; resourceCollectorId < Configurations.MaxCrawlerCount; resourceCollectorId++)
             {
                 var resourceCollector = new ResourceCollector();
-                resourceCollector.OnResourceCollected += resource =>
+                resourceCollector.OnRawResourceCollected += rawResource =>
                 {
                     lock (Lock)
                     {
-                        if (AlreadyVerifiedUrls.TryGetValue(resource.Uri.AbsoluteUri, out _)) return;
-                        AlreadyVerifiedUrls.TryAdd(resource.Uri.AbsoluteUri, true);
+                        if (AlreadyVerifiedUrls.TryGetValue(rawResource.Url, out _)) return;
+                        AlreadyVerifiedUrls.TryAdd(rawResource.Url, true);
                     }
-                    TobeVerifiedResources.Add(resource);
+                    TobeVerifiedRawResources.Add(rawResource);
                 };
                 resourceCollector.OnIdle += () => ResourceCollectorPool.Add(resourceCollector);
                 ResourceCollectorPool.Add(resourceCollector);
@@ -36,8 +36,8 @@ namespace Helix
 
         static void Main()
         {
+            TobeVerifiedRawResources.Add(new RawResource { Url = Configurations.StartUrl, ParentUrl = null });
             InitializeResourceCollectorPool();
-            TobeVerifiedResources.Add(new Resource(Configurations.StartUri));
             StartCrawl();
         }
 
@@ -47,19 +47,19 @@ namespace Helix
             for (var crawlerId = 0; crawlerId < Configurations.MaxCrawlerCount; crawlerId++)
                 crawlerPool[crawlerId] = Task.Factory.StartNew(() =>
                 {
-                    while (TobeVerifiedResources.Any() || _activeCrawlerCount > 0)
+                    while (TobeVerifiedRawResources.Any() || _activeCrawlerCount > 0)
                     {
                         Thread.Sleep(100);
-                        while (TobeVerifiedResources.TryTake(out var tobeVerifiedResource))
+                        while (TobeVerifiedRawResources.TryTake(out var tobeVerifiedRawResource))
                         {
                             Interlocked.Increment(ref _activeCrawlerCount);
-                            var verificationResult = Verifier.Verify(tobeVerifiedResource);
-                            if (verificationResult.StatusCode >= 400 || !verificationResult.IsInternalUrl)
+                            var verificationResult = ResourceVerifier.Verify(tobeVerifiedRawResource);
+                            if (verificationResult.IsBrokenResource || !verificationResult.IsInternalResource)
                             {
                                 Interlocked.Decrement(ref _activeCrawlerCount);
                                 continue;
                             }
-                            ResourceCollectorPool.Take().CollectNewResourcesFrom(tobeVerifiedResource);
+                            ResourceCollectorPool.Take().CollectNewRawResourcesFrom(verificationResult.Resource);
                             Interlocked.Decrement(ref _activeCrawlerCount);
                         }
                     }
@@ -68,7 +68,7 @@ namespace Helix
 
             Console.WriteLine("\nWork done! Cleaning Up ...");
             foreach (var resourceCollector in ResourceCollectorPool) resourceCollector.Dispose();
-            Verifier.Dispose();
+            ResourceVerifier.Dispose();
 
             Console.WriteLine("Shutting down in 15 seconds ...");
             Thread.Sleep(TimeSpan.FromSeconds(15));

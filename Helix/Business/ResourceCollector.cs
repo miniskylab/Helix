@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -14,7 +13,7 @@ namespace Helix
     {
         readonly ChromeDriver _chromeDriver;
         public event IdleEvent OnIdle;
-        public event ResourceCollectedEvent OnResourceCollected;
+        public event RawResourceCollectedEvent OnRawResourceCollected;
 
         public ResourceCollector()
         {
@@ -29,22 +28,23 @@ namespace Helix
             _chromeDriver = new ChromeDriver(chromeDriverService, chromeOptions);
         }
 
-        public void CollectNewResourcesFrom(Resource parentResource)
+        public void CollectNewRawResourcesFrom(Resource parentResource)
         {
             _chromeDriver.Navigate().GoToUrl(parentResource.Uri);
-            var newResources = TryGetResourceReferences("a", "href")
-                .Union(TryGetResourceReferences("link", "href"))
-                .Union(TryGetResourceReferences("script", "src"))
-                .Union(TryGetResourceReferences("img", "src"))
-                .Where(UrlIsValid)
-                .Select(url => new Resource(new Uri(url), parentResource.Uri));
-            foreach (var newResource in newResources) OnResourceCollected?.Invoke(newResource);
+            var newResources = TryGetUrls("a", "href")
+                .Union(TryGetUrls("link", "href"))
+                .Union(TryGetUrls("script", "src"))
+                .Union(TryGetUrls("img", "src"))
+                .Select(url => url.ToLower())
+                .Where(url => url.StartsWith("http") || url.StartsWith("https") || url.StartsWith("/"))
+                .Select(url => new RawResource { Url = url, ParentUrl = parentResource.Uri.AbsoluteUri });
+            foreach (var newResource in newResources) OnRawResourceCollected?.Invoke(newResource);
             OnIdle?.Invoke();
         }
 
         public void Dispose() { _chromeDriver.Quit(); }
 
-        IEnumerable<string> TryGetResourceReferences(string tagName, string attributeName)
+        IEnumerable<string> TryGetUrls(string tagName, string attributeName)
         {
             var stopWatch = new Stopwatch();
             stopWatch.Start();
@@ -61,18 +61,13 @@ namespace Helix
                 catch (StaleElementReferenceException) { }
                 Thread.Sleep(1000);
             }
+
+            /* TODO: Couldn't get the URL due to StaleElementReferenceException, after many attempts.
+             * Need to provide some kind of logging or indicator here.*/
             return new List<string>();
         }
 
-        static bool UrlIsValid(string url)
-        {
-            if (string.IsNullOrWhiteSpace(url)) return false;
-
-            url = url.ToLower();
-            return url.StartsWith("http") || url.StartsWith("https") || url.StartsWith("/");
-        }
-
         public delegate void IdleEvent();
-        public delegate void ResourceCollectedEvent(Resource resource);
+        public delegate void RawResourceCollectedEvent(RawResource rawResource);
     }
 }
