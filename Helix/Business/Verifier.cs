@@ -50,10 +50,10 @@ namespace Helix
             };
 
             try { verificationResult.StatusCode = (int) _httpClient.GetAsync(resource.Uri).Result.StatusCode; }
-            catch (TaskCanceledException taskCanceledException)
+            catch (AggregateException aggregateException)
             {
-                if (!taskCanceledException.CancellationToken.IsCancellationRequested)
-                    verificationResult.StatusCode = (int) HttpStatusCode.RequestTimeout;
+                if (!(aggregateException.InnerException is TaskCanceledException)) throw;
+                verificationResult.StatusCode = (int) HttpStatusCode.RequestTimeout;
             }
 
             Report(verificationResult);
@@ -70,7 +70,7 @@ namespace Helix
         void Report(VerificationResult verificationResult)
         {
             if (Configurations.ReportBrokenLinksOnly && verificationResult.StatusCode < 400) return;
-            _textWriter.WriteLineAsync($"{verificationResult.StatusCode},{verificationResult.Uri}");
+            _textWriter.WriteLine($"{verificationResult.StatusCode},{verificationResult.Uri}");
             Console.WriteLine($"{verificationResult.StatusCode} {verificationResult.Uri}");
         }
     }

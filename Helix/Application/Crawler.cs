@@ -49,6 +49,7 @@ namespace Helix
                 {
                     while (TobeVerifiedResources.Any() || _activeCrawlerCount > 0)
                     {
+                        Thread.Sleep(100);
                         while (TobeVerifiedResources.TryTake(out var tobeVerifiedResource))
                         {
                             Interlocked.Increment(ref _activeCrawlerCount);
@@ -69,8 +70,9 @@ namespace Helix
             foreach (var resourceCollector in ResourceCollectorPool) resourceCollector.Dispose();
             Verifier.Dispose();
 
-            Console.WriteLine("Shutting down in 5 seconds ...");
-            Thread.Sleep(TimeSpan.FromSeconds(5));
+            Console.WriteLine("Shutting down in 15 seconds ...");
+            Thread.Sleep(TimeSpan.FromSeconds(15));
+            Console.ReadLine();
         }
     }
 }
