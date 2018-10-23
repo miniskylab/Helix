@@ -70,6 +70,15 @@ namespace Helix
             return verificationResult;
         }
 
+        static string EnsureAbsolute(string possiblyRelativeUrl, Uri parentUri)
+        {
+            if (parentUri == null || !possiblyRelativeUrl.StartsWith("/")) return possiblyRelativeUrl;
+            var baseString = possiblyRelativeUrl.StartsWith("//")
+                ? $"{parentUri.Scheme}:"
+                : $"{parentUri.Scheme}://{parentUri.Host}:{parentUri.Port}";
+            return $"{baseString}/{possiblyRelativeUrl}";
+        }
+
         void EnsureReportFileIsRecreated()
         {
             if (File.Exists(_reportFilePath)) File.Delete(_reportFilePath);
@@ -96,6 +105,12 @@ namespace Helix
                    resource.Uri.Authority.ToLower().EndsWith(Configurations.TopLevelDomain.ToLower());
         }
 
+        static void StripFragment(ref Uri uri)
+        {
+            if (string.IsNullOrWhiteSpace(uri.Fragment)) return;
+            uri = new Uri(uri.AbsoluteUri.ToLower().Replace(uri.Fragment, string.Empty));
+        }
+
         static bool TryProcessRawResource(RawResource rawResource, out Resource resource)
         {
             resource = null;
@@ -103,16 +118,9 @@ namespace Helix
             var isStartUrl = string.Equals(rawResource.Url, Configurations.StartUrl, StringComparison.InvariantCultureIgnoreCase);
             if (!isStartUrl && !Uri.TryCreate(rawResource.ParentUrl, UriKind.Absolute, out parentUri)) return false;
 
-            var absoluteUrl = rawResource.Url.ToLower();
-            if (parentUri != null && absoluteUrl.StartsWith("/"))
-            {
-                var baseString = absoluteUrl.StartsWith("//")
-                    ? $"{parentUri.Scheme}:"
-                    : $"{parentUri.Scheme}://{parentUri.Host}:{parentUri.Port}";
-                absoluteUrl = $"{baseString}/{absoluteUrl}";
-            }
+            var absoluteUrl = EnsureAbsolute(rawResource.Url.ToLower(), parentUri);
             if (!Uri.TryCreate(absoluteUrl, UriKind.Absolute, out var uri)) return false;
-            if (!string.IsNullOrWhiteSpace(uri.Fragment)) uri = new Uri(absoluteUrl.Replace(uri.Fragment, string.Empty));
+            StripFragment(ref uri);
 
             resource = new Resource { Uri = uri, ParentUri = parentUri };
             return true;

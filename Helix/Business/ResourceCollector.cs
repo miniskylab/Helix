@@ -36,14 +36,14 @@ namespace Helix
             try
             {
                 _chromeDriver.Navigate().GoToUrl(parentResource.Uri);
-                var newResources = TryGetUrls("a", "href")
+                var newRawResources = TryGetUrls("a", "href")
                     .Union(TryGetUrls("link", "href"))
                     .Union(TryGetUrls("script", "src"))
                     .Union(TryGetUrls("img", "src"))
                     .Select(url => url.ToLower())
                     .Where(url => url.StartsWith("http") || url.StartsWith("https") || url.StartsWith("/"))
                     .Select(url => new RawResource { Url = url, ParentUrl = parentResource.Uri.AbsoluteUri });
-                foreach (var newResource in newResources) OnRawResourceCollected?.Invoke(newResource);
+                foreach (var newRawResource in newRawResources) OnRawResourceCollected?.Invoke(newRawResource);
             }
             catch (WebDriverException webDriverException)
             {
@@ -70,15 +70,16 @@ namespace Helix
             {
                 try
                 {
-                    var resourceReferences = new List<string>();
+                    var urls = new List<string>();
                     foreach (var webElement in _chromeDriver.FindElementsByTagName(tagName))
-                        resourceReferences.Add(webElement.GetAttribute(attributeName) ?? string.Empty);
-                    return resourceReferences;
+                        urls.Add(webElement.GetAttribute(attributeName) ?? string.Empty);
+                    return urls;
                 }
                 catch (StaleElementReferenceException) { }
                 Thread.Sleep(1000);
             }
 
+            stopWatch.Reset();
             throw new TaskCanceledException();
         }
 

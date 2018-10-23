@@ -7,7 +7,7 @@ using Helix.Helper;
 
 namespace Helix
 {
-    internal static class Crawler
+    static class Crawler
     {
         static int _activeCrawlerCount;
         static readonly ConcurrentDictionary<string, bool> AlreadyVerifiedUrls = new ConcurrentDictionary<string, bool>();

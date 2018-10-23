@@ -1,5 +1,5 @@
 {
-  "TopLevelDomain": "",
+  "TopLevelDomain": "google.com",
   "MaxCrawlerCount": 4,
   "ReportBrokenLinksOnly": false,
   "StartUrl": "https://www.google.com/",
