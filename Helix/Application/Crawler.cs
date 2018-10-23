@@ -3,10 +3,11 @@ using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Helix.Helper;
 
 namespace Helix
 {
-    static class Crawler
+    internal static class Crawler
     {
         static int _activeCrawlerCount;
         static readonly ConcurrentDictionary<string, bool> AlreadyVerifiedUrls = new ConcurrentDictionary<string, bool>();
@@ -24,10 +25,18 @@ namespace Helix
                 {
                     lock (Lock)
                     {
-                        if (AlreadyVerifiedUrls.TryGetValue(rawResource.Url, out _)) return;
-                        AlreadyVerifiedUrls.TryAdd(rawResource.Url, true);
+                        if (AlreadyVerifiedUrls.TryGetValue(rawResource.Url.StripFragment(), out _)) return;
+                        AlreadyVerifiedUrls.TryAdd(rawResource.Url.StripFragment(), true);
                     }
                     TobeVerifiedRawResources.Add(rawResource);
+                };
+                resourceCollector.OnExceptionOccurred += (exception, resource) =>
+                {
+                    /* TODO: How and Where do we log this information? */
+                };
+                resourceCollector.OnAllAttemptsToCollectResourcesFailed += resource =>
+                {
+                    /* TODO: How and Where do we log this information? */
                 };
                 resourceCollector.OnIdle += () => ResourceCollectorPool.Add(resourceCollector);
                 ResourceCollectorPool.Add(resourceCollector);
@@ -70,8 +79,8 @@ namespace Helix
             foreach (var resourceCollector in ResourceCollectorPool) resourceCollector.Dispose();
             ResourceVerifier.Dispose();
 
-            Console.WriteLine("Shutting down in 15 seconds ...");
-            Thread.Sleep(TimeSpan.FromSeconds(15));
+            Console.WriteLine("Shutting down in 5 seconds ...");
+            Thread.Sleep(TimeSpan.FromSeconds(5));
             Console.ReadLine();
         }
     }

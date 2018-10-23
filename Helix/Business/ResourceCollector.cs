@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 
@@ -12,6 +13,8 @@ namespace Helix
     public class ResourceCollector
     {
         readonly ChromeDriver _chromeDriver;
+        public event AllAttemptsToCollectResourcesFailedEvent OnAllAttemptsToCollectResourcesFailed;
+        public event ExceptionOccurredEvent OnExceptionOccurred;
         public event IdleEvent OnIdle;
         public event RawResourceCollectedEvent OnRawResourceCollected;
 
@@ -30,16 +33,30 @@ namespace Helix
 
         public void CollectNewRawResourcesFrom(Resource parentResource)
         {
-            _chromeDriver.Navigate().GoToUrl(parentResource.Uri);
-            var newResources = TryGetUrls("a", "href")
-                .Union(TryGetUrls("link", "href"))
-                .Union(TryGetUrls("script", "src"))
-                .Union(TryGetUrls("img", "src"))
-                .Select(url => url.ToLower())
-                .Where(url => url.StartsWith("http") || url.StartsWith("https") || url.StartsWith("/"))
-                .Select(url => new RawResource { Url = url, ParentUrl = parentResource.Uri.AbsoluteUri });
-            foreach (var newResource in newResources) OnRawResourceCollected?.Invoke(newResource);
-            OnIdle?.Invoke();
+            try
+            {
+                _chromeDriver.Navigate().GoToUrl(parentResource.Uri);
+                var newResources = TryGetUrls("a", "href")
+                    .Union(TryGetUrls("link", "href"))
+                    .Union(TryGetUrls("script", "src"))
+                    .Union(TryGetUrls("img", "src"))
+                    .Select(url => url.ToLower())
+                    .Where(url => url.StartsWith("http") || url.StartsWith("https") || url.StartsWith("/"))
+                    .Select(url => new RawResource { Url = url, ParentUrl = parentResource.Uri.AbsoluteUri });
+                foreach (var newResource in newResources) OnRawResourceCollected?.Invoke(newResource);
+            }
+            catch (WebDriverException webDriverException)
+            {
+                OnExceptionOccurred?.Invoke(webDriverException, parentResource);
+            }
+            catch (TaskCanceledException)
+            {
+                OnAllAttemptsToCollectResourcesFailed?.Invoke(parentResource);
+            }
+            finally
+            {
+                OnIdle?.Invoke();
+            }
         }
 
         public void Dispose() { _chromeDriver.Quit(); }
@@ -62,11 +79,11 @@ namespace Helix
                 Thread.Sleep(1000);
             }
 
-            /* TODO: Couldn't get the URL due to StaleElementReferenceException, after many attempts.
-             * Need to provide some kind of logging or indicator here.*/
-            return new List<string>();
+            throw new TaskCanceledException();
         }
 
+        public delegate void AllAttemptsToCollectResourcesFailedEvent(Resource parentResource);
+        public delegate void ExceptionOccurredEvent(WebDriverException webDriverException, Resource resourceThatTriggeredThisException);
         public delegate void IdleEvent();
         public delegate void RawResourceCollectedEvent(RawResource rawResource);
     }

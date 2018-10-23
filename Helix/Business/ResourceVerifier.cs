@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -52,8 +53,17 @@ namespace Helix
             }
             catch (AggregateException aggregateException)
             {
-                if (!(aggregateException.InnerException is TaskCanceledException)) throw;
-                verificationResult.StatusCode = (int) HttpStatusCode.RequestTimeout;
+                switch (aggregateException.InnerException)
+                {
+                    case TaskCanceledException _:
+                        verificationResult.StatusCode = (int) HttpStatusCode.RequestTimeout;
+                        break;
+                    case HttpRequestException _:
+                    case SocketException _:
+                        verificationResult.StatusCode = (int) HttpStatusCode.BadRequest;
+                        break;
+                    default: throw;
+                }
             }
 
             WriteReport(verificationResult);
@@ -63,7 +73,7 @@ namespace Helix
         void EnsureReportFileIsRecreated()
         {
             if (File.Exists(_reportFilePath)) File.Delete(_reportFilePath);
-            _textWriter = new StreamWriter(_reportFilePath);
+            _textWriter = TextWriter.Synchronized(new StreamWriter(_reportFilePath));
         }
 
         void FlushDataToDiskEvery(TimeSpan timeSpan)
@@ -81,7 +91,7 @@ namespace Helix
 
         static bool IsInternalResource(Resource resource)
         {
-            return resource.Uri.AbsoluteUri.ToLower().Equals(Configurations.StartUrl.ToLower()) ||
+            return resource.Uri.AbsoluteUri.ToLower().TrimEnd('/').Equals(Configurations.StartUrl.ToLower().TrimEnd('/')) ||
                    resource.Uri.Authority.ToLower().Equals(resource.ParentUri.Authority.ToLower()) ||
                    resource.Uri.Authority.ToLower().EndsWith(Configurations.TopLevelDomain.ToLower());
         }
