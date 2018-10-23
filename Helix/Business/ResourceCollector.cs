@@ -55,7 +55,7 @@ namespace Helix
                 {
                     var resourceReferences = new List<string>();
                     foreach (var webElement in _chromeDriver.FindElementsByTagName(tagName))
-                        resourceReferences.Add(webElement.GetAttribute(attributeName));
+                        resourceReferences.Add(webElement.GetAttribute(attributeName) ?? string.Empty);
                     return resourceReferences;
                 }
                 catch (StaleElementReferenceException) { }
