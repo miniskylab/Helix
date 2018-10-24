@@ -4,7 +4,7 @@ using Newtonsoft.Json.Linq;
 
 namespace Helix
 {
-    public static class Configurations
+    static class Configurations
     {
         public static bool EnableDebugMode { get; }
         public static int MaxCrawlerCount { get; }

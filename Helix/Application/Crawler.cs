@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Helix.Helper;
 
 namespace Helix
 {
@@ -11,9 +10,9 @@ namespace Helix
     {
         static int _activeCrawlerCount;
         static readonly ConcurrentDictionary<string, bool> AlreadyVerifiedUrls = new ConcurrentDictionary<string, bool>();
-        static readonly object Lock = new object();
         static readonly BlockingCollection<ResourceCollector> ResourceCollectorPool = new BlockingCollection<ResourceCollector>();
-        static readonly ResourceVerifier ResourceVerifier = new ResourceVerifier();
+        static readonly BlockingCollection<ResourceVerifier> ResourceVerifierPool = new BlockingCollection<ResourceVerifier>();
+        static readonly object StaticLock = new object();
         static readonly BlockingCollection<RawResource> TobeVerifiedRawResources = new BlockingCollection<RawResource>();
 
         static void InitializeResourceCollectorPool()
@@ -23,7 +22,7 @@ namespace Helix
                 var resourceCollector = new ResourceCollector();
                 resourceCollector.OnRawResourceCollected += rawResource =>
                 {
-                    lock (Lock)
+                    lock (StaticLock)
                     {
                         if (AlreadyVerifiedUrls.TryGetValue(rawResource.Url.StripFragment(), out _)) return;
                         AlreadyVerifiedUrls.TryAdd(rawResource.Url.StripFragment(), true);
@@ -43,10 +42,21 @@ namespace Helix
             }
         }
 
+        static void InitializeResourceVerifierPool()
+        {
+            for (var resourceVerifierId = 0; resourceVerifierId < Configurations.MaxCrawlerCount; resourceVerifierId++)
+            {
+                var resourceVerifier = new ResourceVerifier();
+                resourceVerifier.OnIdle += () => ResourceVerifierPool.Add(resourceVerifier);
+                ResourceVerifierPool.Add(resourceVerifier);
+            }
+        }
+
         static void Main()
         {
             TobeVerifiedRawResources.Add(new RawResource { Url = Configurations.StartUrl, ParentUrl = null });
             InitializeResourceCollectorPool();
+            InitializeResourceVerifierPool();
             StartCrawl();
         }
 
@@ -62,7 +72,7 @@ namespace Helix
                         while (TobeVerifiedRawResources.TryTake(out var tobeVerifiedRawResource))
                         {
                             Interlocked.Increment(ref _activeCrawlerCount);
-                            var verificationResult = ResourceVerifier.Verify(tobeVerifiedRawResource);
+                            var verificationResult = ResourceVerifierPool.Take().Verify(tobeVerifiedRawResource);
                             if (verificationResult.IsBrokenResource || !verificationResult.IsInternalResource)
                             {
                                 Interlocked.Decrement(ref _activeCrawlerCount);
@@ -77,10 +87,9 @@ namespace Helix
 
             Console.WriteLine("\nWork done! Cleaning Up ...");
             foreach (var resourceCollector in ResourceCollectorPool) resourceCollector.Dispose();
-            ResourceVerifier.Dispose();
+            foreach (var resourceVerifier in ResourceVerifierPool) resourceVerifier.Dispose();
 
-            Console.WriteLine("Shutting down in 5 seconds ...");
-            Thread.Sleep(TimeSpan.FromSeconds(5));
+            Console.WriteLine("Press any key to quit ...");
             Console.ReadLine();
         }
     }
