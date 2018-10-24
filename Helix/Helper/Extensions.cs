@@ -1,8 +1,8 @@
 ﻿using System;
 
-namespace Helix.Helper
+namespace Helix
 {
-    public static class Extensions
+    static class Extensions
     {
         public static string StripFragment(this string url)
         {

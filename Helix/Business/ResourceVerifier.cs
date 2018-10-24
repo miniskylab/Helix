@@ -9,27 +9,29 @@ using System.Threading.Tasks;
 
 namespace Helix
 {
-    public class ResourceVerifier
+    class ResourceVerifier : IDisposable
     {
-        readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
         readonly HttpClient _httpClient;
-        readonly string _reportFilePath = $@"{Path.GetDirectoryName(Assembly.GetEntryAssembly().Location)}\Report.csv";
-        TextWriter _textWriter;
+        static TextWriter _textWriter;
+        static readonly CancellationTokenSource CancellationTokenSource = new CancellationTokenSource();
+
+        public event IdleEvent OnIdle;
 
         public ResourceVerifier()
         {
             _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(Configurations.RequestTimeoutDuration) };
             _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(Configurations.UserAgent);
 
-            EnsureReportFileIsRecreated();
             FlushDataToDiskEvery(TimeSpan.FromSeconds(5));
         }
 
+        static ResourceVerifier() { EnsureReportFileIsRecreated(); }
+
         public void Dispose()
         {
-            _cancellationTokenSource.Cancel();
-            _textWriter.Flush();
-            _textWriter.Dispose();
+            CancellationTokenSource?.Cancel();
+            _textWriter?.Flush();
+            _textWriter?.Dispose();
         }
 
         public VerificationResult Verify(RawResource rawResource)
@@ -42,6 +44,7 @@ namespace Helix
                 verificationResult.IsInternalResource = false;
 
                 WriteReport(verificationResult);
+                OnIdle?.Invoke();
                 return verificationResult;
             }
 
@@ -62,11 +65,14 @@ namespace Helix
                     case SocketException _:
                         verificationResult.StatusCode = (int) HttpStatusCode.BadRequest;
                         break;
-                    default: throw;
+                    default:
+                        OnIdle?.Invoke();
+                        throw;
                 }
             }
 
             WriteReport(verificationResult);
+            OnIdle?.Invoke();
             return verificationResult;
         }
 
@@ -79,15 +85,16 @@ namespace Helix
             return $"{baseString}/{possiblyRelativeUrl}";
         }
 
-        void EnsureReportFileIsRecreated()
+        static void EnsureReportFileIsRecreated()
         {
-            if (File.Exists(_reportFilePath)) File.Delete(_reportFilePath);
-            _textWriter = TextWriter.Synchronized(new StreamWriter(_reportFilePath));
+            var reportFilePath = $@"{Path.GetDirectoryName(Assembly.GetEntryAssembly().Location)}\Report.csv";
+            if (File.Exists(reportFilePath)) File.Delete(reportFilePath);
+            _textWriter = TextWriter.Synchronized(new StreamWriter(reportFilePath));
         }
 
-        void FlushDataToDiskEvery(TimeSpan timeSpan)
+        static void FlushDataToDiskEvery(TimeSpan timeSpan)
         {
-            var cancellationToken = _cancellationTokenSource.Token;
+            var cancellationToken = CancellationTokenSource.Token;
             Task.Run(() =>
             {
                 while (!cancellationToken.IsCancellationRequested)
@@ -105,7 +112,7 @@ namespace Helix
                    resource.Uri.Authority.ToLower().EndsWith(Configurations.TopLevelDomain.ToLower());
         }
 
-        static void StripFragment(ref Uri uri)
+        static void StripFragmentFrom(ref Uri uri)
         {
             if (string.IsNullOrWhiteSpace(uri.Fragment)) return;
             uri = new Uri(uri.AbsoluteUri.ToLower().Replace(uri.Fragment, string.Empty));
@@ -120,18 +127,20 @@ namespace Helix
 
             var absoluteUrl = EnsureAbsolute(rawResource.Url.ToLower(), parentUri);
             if (!Uri.TryCreate(absoluteUrl, UriKind.Absolute, out var uri)) return false;
-            StripFragment(ref uri);
+            StripFragmentFrom(ref uri);
 
             resource = new Resource { Uri = uri, ParentUri = parentUri };
             return true;
         }
 
-        void WriteReport(VerificationResult verificationResult)
+        static void WriteReport(VerificationResult verificationResult)
         {
             if (Configurations.ReportBrokenLinksOnly && !verificationResult.IsBrokenResource) return;
             var verifiedUrl = verificationResult.Resource?.Uri.AbsoluteUri ?? verificationResult.RawResource.Url;
             _textWriter.WriteLine($"{verificationResult.StatusCode},{verifiedUrl}");
             Console.WriteLine($"{verificationResult.StatusCode} {verifiedUrl}");
         }
+
+        public delegate void IdleEvent();
     }
 }

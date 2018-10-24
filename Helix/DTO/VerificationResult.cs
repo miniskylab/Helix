@@ -1,6 +1,6 @@
 namespace Helix
 {
-    public class VerificationResult
+    class VerificationResult
     {
         public bool IsInternalResource { get; set; }
         public RawResource RawResource { get; set; }
