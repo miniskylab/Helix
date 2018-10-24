@@ -108,7 +108,7 @@ namespace Helix
 
         static bool IsInternalResource(Resource resource)
         {
-            return resource.Uri.AbsoluteUri.ToLower().TrimEnd('/').Equals(Configurations.StartUrl.ToLower().TrimEnd('/')) ||
+            return resource.Uri.AbsoluteUri.ToLower().Equals(Configurations.StartUrl) ||
                    resource.Uri.Authority.ToLower().Equals(resource.ParentUri.Authority.ToLower()) ||
                    resource.Uri.Authority.ToLower().EndsWith(Configurations.TopLevelDomain.ToLower());
         }
@@ -116,7 +116,7 @@ namespace Helix
         static void StripFragmentFrom(ref Uri uri)
         {
             if (string.IsNullOrWhiteSpace(uri.Fragment)) return;
-            uri = new Uri(uri.AbsoluteUri.ToLower().Replace(uri.Fragment, string.Empty));
+            uri = new Uri(uri.AbsoluteUri.Replace(uri.Fragment, string.Empty).EnsureEndsWith('/'));
         }
 
         static bool TryProcessRawResource(RawResource rawResource, out Resource resource)
@@ -126,7 +126,7 @@ namespace Helix
             var isStartUrl = string.Equals(rawResource.Url, Configurations.StartUrl, StringComparison.InvariantCultureIgnoreCase);
             if (!isStartUrl && !Uri.TryCreate(rawResource.ParentUrl, UriKind.Absolute, out parentUri)) return false;
 
-            var absoluteUrl = EnsureAbsolute(rawResource.Url.ToLower(), parentUri);
+            var absoluteUrl = EnsureAbsolute(rawResource.Url, parentUri);
             if (!Uri.TryCreate(absoluteUrl, UriKind.Absolute, out var uri)) return false;
             StripFragmentFrom(ref uri);
 

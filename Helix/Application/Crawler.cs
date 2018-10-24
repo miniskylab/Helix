@@ -54,6 +54,7 @@ namespace Helix
 
         static void Main()
         {
+            lock (StaticLock) { AlreadyVerifiedUrls.TryAdd(Configurations.StartUrl, true); }
             TobeVerifiedRawResources.Add(new RawResource { Url = Configurations.StartUrl, ParentUrl = null });
             InitializeResourceCollectorPool();
             InitializeResourceVerifierPool();

@@ -22,7 +22,7 @@ namespace Helix
             MaxCrawlerCount = (int) tokens.SelectToken(nameof(MaxCrawlerCount));
             ReportBrokenLinksOnly = (bool) tokens.SelectToken(nameof(ReportBrokenLinksOnly));
             RequestTimeoutDuration = (int) tokens.SelectToken(nameof(RequestTimeoutDuration));
-            StartUrl = (string) tokens.SelectToken(nameof(StartUrl));
+            StartUrl = ((string) tokens.SelectToken(nameof(StartUrl))).ToLower().EnsureEndsWith('/');
             UserAgent = (string) tokens.SelectToken(nameof(UserAgent));
 
             TopLevelDomain = (string) tokens.SelectToken(nameof(TopLevelDomain));
