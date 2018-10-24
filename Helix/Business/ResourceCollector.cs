@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -11,7 +10,7 @@ using OpenQA.Selenium.Chrome;
 
 namespace Helix
 {
-    class ResourceCollector : IDisposable
+    public class ResourceCollector
     {
         readonly ChromeDriver _chromeDriver;
         public event AllAttemptsToCollectResourcesFailedEvent OnAllAttemptsToCollectResourcesFailed;
@@ -60,7 +59,7 @@ namespace Helix
             }
         }
 
-        public void Dispose() { _chromeDriver?.Quit(); }
+        public void Dispose() { _chromeDriver.Quit(); }
 
         IEnumerable<string> TryGetUrls(string tagName, string attributeName)
         {
