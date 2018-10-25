@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -54,11 +56,32 @@ namespace Helix
 
         static void Main()
         {
-            lock (StaticLock) { AlreadyVerifiedUrls.TryAdd(Configurations.StartUrl, true); }
-            TobeVerifiedRawResources.Add(new RawResource { Url = Configurations.StartUrl, ParentUrl = null });
-            InitializeResourceCollectorPool();
-            InitializeResourceVerifierPool();
-            StartCrawl();
+            var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
+            var errorFilePath = Path.Combine(workingDirectory, "error.txt");
+
+            try
+            {
+                if (File.Exists(errorFilePath)) File.Delete(errorFilePath);
+                lock (StaticLock) { AlreadyVerifiedUrls.TryAdd(Configurations.StartUrl, true); }
+                TobeVerifiedRawResources.Add(new RawResource { Url = Configurations.StartUrl, ParentUrl = null });
+                InitializeResourceCollectorPool();
+                InitializeResourceVerifierPool();
+                StartCrawl();
+            }
+            catch (Exception exception)
+            {
+                File.WriteAllText(errorFilePath, exception.ToString());
+                Console.WriteLine(exception.ToString());
+            }
+            finally
+            {
+                Console.WriteLine("\nCleaning Up ...");
+                foreach (var resourceCollector in ResourceCollectorPool) resourceCollector.Dispose();
+                foreach (var resourceVerifier in ResourceVerifierPool) resourceVerifier.Dispose();
+
+                Console.WriteLine("Press any key to quit ...");
+                Console.ReadLine();
+            }
         }
 
         static void StartCrawl()
@@ -85,13 +108,6 @@ namespace Helix
                     }
                 });
             Task.WhenAll(crawlerPool).Wait();
-
-            Console.WriteLine("\nWork done! Cleaning Up ...");
-            foreach (var resourceCollector in ResourceCollectorPool) resourceCollector.Dispose();
-            foreach (var resourceVerifier in ResourceVerifierPool) resourceVerifier.Dispose();
-
-            Console.WriteLine("Press any key to quit ...");
-            Console.ReadLine();
         }
     }
 }

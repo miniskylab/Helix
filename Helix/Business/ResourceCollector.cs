@@ -41,7 +41,7 @@ namespace Helix
                     .Union(TryGetUrls("link", "href"))
                     .Union(TryGetUrls("script", "src"))
                     .Union(TryGetUrls("img", "src"))
-                    .Select(url => url.ToLower().EnsureEndsWith('/'))
+                    .Select(url => url.ToLower())
                     .Where(url => url.StartsWith("http") || url.StartsWith("https") || url.StartsWith("/"))
                     .Select(url => new RawResource { Url = url, ParentUrl = parentResource.Uri.AbsoluteUri });
                 foreach (var newRawResource in newRawResources) OnRawResourceCollected?.Invoke(newRawResource);

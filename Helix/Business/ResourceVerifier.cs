@@ -30,9 +30,11 @@ namespace Helix
         public void Dispose()
         {
             CancellationTokenSource?.Cancel();
+            _httpClient?.Dispose();
+
             _textWriter?.Flush();
             _textWriter?.Dispose();
-            _httpClient?.Dispose();
+            _textWriter = null;
         }
 
         public VerificationResult Verify(RawResource rawResource)
@@ -108,7 +110,7 @@ namespace Helix
 
         static bool IsInternalResource(Resource resource)
         {
-            return resource.Uri.AbsoluteUri.ToLower().Equals(Configurations.StartUrl) ||
+            return resource.Uri.OriginalString.ToLower().EnsureEndsWith('/').Equals(Configurations.StartUrl.EnsureEndsWith('/')) ||
                    resource.Uri.Authority.ToLower().Equals(resource.ParentUri.Authority.ToLower()) ||
                    resource.Uri.Authority.ToLower().EndsWith(Configurations.TopLevelDomain.ToLower());
         }
@@ -116,7 +118,7 @@ namespace Helix
         static void StripFragmentFrom(ref Uri uri)
         {
             if (string.IsNullOrWhiteSpace(uri.Fragment)) return;
-            uri = new Uri(uri.AbsoluteUri.Replace(uri.Fragment, string.Empty).EnsureEndsWith('/'));
+            uri = new Uri(uri.AbsoluteUri.Replace(uri.Fragment, string.Empty));
         }
 
         static bool TryProcessRawResource(RawResource rawResource, out Resource resource)
@@ -137,7 +139,7 @@ namespace Helix
         static void WriteReport(VerificationResult verificationResult)
         {
             if (Configurations.ReportBrokenLinksOnly && !verificationResult.IsBrokenResource) return;
-            var verifiedUrl = verificationResult.Resource?.Uri.AbsoluteUri ?? verificationResult.RawResource.Url;
+            var verifiedUrl = verificationResult.Resource?.Uri.OriginalString ?? verificationResult.RawResource.Url;
             _textWriter.WriteLine($"{verificationResult.StatusCode},{verifiedUrl}");
             Console.WriteLine($"{verificationResult.StatusCode} {verifiedUrl}");
         }
