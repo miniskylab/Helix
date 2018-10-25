@@ -110,10 +110,12 @@ namespace Helix
 
         static bool IsInternalResource(Resource resource)
         {
-            return resource.Uri.OriginalString.ToLower().EnsureEndsWith('/').Equals(Configurations.StartUrl.EnsureEndsWith('/')) ||
+            return IsStartUrl(resource.Uri.AbsoluteUri) ||
                    resource.Uri.Authority.ToLower().Equals(resource.ParentUri.Authority.ToLower()) ||
                    resource.Uri.Authority.ToLower().EndsWith(Configurations.TopLevelDomain.ToLower());
         }
+
+        static bool IsStartUrl(string url) { return url.ToLower().EnsureEndsWith('/').Equals(Configurations.StartUrl.EnsureEndsWith('/')); }
 
         static void StripFragmentFrom(ref Uri uri)
         {
@@ -125,8 +127,7 @@ namespace Helix
         {
             resource = null;
             Uri parentUri = null;
-            var isStartUrl = string.Equals(rawResource.Url, Configurations.StartUrl, StringComparison.InvariantCultureIgnoreCase);
-            if (!isStartUrl && !Uri.TryCreate(rawResource.ParentUrl, UriKind.Absolute, out parentUri)) return false;
+            if (!IsStartUrl(rawResource.Url) && !Uri.TryCreate(rawResource.ParentUrl, UriKind.Absolute, out parentUri)) return false;
 
             var absoluteUrl = EnsureAbsolute(rawResource.Url, parentUri);
             if (!Uri.TryCreate(absoluteUrl, UriKind.Absolute, out var uri)) return false;
