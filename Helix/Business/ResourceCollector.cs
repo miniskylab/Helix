@@ -14,7 +14,7 @@ namespace Helix
     class ResourceCollector : IDisposable
     {
         readonly ChromeDriver _chromeDriver;
-        public event AllAttemptsToCollectResourcesFailedEvent OnAllAttemptsToCollectResourcesFailed;
+        public event AllAttemptsToCollectNewRawResourcesFailedEvent OnAllAttemptsToCollectNewRawResourcesFailed;
         public event ExceptionOccurredEvent OnExceptionOccurred;
         public event IdleEvent OnIdle;
         public event RawResourceCollectedEvent OnRawResourceCollected;
@@ -52,7 +52,7 @@ namespace Helix
             }
             catch (TaskCanceledException)
             {
-                OnAllAttemptsToCollectResourcesFailed?.Invoke(parentResource);
+                OnAllAttemptsToCollectNewRawResourcesFailed?.Invoke(parentResource);
             }
             finally
             {
@@ -87,7 +87,7 @@ namespace Helix
             throw new TaskCanceledException();
         }
 
-        public delegate void AllAttemptsToCollectResourcesFailedEvent(Resource parentResource);
+        public delegate void AllAttemptsToCollectNewRawResourcesFailedEvent(Resource parentResource);
         public delegate void ExceptionOccurredEvent(WebDriverException webDriverException, Resource resourceThatTriggeredThisException);
         public delegate void IdleEvent();
         public delegate void RawResourceCollectedEvent(RawResource rawResource);

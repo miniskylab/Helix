@@ -35,7 +35,7 @@ namespace Helix
                 {
                     /* TODO: How and Where do we log this information? */
                 };
-                resourceCollector.OnAllAttemptsToCollectResourcesFailed += resource =>
+                resourceCollector.OnAllAttemptsToCollectNewRawResourcesFailed += parentResource =>
                 {
                     /* TODO: How and Where do we log this information? */
                 };
