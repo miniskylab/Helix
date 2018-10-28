@@ -17,20 +17,7 @@ namespace Gui
             {
                 var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
                 var webDirectory = Path.Combine(workingDirectory, "www");
-
-                return new FileServerOptions
-                {
-                    FileProvider = new PhysicalFileProvider(webDirectory),
-                    StaticFileOptions =
-                    {
-                        OnPrepareResponse = context =>
-                        {
-                            var fileName = context.File.Name;
-                            if (fileName.Contains(".gz."))
-                                context.Context.Response.Headers["Content-Encoding"] = "gzip";
-                        }
-                    }
-                };
+                return new FileServerOptions { FileProvider = new PhysicalFileProvider(webDirectory) };
             }
         }
 
