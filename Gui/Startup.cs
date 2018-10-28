@@ -49,12 +49,17 @@ namespace Gui
             var browserWindow = await Electron.WindowManager.CreateWindowAsync(new BrowserWindowOptions
             {
                 Width = 1000,
-                Height = 600,
-                Show = false
+                Height = 700,
+                Show = false,
+                Center = true,
+                Fullscreenable = false,
+                Maximizable = false,
+                Resizable = false,
+                Title = "Helix"
             });
 
+            browserWindow.SetMenuBarVisibility(false);
             browserWindow.OnReadyToShow += () => browserWindow.Show();
-            browserWindow.SetTitle("Helix");
         }
 
         static void Main(string[] args)
