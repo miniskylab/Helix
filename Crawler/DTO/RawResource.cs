@@ -1,4 +1,4 @@
-namespace Helix
+namespace Crawler
 {
     class RawResource
     {

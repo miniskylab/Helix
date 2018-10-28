@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 
-namespace Helix
+namespace Crawler
 {
     class ResourceCollector : IDisposable
     {

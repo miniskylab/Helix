@@ -1,6 +1,6 @@
 {
   "TopLevelDomain": "google.com",
-  "MaxCrawlerCount": 6,
+  "MaxThreadCount": 6,
   "ReportBrokenLinksOnly": false,
   "StartUrl": "https://www.google.com",
   "EnableDebugMode": false,

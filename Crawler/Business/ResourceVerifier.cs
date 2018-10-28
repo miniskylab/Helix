@@ -7,7 +7,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Helix
+namespace Crawler
 {
     class ResourceVerifier : IDisposable
     {

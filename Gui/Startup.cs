@@ -1,0 +1,70 @@
+using System.IO;
+using System.Reflection;
+using ElectronNET.API;
+using ElectronNET.API.Entities;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
+
+namespace Gui
+{
+    class Startup
+    {
+        static FileServerOptions FileServerOptions
+        {
+            get
+            {
+                var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
+                var webDirectory = Path.Combine(workingDirectory, "www");
+
+                return new FileServerOptions
+                {
+                    FileProvider = new PhysicalFileProvider(webDirectory),
+                    StaticFileOptions =
+                    {
+                        OnPrepareResponse = context =>
+                        {
+                            var fileName = context.File.Name;
+                            if (fileName.Contains(".gz."))
+                                context.Context.Response.Headers["Content-Encoding"] = "gzip";
+                        }
+                    }
+                };
+            }
+        }
+
+        public void Configure(IApplicationBuilder app)
+        {
+            app.UseMvc();
+            app.UseFileServer(FileServerOptions);
+
+            ElectronBootstrap();
+        }
+
+        public void ConfigureServices(IServiceCollection services) { services.AddMvcCore().AddJsonFormatters(); }
+
+        static async void ElectronBootstrap()
+        {
+            var browserWindow = await Electron.WindowManager.CreateWindowAsync(new BrowserWindowOptions
+            {
+                Width = 1000,
+                Height = 600,
+                Show = false
+            });
+
+            browserWindow.OnReadyToShow += () => browserWindow.Show();
+            browserWindow.SetTitle("Helix");
+        }
+
+        static void Main(string[] args)
+        {
+            new WebHostBuilder()
+                .UseStartup<Startup>()
+                .UseKestrel()
+                .UseElectron(args)
+                .Build()
+                .Run();
+        }
+    }
+}

@@ -1,6 +1,6 @@
 using System;
 
-namespace Helix
+namespace Crawler
 {
     class Resource
     {
