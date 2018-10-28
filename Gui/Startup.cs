@@ -17,7 +17,19 @@ namespace Gui
             {
                 var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
                 var webDirectory = Path.Combine(workingDirectory, "www");
-                return new FileServerOptions { FileProvider = new PhysicalFileProvider(webDirectory) };
+                return new FileServerOptions
+                {
+                    FileProvider = new PhysicalFileProvider(webDirectory),
+                    StaticFileOptions =
+                    {
+                        OnPrepareResponse = context =>
+                        {
+                            context.Context.Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+                            context.Context.Response.Headers["Pragma"] = "no-cache";
+                            context.Context.Response.Headers["Expires"] = "0";
+                        }
+                    }
+                };
             }
         }
 
