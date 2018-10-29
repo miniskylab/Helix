@@ -1,10 +1,121 @@
 @font-face {
     font-family: Roboto;
     src: url("font/Roboto-Regular.woff") format("woff"),
-         url("font/Roboto-Regular.woff2") format("woff2")
+    url("font/Roboto-Regular.woff2") format("woff2");
 }
 
 * {
     font-family: Roboto, sans-serif;
-    font-size: 16px;
+    font-size: 14px;
+}
+
+html {
+    overflow: hidden;
+}
+
+body {
+    background-color: #1E1E1E;
+    color: #DCDCDC;
+}
+
+.gap {
+    display: inline-block;
+    width: 10px;
+}
+
+.url-label {
+    display: inline-flex;
+    align-items: center;
+    height: 34px;
+    font-size: 18px;
+    font-weight: bold;
+    vertical-align: top;
+}
+
+.input-field {
+    display: inline-flex;
+    height: 34px;
+    padding: 6px 12px;
+    border: none;
+    outline: none;
+    vertical-align: top;
+    color: #DCDCDC;
+    flex-grow: 2;
+    background-color: #323232;
+}
+
+.button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 120px;
+    height: 34px;
+    padding: 6px 12px;
+    box-sizing: border-box;
+    border: 1px solid #3399FF;
+    vertical-align: top;
+    user-select: none;
+    cursor: pointer;
+}
+
+.button:hover {
+    color: #FFFFFF;
+    background-color: rgba(51, 153, 255, 0.1);
+}
+
+.button:active {
+    color: #FFFFFF;
+    background-color: #3399FF;
+}
+
+.button:active .button__play-icon,
+.button:hover .button__play-icon {
+    border-left-color: #FFFFFF;
+}
+
+.button__play-icon {
+    width: 9px;
+    height: 14px;
+    border-width: 7px 0 7px 9px;
+    border-color: transparent transparent transparent #DCDCDC;
+    border-style: solid;
+    box-sizing: border-box;
+}
+
+.button__text {
+    display: flex;
+    flex-grow: 1;
+    justify-content: center;
+    align-items: center;
+    height: 20px;
+    padding: 0 10px;
+    box-sizing: border-box;
+    font-size: 14px;
+}
+
+.address-bar {
+    display: flex;
+}
+
+.result-table {
+    height: 300px;
+    margin-top: 10px;
+    border: 1px solid #3399FF;
+}
+
+.configurations {
+    display: inline-flex;
+    width: 550px;
+    height: 294px;
+    margin-top: 10px;
+    border: 1px solid #3399FF;
+}
+
+.statistics {
+    display: inline-flex;
+    width: 413px;
+    height: 294px;
+    margin-top: 10px;
+    margin-left: 7px;
+    border: 1px solid #3399FF;
 }
