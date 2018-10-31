@@ -1,20 +1,55 @@
 <html>
     <head>
-        <link href="styles.css" rel="stylesheet"/>
+        <link href="styles/main.css" rel="stylesheet" />
+        <link href="styles/button.css" rel="stylesheet" />
+        <link href="styles/checkbox.css" rel="stylesheet" />
     </head>
     <body>
-    <div class="address-bar">
-        <div class="url-label">URL</div>
-        <div class="gap"></div>
-        <input class="input-field" type="text"/>
-        <div class="gap"></div>
-        <div class="button">
+        <div class="field-group">
+            <div class="field">
+                <div class="label">Start URL</div>
+                <input class="input-field" type="text" />
+            </div>
+        </div>
+        <div class="field-group">
+            <div class="field">
+                <div class="label">Top Level Domain</div>
+                <input class="input-field" type="text" />
+            </div>
+        </div>
+        <div class="field-group">
+            <div class="field field--one-half">
+                <div class="label">Max Thread Count</div>
+                <input class="input-field" type="text" />
+            </div>
+            <div class="field field--one-half">
+                <div class="label">Request Timeout Duration</div>
+                <input class="input-field" type="text" />
+            </div>
+        </div>
+        <div class="field-group">
+            <div class="field field--one-half">
+                <div class="checkbox">
+                    <input type="checkbox" />
+                    <div class="checkbox-content">
+                        <div class="checkbox__checkmark-icon"></div>
+                        <div class="checkbox__text">Report Broken Links Only</div>
+                    </div>
+                </div>
+            </div>
+            <div class="field field--one-half">
+                <div class="checkbox checkbox--tomato">
+                    <input type="checkbox" />
+                    <div class="checkbox-content">
+                        <div class="checkbox__checkmark-icon"></div>
+                        <div class="checkbox__text">Enable Debug Mode</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!--<div class="button">
             <div class="button__play-icon"></div>
             <div class="button__text">Start</div>
-        </div>
-    </div>
-    <div class="result-table"></div>
-    <div class="configurations"></div>
-    <div class="statistics"></div>
+        </div>-->
     </body>
 </html>

@@ -47,7 +47,7 @@ namespace Gui
         {
             var browserWindow = await Electron.WindowManager.CreateWindowAsync(new BrowserWindowOptions
             {
-                Width = 1000,
+                Width = 500,
                 Height = 700,
                 Show = false,
                 Center = true,

@@ -24,7 +24,13 @@
       <None Update="www\index.html">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
-      <None Update="www\styles.css">
+      <None Update="www\styles\button.css">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="www\styles\checkbox.css">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="www\styles\main.css">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
       <None Update="www\font\Roboto-Black.woff">
