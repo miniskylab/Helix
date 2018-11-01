@@ -28,6 +28,7 @@ body {
 }
 
 .field {
+    position: relative;
     display: inline-block;
     width: 100%;
     padding: 0 5px;
@@ -37,6 +38,10 @@ body {
 
 .field--one-half {
     width: 50%;
+}
+
+.field--one-third {
+    width: calc(100% / 3);
 }
 
 .label {

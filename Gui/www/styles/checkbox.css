@@ -1,6 +1,6 @@
 ﻿.checkbox {
     position: relative;
-    margin-top: 10px;
+    margin-top: 2px;
     vertical-align: top;
     user-select: none;
     cursor: pointer;
@@ -16,9 +16,19 @@
     border: 1px solid #3399FF;
 }
 
+/* Begin: Border Color */
 .checkbox--tomato .checkbox-content {
     border-color: #FF6347;
 }
+
+.checkbox--chelsea-cucumber .checkbox-content {
+    border-color: #87AC4E;
+}
+
+.checkbox--purple .checkbox-content {
+    border-color: #8959A8;
+}
+/* End: Border Color */
 
 .checkbox input {
     position: absolute;
@@ -29,25 +39,44 @@
     cursor: pointer;
 }
 
+/* Begin: Hover */
 .checkbox:hover .checkbox-content {
     color: #FFFFFF;
     background-color: rgba(51, 153, 255, 0.1);
 }
 
 .checkbox--tomato:hover .checkbox-content {
-    color: #FFFFFF;
     background-color: rgba(255, 99, 71, 0.1);
 }
 
+.checkbox--chelsea-cucumber:hover .checkbox-content {
+    background-color: rgba(135, 172, 78, 0.1);
+}
+
+.checkbox--purple:hover .checkbox-content {
+    background-color: rgba(137, 89, 168, 0.1);
+}
+/* End: Hover */
+
+/* Begin: Highlight */
 .checkbox input:checked ~ .checkbox-content {
     color: #FFFFFF;
     background-color: #3399FF;
 }
 
 .checkbox--tomato input:checked ~ .checkbox-content {
-    color: #FFFFFF;
     background-color: #FF6347;
 }
+
+.checkbox--chelsea-cucumber input:checked ~ .checkbox-content {
+    background-color: #87AC4E;
+}
+
+.checkbox--purple input:checked ~ .checkbox-content {
+    border-color: #7D26CD;
+    background-color: #7D26CD;
+}
+/* End: Highlight */
 
 .checkbox__checkmark-icon {
     width: 12px;

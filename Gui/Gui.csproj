@@ -105,6 +105,9 @@
       <None Update="www\font\Roboto-ThinItalic.woff2">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
+      <None Update="www\styles\statistics.css">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
     </ItemGroup>
     
     <ItemGroup>
