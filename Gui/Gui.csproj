@@ -24,9 +24,6 @@
       <None Update="www\index.html">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
-      <None Update="www\styles\button.css">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </None>
       <None Update="www\styles\checkbox.css">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
@@ -106,6 +103,9 @@
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
       <None Update="www\styles\statistics.css">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="www\styles\controls.css">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
     </ItemGroup>
