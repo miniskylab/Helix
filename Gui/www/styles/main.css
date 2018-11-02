@@ -44,7 +44,7 @@ body {
     width: calc(100% / 3);
 }
 
-.label {
+.input-field-label {
     display: flex;
     align-items: center;
     width: 100%;

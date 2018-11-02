@@ -14,6 +14,14 @@
     border-radius: 100px;
 }
 
+.controls__main-button-background {
+    width: 90px;
+    height: 90px;
+    border: none;
+    background-color: #1E1E1E;
+    pointer-events: none;
+}
+
 .controls__main-button {
     position: absolute;
     top: 0; bottom: 0; left: 0; right: 0;
@@ -31,25 +39,9 @@
     cursor: pointer;
 }
 
-.controls__main-button--amber {
-    border-color: #FFBF47;
-}
-
-.controls__main-button-background {
-    width: 90px;
-    height: 90px;
-    border: none;
-    background-color: #1E1E1E;
-    pointer-events: none;
-}
-
 .controls__main-button:hover {
     color: #FFFFFF;
     background-color: rgba(51, 153, 255, 0.1);
-}
-
-.controls__main-button--amber:hover {
-    background-color: rgba(255, 191, 71, 0.1);
 }
 
 .controls__main-button:active {
@@ -57,21 +49,11 @@
     background-color: #3399FF;
 }
 
-.controls__main-button--amber:active {
-    background-color: #FFBF47;
-}
+.controls__main-button--amber { border-color: #FFBF47; }
+.controls__main-button--amber:hover { background-color: rgba(255, 191, 71, 0.1); }
+.controls__main-button--amber:active { background-color: #FFBF47; }
 
-.controls__main-button:active .play-icon,
-.controls__main-button:hover .play-icon {
-    border-left-color: #FFFFFF;
-}
-
-.controls__main-button:active .pause-icon,
-.controls__main-button:hover .pause-icon {
-    border-color: #FFFFFF;
-}
-
-.play-icon {
+.controls__play-icon {
     width: 24px;
     height: 36px;
     border-width: 18px 0 18px 24px;
@@ -81,8 +63,18 @@
     margin-left: 8px;
 }
 
-.pause-icon {
+.controls__main-button:active .controls__play-icon,
+.controls__main-button:hover .controls__play-icon {
+    border-left-color: #FFFFFF;
+}
+
+.controls__pause-icon {
     height: 36px;
     border: double #9B9B9B;
     border-width: 0 0 0 30px;
+}
+
+.controls__main-button:active .controls__pause-icon,
+.controls__main-button:hover .controls__pause-icon {
+    border-color: #FFFFFF;
 }

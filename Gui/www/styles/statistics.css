@@ -7,24 +7,24 @@
     padding: 15px 0 5px 0;
 }
 
-.statistics-card {
+.statistics__card {
     display: inline-block;
     width: calc(100% / 3);
     margin: 8px 0;
     text-align: center;
 }
 
-.statistics-card-label {
+.statistics__card-label {
     line-height: 20px;
     font-weight: normal;
 }
 
-.statistics-card-value {
+.statistics__card-value {
     line-height: 25px;
     font-size: 20px;
 }
 
-.statistics-label {
+.statistics__header {
     position: absolute;
     width: fit-content;
     line-height: 24px;
@@ -35,7 +35,7 @@
     background-color: #1E1E1E;
 }
 
-.statistics-label-background {
+.statistics__header-background {
     color: transparent;
     opacity: 1;
 }
