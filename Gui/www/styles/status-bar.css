@@ -1,0 +1,28 @@
+.status-bar {
+    position: fixed;
+    display: flex;
+    align-items: center;
+    left: 0; right: 0; bottom: 0;
+    height: 25px;
+    border-top: 1px solid #9B9B9B;
+    box-sizing: border-box;
+}
+
+.status-bar__status-icon {
+    width: 12px;
+    height: 12px;
+    margin-left: 6px;
+    border-radius: 50%;
+    background-color: #9B9B9B;
+}
+
+.status-bar__message {
+    font-weight: normal;
+    margin-left: 6px;
+    line-height: 25px;
+    margin-right: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 13px;
+}

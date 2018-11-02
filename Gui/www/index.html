@@ -1,9 +1,13 @@
 <html>
     <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <link href="styles/main.css" rel="stylesheet" />
         <link href="styles/checkbox.css" rel="stylesheet" />
         <link href="styles/statistics.css" rel="stylesheet" />
         <link href="styles/controls.css" rel="stylesheet" />
+        <link href="styles/status-bar.css" rel="stylesheet" />
     </head>
     <body>
         <div>
@@ -119,9 +123,13 @@
         <div class="controls">
             <div class="controls__bar"></div>
             <div class="controls__main-button controls__main-button-background"></div>
-            <div class="controls__main-button controls__main-button--amber">
-                <div class="controls__pause-icon"></div>
+            <div class="controls__main-button controls__main-button">
+                <div class="controls__play-icon"></div>
             </div>
+        </div>
+        <div class="status-bar">
+            <div class="status-bar__status-icon"></div>
+            <div class="status-bar__message">Set configurations and then hit ► button to begin.</div>
         </div>
     </body>
 </html>

@@ -14,14 +14,6 @@
     border-radius: 100px;
 }
 
-.controls__main-button-background {
-    width: 90px;
-    height: 90px;
-    border: none;
-    background-color: #1E1E1E;
-    pointer-events: none;
-}
-
 .controls__main-button {
     position: absolute;
     top: 0; bottom: 0; left: 0; right: 0;
@@ -52,6 +44,14 @@
 .controls__main-button--amber { border-color: #FFBF47; }
 .controls__main-button--amber:hover { background-color: rgba(255, 191, 71, 0.1); }
 .controls__main-button--amber:active { background-color: #FFBF47; }
+
+.controls__main-button-background {
+    width: 90px;
+    height: 90px;
+    border: none;
+    background-color: #1E1E1E;
+    pointer-events: none;
+}
 
 .controls__play-icon {
     width: 24px;
