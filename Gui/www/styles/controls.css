@@ -1,5 +1,4 @@
 .controls {
-    position: relative;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -8,42 +7,68 @@
 }
 
 .controls__bar {
-    width: 400px;
+    position: relative;
+    width: 410px;
     height: 65px;
     background-color: #323232;
     border-radius: 100px;
 }
 
-.controls__main-button {
+.controls__button {
     position: absolute;
-    top: 0; bottom: 0; left: 0; right: 0;
+    top: 0; bottom: 0;
     margin: auto;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 80px;
-    height: 80px;
-    border: 4px solid #3399FF;
+    width: 40px;
+    height: 40px;
+    border: 3px solid transparent;
     border-radius: 50%;
     box-sizing: border-box;
-    vertical-align: top;
     user-select: none;
     cursor: pointer;
 }
 
-.controls__main-button:hover {
-    color: #FFFFFF;
-    background-color: rgba(51, 153, 255, 0.1);
+.controls__button--first { left: 15px; }
+.controls__button--second { left: 69px; }
+.controls__button--third { left: 115px; }
+.controls__button--fourth { right: 115px; }
+.controls__button--fifth { right: 61px; }
+.controls__button--sixth { right: 15px; }
+
+
+.controls__main-button {
+    border: 4px solid #3399FF;
+    width: 80px;
+    height: 80px;
+    left: 0; right: 0;
 }
 
-.controls__main-button:active {
+.controls__button:hover {
+    color: #FFFFFF;
+    background-color: rgba(51, 153, 255, 0.1);
+    border-color: #3399FF;
+}
+
+.controls__button:active {
     color: #FFFFFF;
     background-color: #3399FF;
 }
 
-.controls__main-button--amber { border-color: #FFBF47; }
-.controls__main-button--amber:hover { background-color: rgba(255, 191, 71, 0.1); }
-.controls__main-button--amber:active { background-color: #FFBF47; }
+.controls__button--amber:hover {
+    border-color: #FFBF47;
+    background-color: rgba(255, 191, 71, 0.1);
+}
+
+.controls__button--amber:active { background-color: #FFBF47; }
+
+.controls__button--tomato:hover {
+    border-color: #FF6347;
+    background-color: rgba(255, 99, 71, 0.1);
+}
+
+.controls__button--tomato:active { background-color: #FF6347; }
 
 .controls__main-button-background {
     width: 90px;
@@ -52,6 +77,18 @@
     background-color: #1E1E1E;
     pointer-events: none;
 }
+
+.controls__vertical-separator {
+    position: absolute;
+    top: 0; bottom: 0;
+    margin: auto;
+    height: 28px;
+    width: 2px;
+    background-color: #1E1E1E;
+}
+
+.controls__vertical-separator--left { left: 61px; }
+.controls__vertical-separator--right { right: 107px; }
 
 .controls__play-icon {
     width: 24px;
@@ -63,8 +100,8 @@
     margin-left: 8px;
 }
 
-.controls__main-button:active .controls__play-icon,
-.controls__main-button:hover .controls__play-icon {
+.controls__button:active .controls__play-icon,
+.controls__button:hover .controls__play-icon {
     border-left-color: #FFFFFF;
 }
 
@@ -74,7 +111,41 @@
     border-width: 0 0 0 30px;
 }
 
-.controls__main-button:active .controls__pause-icon,
-.controls__main-button:hover .controls__pause-icon {
+.controls__button:active .controls__pause-icon,
+.controls__button:hover .controls__pause-icon {
     border-color: #FFFFFF;
+}
+
+.controls__stop-icon {
+    width: 14px;
+    height: 14px;
+    background-color: #FF6347;
+}
+
+.controls__button:active .controls__stop-icon,
+.controls__button:hover .controls__stop-icon {
+    background-color: #FFFFFF;
+}
+
+.controls__svg-icon {
+    width: 16px;
+    height: 16px;
+}
+
+.controls__svg-icon svg {
+    fill: #9B9B9B;
+}
+
+.controls__button:active .controls__svg-icon svg,
+.controls__button:hover .controls__svg-icon svg {
+    fill: #FFFFFF;
+}
+
+.controls__close-icon svg {
+    fill: #FF6347;
+}
+
+.controls__preview-icon {
+    width: 20px;
+    height: 20px;
 }
