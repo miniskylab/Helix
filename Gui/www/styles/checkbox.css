@@ -25,6 +25,15 @@
     border: 1px solid #3399FF;
 }
 
+/* Begin: Disabled */
+.checkbox[disabled] {
+    pointer-events: none;
+    opacity: .3;
+}
+
+.checkbox[disabled] .checkbox__content { border-color: #9B9B9B; }
+/* End: Disabled */
+
 /* Begin: Border Color */
 .checkbox--tomato .checkbox__content { border-color: #FF6347; } 
 .checkbox--chelsea-cucumber .checkbox__content { border-color: #87AC4E; }

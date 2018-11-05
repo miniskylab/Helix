@@ -30,6 +30,14 @@
     cursor: pointer;
 }
 
+.controls__button[disabled] {
+    pointer-events: none;
+    opacity: .3;
+}
+
+.controls__button[disabled] .controls__icon { background-color: #9B9B9B; }
+.controls__button[disabled] .controls__svg-icon svg { fill: #9B9B9B; }
+
 .controls__button--first { left: 15px; }
 .controls__button--second { left: 69px; }
 .controls__button--third { left: 115px; }
