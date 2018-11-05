@@ -7,20 +7,23 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Crawler
+namespace CrawlerBackendBusiness
 {
     class ResourceVerifier : IDisposable
     {
+        readonly Configurations _configurations;
         readonly HttpClient _httpClient;
         static TextWriter _textWriter;
         static readonly CancellationTokenSource CancellationTokenSource = new CancellationTokenSource();
 
         public event IdleEvent OnIdle;
 
-        public ResourceVerifier()
+        public ResourceVerifier(Configurations configurations)
         {
-            _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(Configurations.RequestTimeoutDuration) };
-            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(Configurations.UserAgent);
+            _configurations = configurations;
+
+            _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(_configurations.RequestTimeoutDuration) };
+            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(_configurations.UserAgent);
 
             FlushDataToDiskEvery(TimeSpan.FromSeconds(5));
         }
@@ -108,14 +111,14 @@ namespace Crawler
             }, cancellationToken);
         }
 
-        static bool IsInternalResource(Resource resource)
+        bool IsInternalResource(Resource resource)
         {
             return IsStartUrl(resource.Uri.AbsoluteUri) ||
                    resource.Uri.Authority.ToLower().Equals(resource.ParentUri.Authority.ToLower()) ||
-                   resource.Uri.Authority.ToLower().EndsWith(Configurations.TopLevelDomain.ToLower());
+                   resource.Uri.Authority.ToLower().EndsWith(_configurations.TopLevelDomain.ToLower());
         }
 
-        static bool IsStartUrl(string url) { return url.ToLower().EnsureEndsWith('/').Equals(Configurations.StartUrl.EnsureEndsWith('/')); }
+        bool IsStartUrl(string url) { return url.ToLower().EnsureEndsWith('/').Equals(_configurations.StartUrl.EnsureEndsWith('/')); }
 
         static void StripFragmentFrom(ref Uri uri)
         {
@@ -123,7 +126,7 @@ namespace Crawler
             uri = new Uri(uri.AbsoluteUri.Replace(uri.Fragment, string.Empty));
         }
 
-        static bool TryProcessRawResource(RawResource rawResource, out Resource resource)
+        bool TryProcessRawResource(RawResource rawResource, out Resource resource)
         {
             resource = null;
             Uri parentUri = null;
@@ -137,12 +140,11 @@ namespace Crawler
             return true;
         }
 
-        static void WriteReport(VerificationResult verificationResult)
+        void WriteReport(VerificationResult verificationResult)
         {
-            if (Configurations.ReportBrokenLinksOnly && !verificationResult.IsBrokenResource) return;
+            if (_configurations.ReportBrokenLinksOnly && !verificationResult.IsBrokenResource) return;
             var verifiedUrl = verificationResult.Resource?.Uri.OriginalString ?? verificationResult.RawResource.Url;
             _textWriter.WriteLine($"{verificationResult.StatusCode},{verifiedUrl}");
-            Console.WriteLine($"{verificationResult.StatusCode} {verifiedUrl}");
         }
 
         public delegate void IdleEvent();

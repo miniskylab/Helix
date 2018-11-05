@@ -24,6 +24,9 @@
       <None Update="www\index.html">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
+      <None Update="www\script.js">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
       <None Update="www\styles\checkbox.css">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>

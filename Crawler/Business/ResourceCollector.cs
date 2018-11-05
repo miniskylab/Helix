@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 
-namespace Crawler
+namespace CrawlerBackendBusiness
 {
     class ResourceCollector : IDisposable
     {
@@ -19,15 +19,14 @@ namespace Crawler
         public event IdleEvent OnIdle;
         public event RawResourceCollectedEvent OnRawResourceCollected;
 
-        public ResourceCollector()
+        public ResourceCollector(Configurations configurations)
         {
             var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
             var chromeDriverService = ChromeDriverService.CreateDefaultService(workingDirectory);
             chromeDriverService.HideCommandPromptWindow = true;
 
             var chromeOptions = new ChromeOptions();
-            chromeOptions.AddArgument($"--user-agent={Configurations.UserAgent}");
-            if (!Configurations.EnableDebugMode) chromeOptions.AddArgument("--headless");
+            if (!configurations.EnableDebugMode) chromeOptions.AddArgument("--headless");
 
             _chromeDriver = new ChromeDriver(chromeDriverService, chromeOptions);
         }

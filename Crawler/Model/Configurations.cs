@@ -1,23 +1,20 @@
-using System.IO;
-using System.Reflection;
 using Newtonsoft.Json.Linq;
 
-namespace Crawler
+namespace CrawlerBackendBusiness
 {
-    static class Configurations
+    public class Configurations
     {
-        public static bool EnableDebugMode { get; }
-        public static int MaxThreadCount { get; }
-        public static bool ReportBrokenLinksOnly { get; }
-        public static int RequestTimeoutDuration { get; }
-        public static string StartUrl { get; }
-        public static string TopLevelDomain { get; }
-        public static string UserAgent { get; }
+        public bool EnableDebugMode { get; }
+        public int MaxThreadCount { get; }
+        public bool ReportBrokenLinksOnly { get; }
+        public int RequestTimeoutDuration { get; }
+        public string StartUrl { get; }
+        public string TopLevelDomain { get; }
+        public string UserAgent { get; }
 
-        static Configurations()
+        public Configurations(string configurationJsonString)
         {
-            var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
-            var tokens = JObject.Parse(File.ReadAllText($"{workingDirectory}/configurations.json"));
+            var tokens = JObject.Parse(configurationJsonString);
             EnableDebugMode = (bool) tokens.SelectToken(nameof(EnableDebugMode));
             MaxThreadCount = (int) tokens.SelectToken(nameof(MaxThreadCount));
             ReportBrokenLinksOnly = (bool) tokens.SelectToken(nameof(ReportBrokenLinksOnly));

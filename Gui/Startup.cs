@@ -1,5 +1,6 @@
 using System.IO;
 using System.Reflection;
+using CrawlerBackendBusiness;
 using ElectronNET.API;
 using ElectronNET.API.Entities;
 using Microsoft.AspNetCore.Builder;
@@ -38,6 +39,7 @@ namespace Gui
             app.UseMvc();
             app.UseFileServer(FileServerOptions);
 
+            ElectronSetupEventListeners();
             ElectronBootstrap();
         }
 
@@ -59,6 +61,19 @@ namespace Gui
 
             browserWindow.SetMenuBarVisibility(false);
             browserWindow.OnReadyToShow += () => browserWindow.Show();
+        }
+
+        static void ElectronSetupEventListeners()
+        {
+            Electron.IpcMain.On("btnStartClicked", configurationJsonString =>
+            {
+                Crawler.StartWorking(new Configurations((string) configurationJsonString));
+            });
+            Electron.IpcMain.On("btnCloseClicked", _ =>
+            {
+                Crawler.StopWorking();
+                Electron.App.Quit();
+            });
         }
 
         static void Main(string[] args)

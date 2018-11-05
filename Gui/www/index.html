@@ -14,23 +14,23 @@
             <div class="field-group">
                 <div class="field">
                     <div class="input-field-label">Start URL</div>
-                    <input class="input-field" type="text" />
+                    <input id="inp-start-url" class="input-field" type="text" />
                 </div>
             </div>
             <div class="field-group">
                 <div class="field">
                     <div class="input-field-label">Domain Name</div>
-                    <input class="input-field" type="text" />
+                    <input id="ipn-domain-name" class="input-field" type="text" />
                 </div>
             </div>
             <div class="field-group">
                 <div class="field field--one-half">
                     <div class="input-field-label">Max Thread Count</div>
-                    <input class="input-field" type="text" />
+                    <input id="ipn-max-thread-count" class="input-field" type="text" value="6" />
                 </div>
                 <div class="field field--one-half">
                     <div class="input-field-label">Request Timeout Duration</div>
-                    <input class="input-field" type="text" />
+                    <input id="ipn-request-timeout-duration" class="input-field" type="text" value="30" />
                 </div>
             </div>
             <div class="field-group">
@@ -69,7 +69,7 @@
                 <div class="field field--one-half">
                     <div class="input-field-label">Miscellaneous</div>
                     <div class="checkbox">
-                        <input type="checkbox" />
+                        <input type="checkbox" id="ipn-report-broken-links-only" />
                         <div class="checkbox__content">
                             <div class="checkbox__checkmark-icon"></div>
                             <div class="checkbox__text">Report Broken Links Only</div>
@@ -79,7 +79,7 @@
                 <div class="field field--one-half">
                     <div class="input-field-label"></div>
                     <div class="checkbox checkbox--tomato">
-                        <input type="checkbox" />
+                        <input type="checkbox" id="ipn-enable-debug-mode" />
                         <div class="checkbox__content">
                             <div class="checkbox__checkmark-icon"></div>
                             <div class="checkbox__text">Enable Debug Mode</div>
@@ -95,27 +95,27 @@
                 <div class="statistics">
                     <div class="statistics__card">
                         <div class="statistics__card-label">Verified URLs</div>
-                        <div class="statistics__card-value">13,500</div>
+                        <div class="statistics__card-value">-</div>
                     </div>
                     <div class="statistics__card">
                         <div class="statistics__card-label">Valid URLs</div>
-                        <div class="statistics__card-value">6,893</div>
+                        <div class="statistics__card-value">-</div>
                     </div>
                     <div class="statistics__card">
                         <div class="statistics__card-label">Broken URLs</div>
-                        <div class="statistics__card-value">1,256</div>
+                        <div class="statistics__card-value">-</div>
                     </div>
                     <div class="statistics__card">
                         <div class="statistics__card-label">Remaining URLs</div>
-                        <div class="statistics__card-value">126</div>
+                        <div class="statistics__card-value">-</div>
                     </div>
                     <div class="statistics__card">
                         <div class="statistics__card-label">Idle Threads</div>
-                        <div class="statistics__card-value">2</div>
+                        <div class="statistics__card-value">-</div>
                     </div>
                     <div class="statistics__card">
                         <div class="statistics__card-label">Elapsed Time</div>
-                        <div class="statistics__card-value">01 : 25 : 15</div>
+                        <div class="statistics__card-value">-- : -- : --</div>
                     </div>
                 </div>
             </div>
@@ -123,7 +123,7 @@
         <div class="controls">
             <div class="controls__bar">
                 <div class="controls__button controls__main-button controls__main-button-background"></div>
-                <div class="controls__button controls__main-button">
+                <div id="btn-start" class="controls__button controls__main-button">
                     <div class="controls__play-icon"></div>
                 </div>
                 <div class="controls__button controls__button--first" disabled>
@@ -157,10 +157,10 @@
                     </div>
                 </div>
                 <div class="controls__vertical-separator controls__vertical-separator--right"></div>
-                <div class="controls__button controls__button--tomato controls__button--fifth">
+                <div class="controls__button controls__button--tomato controls__button--fifth" disabled>
                     <div class="controls__icon controls__stop-icon"></div>
                 </div>
-                <div class="controls__button controls__button--tomato controls__button--sixth">
+                <div id="btn-close" class="controls__button controls__button--tomato controls__button--sixth">
                     <div class="controls__svg-icon controls__close-icon">
                         <svg viewBox="-1 -1 14 14">
                             <path d="M11.414,0.586c-0.78-0.781-2.048-0.781-2.828,0L6,3.172L3.414,0.586c-0.78-0.781-2.048-0.781-2.828,0c-0.781,0.781-0.781,2.047,0,2.828L3.171,6L0.586,8.586c-0.781,0.781-0.781,2.047,0,2.828C0.976,11.805,1.488,12,2,12s1.024-0.195,1.414-0.586L6,8.828l2.586,2.586C8.976,11.805,9.488,12,10,12c0.512,0,1.024-0.195,1.414-0.586c0.781-0.781,0.781-2.047,0-2.828L8.829,6l2.585-2.586C12.195,2.633,12.195,1.367,11.414,0.586z"></path>
@@ -173,5 +173,6 @@
             <div class="status-bar__status-icon"></div>
             <div class="status-bar__message">Set configurations and then hit ► button to begin.</div>
         </div>
+        <script src="script.js"></script>
     </body>
 </html>

@@ -1,4 +1,4 @@
-namespace Crawler
+namespace CrawlerBackendBusiness
 {
     class RawResource
     {
