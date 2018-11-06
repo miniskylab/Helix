@@ -13,3 +13,8 @@ document.getElementById("btn-start").addEventListener("click", () => {
 });
 
 document.getElementById("btn-close").addEventListener("click", () => { ipcRenderer.send("btnCloseClicked", ""); });
+
+ipcRenderer.on("redraw", (event, viewModelJson) => {
+    const viewModel = JSON.parse(viewModelJson);
+    document.getElementById("elapsed-time").textContent = viewModel.ElapsedTime;
+});

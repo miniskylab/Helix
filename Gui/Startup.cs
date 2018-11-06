@@ -1,5 +1,8 @@
+using System;
+using System.Diagnostics;
 using System.IO;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using CrawlerBackendBusiness;
 using ElectronNET.API;
@@ -8,11 +11,15 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
+using Newtonsoft.Json;
 
 namespace Gui
 {
     class Startup
     {
+        static BrowserWindow _gui;
+        static readonly Stopwatch Stopwatch = new Stopwatch();
+
         static FileServerOptions FileServerOptions
         {
             get
@@ -40,15 +47,57 @@ namespace Gui
             app.UseMvc();
             app.UseFileServer(FileServerOptions);
 
-            ElectronSetupEventListeners();
-            ElectronBootstrap();
+            SetupGuiEventHandlers();
+            ShowGui();
         }
 
         public void ConfigureServices(IServiceCollection services) { services.AddMvcCore().AddJsonFormatters(); }
 
-        static async void ElectronBootstrap()
+        static void Main(string[] args)
         {
-            var browserWindow = await Electron.WindowManager.CreateWindowAsync(new BrowserWindowOptions
+            new WebHostBuilder()
+                .UseStartup<Startup>()
+                .UseKestrel()
+                .UseElectron(args)
+                .Build()
+                .Run();
+        }
+
+        static void RedrawGuiEvery(TimeSpan timeSpan)
+        {
+            Task.Run(() =>
+            {
+                while (!Crawler.CancellationToken.IsCancellationRequested)
+                {
+                    Electron.IpcMain.Send(_gui, "redraw", JsonConvert.SerializeObject(new ViewModel
+                    {
+                        ElapsedTime = Stopwatch.Elapsed.ToString("hh' : 'mm' : 'ss")
+                    }));
+                    Thread.Sleep(timeSpan);
+                }
+            }, Crawler.CancellationToken);
+        }
+
+        static void SetupGuiEventHandlers()
+        {
+            Electron.IpcMain.On("btnStartClicked", configurationJsonString =>
+            {
+                if (Crawler.State != CrawlerState.Ready) return;
+                Task.Run(() => { Crawler.StartWorking(new Configurations((string) configurationJsonString)); });
+                RedrawGuiEvery(TimeSpan.FromSeconds(1));
+                Stopwatch.Start();
+            });
+            Electron.IpcMain.On("btnCloseClicked", _ =>
+            {
+                Stopwatch.Stop();
+                Crawler.StopWorking();
+                Electron.App.Quit();
+            });
+        }
+
+        static async void ShowGui()
+        {
+            _gui = await Electron.WindowManager.CreateWindowAsync(new BrowserWindowOptions
             {
                 Width = 500,
                 Height = 700,
@@ -60,32 +109,8 @@ namespace Gui
                 Title = "Helix"
             });
 
-            browserWindow.SetMenuBarVisibility(false);
-            browserWindow.OnReadyToShow += () => browserWindow.Show();
-        }
-
-        static void ElectronSetupEventListeners()
-        {
-            Electron.IpcMain.On("btnStartClicked", configurationJsonString =>
-            {
-                if (Crawler.State != CrawlerState.Ready) return;
-                Task.Run(() => { Crawler.StartWorking(new Configurations((string) configurationJsonString)); });
-            });
-            Electron.IpcMain.On("btnCloseClicked", _ =>
-            {
-                Crawler.StopWorking();
-                Electron.App.Quit();
-            });
-        }
-
-        static void Main(string[] args)
-        {
-            new WebHostBuilder()
-                .UseStartup<Startup>()
-                .UseKestrel()
-                .UseElectron(args)
-                .Build()
-                .Run();
+            _gui.SetMenuBarVisibility(false);
+            _gui.OnReadyToShow += () => _gui.Show();
         }
     }
 }

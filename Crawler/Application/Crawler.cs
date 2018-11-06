@@ -21,6 +21,7 @@ namespace CrawlerBackendBusiness
         static readonly BlockingCollection<RawResource> TobeVerifiedRawResources = new BlockingCollection<RawResource>();
 
         public static CrawlerState State { get; private set; }
+        public static CancellationToken CancellationToken => _cancellationTokenSource.Token;
 
         public static void StartWorking(Configurations configurations)
         {
