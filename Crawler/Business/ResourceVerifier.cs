@@ -25,10 +25,9 @@ namespace CrawlerBackendBusiness
             _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(_configurations.RequestTimeoutDuration) };
             _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(_configurations.UserAgent);
 
+            EnsureReportFileIsRecreated();
             FlushDataToDiskEvery(TimeSpan.FromSeconds(5));
         }
-
-        static ResourceVerifier() { EnsureReportFileIsRecreated(); }
 
         public void Dispose()
         {
@@ -93,6 +92,8 @@ namespace CrawlerBackendBusiness
 
         static void EnsureReportFileIsRecreated()
         {
+            if (_textWriter != null) return;
+
             var reportFilePath = $@"{Path.GetDirectoryName(Assembly.GetEntryAssembly().Location)}\Report.csv";
             if (File.Exists(reportFilePath)) File.Delete(reportFilePath);
             _textWriter = TextWriter.Synchronized(new StreamWriter(reportFilePath));
@@ -115,7 +116,7 @@ namespace CrawlerBackendBusiness
         {
             return IsStartUrl(resource.Uri.AbsoluteUri) ||
                    resource.Uri.Authority.ToLower().Equals(resource.ParentUri.Authority.ToLower()) ||
-                   resource.Uri.Authority.ToLower().EndsWith(_configurations.TopLevelDomain.ToLower());
+                   resource.Uri.Authority.ToLower().EndsWith(_configurations.DomainName.ToLower());
         }
 
         bool IsStartUrl(string url) { return url.ToLower().EnsureEndsWith('/').Equals(_configurations.StartUrl.EnsureEndsWith('/')); }

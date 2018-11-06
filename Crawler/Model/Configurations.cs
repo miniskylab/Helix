@@ -4,12 +4,12 @@ namespace CrawlerBackendBusiness
 {
     public class Configurations
     {
+        public string DomainName { get; }
         public bool EnableDebugMode { get; }
         public int MaxThreadCount { get; }
         public bool ReportBrokenLinksOnly { get; }
         public int RequestTimeoutDuration { get; }
         public string StartUrl { get; }
-        public string TopLevelDomain { get; }
         public string UserAgent { get; }
 
         public Configurations(string configurationJsonString)
@@ -22,8 +22,8 @@ namespace CrawlerBackendBusiness
             StartUrl = ((string) tokens.SelectToken(nameof(StartUrl))).ToLower();
             UserAgent = (string) tokens.SelectToken(nameof(UserAgent));
 
-            TopLevelDomain = (string) tokens.SelectToken(nameof(TopLevelDomain));
-            if (string.IsNullOrWhiteSpace(TopLevelDomain)) TopLevelDomain = "_";
+            DomainName = (string) tokens.SelectToken(nameof(DomainName));
+            if (string.IsNullOrWhiteSpace(DomainName)) DomainName = "_";
         }
     }
 }

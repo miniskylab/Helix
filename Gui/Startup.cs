@@ -1,5 +1,6 @@
 using System.IO;
 using System.Reflection;
+using System.Threading.Tasks;
 using CrawlerBackendBusiness;
 using ElectronNET.API;
 using ElectronNET.API.Entities;
@@ -67,7 +68,8 @@ namespace Gui
         {
             Electron.IpcMain.On("btnStartClicked", configurationJsonString =>
             {
-                Crawler.StartWorking(new Configurations((string) configurationJsonString));
+                if (Crawler.State != CrawlerState.Ready) return;
+                Task.Run(() => { Crawler.StartWorking(new Configurations((string) configurationJsonString)); });
             });
             Electron.IpcMain.On("btnCloseClicked", _ =>
             {

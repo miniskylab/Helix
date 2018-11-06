@@ -11,25 +11,32 @@ namespace CrawlerBackendBusiness
     public static class Crawler
     {
         static int _activeThreadCount;
+        static CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
         static Configurations _configurations;
         static Task[] _tasks;
         static readonly ConcurrentDictionary<string, bool> AlreadyVerifiedUrls = new ConcurrentDictionary<string, bool>();
-        static readonly CancellationTokenSource CancellationTokenSource = new CancellationTokenSource();
         static readonly BlockingCollection<ResourceCollector> ResourceCollectorPool = new BlockingCollection<ResourceCollector>();
         static readonly BlockingCollection<ResourceVerifier> ResourceVerifierPool = new BlockingCollection<ResourceVerifier>();
         static readonly object StaticLock = new object();
         static readonly BlockingCollection<RawResource> TobeVerifiedRawResources = new BlockingCollection<RawResource>();
 
+        public static CrawlerState State { get; private set; }
+
         public static void StartWorking(Configurations configurations)
         {
+            if (State != CrawlerState.Ready) return;
+
             _configurations = configurations;
+            _cancellationTokenSource = new CancellationTokenSource();
             _tasks = new Task[configurations.MaxThreadCount];
+            _activeThreadCount = 0;
 
             var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
             var errorFilePath = Path.Combine(workingDirectory, "error.txt");
 
             try
             {
+                State = CrawlerState.Working;
                 if (File.Exists(errorFilePath)) File.Delete(errorFilePath);
                 lock (StaticLock) { AlreadyVerifiedUrls.TryAdd(_configurations.StartUrl, true); }
                 TobeVerifiedRawResources.Add(new RawResource { Url = _configurations.StartUrl, ParentUrl = null });
@@ -49,14 +56,20 @@ namespace CrawlerBackendBusiness
 
         public static void StopWorking()
         {
-            if (_tasks != null)
+            if (_tasks != null && _tasks.Any())
             {
-                CancellationTokenSource.Cancel();
+                _cancellationTokenSource.Cancel();
                 Task.WhenAll(_tasks).Wait();
+                _cancellationTokenSource.Dispose();
+                _tasks = null;
             }
 
-            foreach (var resourceCollector in ResourceCollectorPool) resourceCollector.Dispose();
-            foreach (var resourceVerifier in ResourceVerifierPool) resourceVerifier.Dispose();
+            while (ResourceCollectorPool.Any()) ResourceCollectorPool.Take().Dispose();
+            while (ResourceVerifierPool.Any()) ResourceVerifierPool.Take().Dispose();
+            while (TobeVerifiedRawResources.Any()) TobeVerifiedRawResources.Take();
+            lock (StaticLock) { AlreadyVerifiedUrls.Clear(); }
+            _activeThreadCount = 0;
+            State = CrawlerState.Ready;
         }
 
         static void Crawl()
@@ -67,17 +80,17 @@ namespace CrawlerBackendBusiness
                 while (TobeVerifiedRawResources.TryTake(out var tobeVerifiedRawResource))
                 {
                     Interlocked.Increment(ref _activeThreadCount);
-                    var verificationResult = ResourceVerifierPool.Take(CancellationTokenSource.Token).Verify(tobeVerifiedRawResource);
+                    var verificationResult = ResourceVerifierPool.Take(_cancellationTokenSource.Token).Verify(tobeVerifiedRawResource);
                     if (verificationResult.IsBrokenResource || !verificationResult.IsInternalResource)
                     {
                         Interlocked.Decrement(ref _activeThreadCount);
                         continue;
                     }
-                    ResourceCollectorPool.Take(CancellationTokenSource.Token).CollectNewRawResourcesFrom(verificationResult.Resource);
+                    ResourceCollectorPool.Take(_cancellationTokenSource.Token).CollectNewRawResourcesFrom(verificationResult.Resource);
                     Interlocked.Decrement(ref _activeThreadCount);
-                    if (CancellationTokenSource.IsCancellationRequested) return;
+                    if (_cancellationTokenSource.IsCancellationRequested) return;
                 }
-                if (CancellationTokenSource.IsCancellationRequested) return;
+                if (_cancellationTokenSource.IsCancellationRequested) return;
             }
         }
 
