@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using CrawlerBackendBusiness;
 using ElectronNET.API;
 using ElectronNET.API.Entities;
+using JetBrains.Annotations;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,6 +16,7 @@ using Newtonsoft.Json;
 
 namespace Gui
 {
+    [UsedImplicitly]
     class Startup
     {
         static BrowserWindow _gui;
@@ -42,6 +44,7 @@ namespace Gui
             }
         }
 
+        [UsedImplicitly]
         public void Configure(IApplicationBuilder app)
         {
             app.UseMvc();
@@ -51,6 +54,7 @@ namespace Gui
             ShowGui();
         }
 
+        [UsedImplicitly]
         public void ConfigureServices(IServiceCollection services) { services.AddMvcCore().AddJsonFormatters(); }
 
         static void Main(string[] args)
@@ -63,16 +67,22 @@ namespace Gui
                 .Run();
         }
 
+        static void RedrawGui()
+        {
+            Electron.IpcMain.Send(_gui, "redraw", JsonConvert.SerializeObject(new ViewModel
+            {
+                CrawlerState = Crawler.State,
+                ElapsedTime = Stopwatch.Elapsed.ToString("hh' : 'mm' : 'ss")
+            }));
+        }
+
         static void RedrawGuiEvery(TimeSpan timeSpan)
         {
             Task.Run(() =>
             {
                 while (!Crawler.CancellationToken.IsCancellationRequested)
                 {
-                    Electron.IpcMain.Send(_gui, "redraw", JsonConvert.SerializeObject(new ViewModel
-                    {
-                        ElapsedTime = Stopwatch.Elapsed.ToString("hh' : 'mm' : 'ss")
-                    }));
+                    RedrawGui();
                     Thread.Sleep(timeSpan);
                 }
             }, Crawler.CancellationToken);

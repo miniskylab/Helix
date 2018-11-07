@@ -15,6 +15,8 @@ namespace CrawlerBackendBusiness
         static Configurations _configurations;
         static Task[] _tasks;
         static readonly ConcurrentDictionary<string, bool> AlreadyVerifiedUrls = new ConcurrentDictionary<string, bool>();
+        static readonly string WorkingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
+        static readonly string ErrorFilePath = Path.Combine(WorkingDirectory, "error.txt");
         static readonly BlockingCollection<ResourceCollector> ResourceCollectorPool = new BlockingCollection<ResourceCollector>();
         static readonly BlockingCollection<ResourceVerifier> ResourceVerifierPool = new BlockingCollection<ResourceVerifier>();
         static readonly object StaticLock = new object();
@@ -23,31 +25,35 @@ namespace CrawlerBackendBusiness
         public static CrawlerState State { get; private set; }
         public static CancellationToken CancellationToken => _cancellationTokenSource.Token;
 
+        static Crawler() { EnsureErrorLogFileIsRecreated(); }
+
         public static void StartWorking(Configurations configurations)
         {
-            if (State != CrawlerState.Ready) return;
+            lock (StaticLock)
+            {
+                if (State != CrawlerState.Ready) return;
+                State = CrawlerState.Working;
+            }
 
             _configurations = configurations;
             _cancellationTokenSource = new CancellationTokenSource();
             _tasks = new Task[configurations.MaxThreadCount];
             _activeThreadCount = 0;
 
-            var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
-            var errorFilePath = Path.Combine(workingDirectory, "error.txt");
-
             try
             {
-                State = CrawlerState.Working;
-                if (File.Exists(errorFilePath)) File.Delete(errorFilePath);
-                lock (StaticLock) { AlreadyVerifiedUrls.TryAdd(_configurations.StartUrl, true); }
-                TobeVerifiedRawResources.Add(new RawResource { Url = _configurations.StartUrl, ParentUrl = null });
+                lock (StaticLock)
+                {
+                    AlreadyVerifiedUrls.TryAdd(_configurations.StartUrl, true);
+                    TobeVerifiedRawResources.Add(new RawResource { Url = _configurations.StartUrl, ParentUrl = null });
+                }
                 InitializeResourceCollectorPool();
                 InitializeResourceVerifierPool();
                 DoWorkInParallel();
             }
             catch (Exception exception)
             {
-                File.WriteAllText(errorFilePath, exception.ToString());
+                File.WriteAllText(ErrorFilePath, exception.ToString());
             }
             finally
             {
@@ -57,6 +63,12 @@ namespace CrawlerBackendBusiness
 
         public static void StopWorking()
         {
+            lock (StaticLock)
+            {
+                if (State == CrawlerState.Ready) return;
+                State = CrawlerState.Ready;
+            }
+
             if (_tasks != null && _tasks.Any())
             {
                 _cancellationTokenSource.Cancel();
@@ -70,7 +82,6 @@ namespace CrawlerBackendBusiness
             while (TobeVerifiedRawResources.Any()) TobeVerifiedRawResources.Take();
             lock (StaticLock) { AlreadyVerifiedUrls.Clear(); }
             _activeThreadCount = 0;
-            State = CrawlerState.Ready;
         }
 
         static void Crawl()
@@ -78,20 +89,28 @@ namespace CrawlerBackendBusiness
             while (TobeVerifiedRawResources.Any() || _activeThreadCount > 0)
             {
                 Thread.Sleep(100);
+                if (_cancellationTokenSource.IsCancellationRequested) return;
                 while (TobeVerifiedRawResources.TryTake(out var tobeVerifiedRawResource))
                 {
-                    Interlocked.Increment(ref _activeThreadCount);
-                    var verificationResult = ResourceVerifierPool.Take(_cancellationTokenSource.Token).Verify(tobeVerifiedRawResource);
-                    if (verificationResult.IsBrokenResource || !verificationResult.IsInternalResource)
+                    try
                     {
+                        Interlocked.Increment(ref _activeThreadCount);
+                        var verificationResult = ResourceVerifierPool.Take(_cancellationTokenSource.Token).Verify(tobeVerifiedRawResource);
+                        if (verificationResult.IsBrokenResource || !verificationResult.IsInternalResource)
+                        {
+                            Interlocked.Decrement(ref _activeThreadCount);
+                            continue;
+                        }
+                        ResourceCollectorPool.Take(_cancellationTokenSource.Token).CollectNewRawResourcesFrom(verificationResult.Resource);
                         Interlocked.Decrement(ref _activeThreadCount);
-                        continue;
+                        if (_cancellationTokenSource.IsCancellationRequested) return;
                     }
-                    ResourceCollectorPool.Take(_cancellationTokenSource.Token).CollectNewRawResourcesFrom(verificationResult.Resource);
-                    Interlocked.Decrement(ref _activeThreadCount);
-                    if (_cancellationTokenSource.IsCancellationRequested) return;
+                    catch (OperationCanceledException operationCanceledException)
+                    {
+                        if (operationCanceledException.CancellationToken.IsCancellationRequested) return;
+                        throw;
+                    }
                 }
-                if (_cancellationTokenSource.IsCancellationRequested) return;
             }
         }
 
@@ -99,6 +118,11 @@ namespace CrawlerBackendBusiness
         {
             for (var taskId = 0; taskId < _configurations.MaxThreadCount; taskId++) _tasks[taskId] = Task.Factory.StartNew(Crawl);
             Task.WhenAll(_tasks).Wait();
+        }
+
+        static void EnsureErrorLogFileIsRecreated()
+        {
+            if (File.Exists(ErrorFilePath)) File.Delete(ErrorFilePath);
         }
 
         static void InitializeResourceCollectorPool()

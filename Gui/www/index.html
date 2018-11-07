@@ -123,7 +123,7 @@
         <div class="controls">
             <div class="controls__bar">
                 <div class="controls__button controls__main-button controls__main-button-background"></div>
-                <div id="btn-start" class="controls__button controls__main-button">
+                <div id="btn-main" class="controls__button controls__main-button">
                     <div class="controls__play-icon"></div>
                 </div>
                 <div class="controls__button controls__button--first" disabled>
@@ -157,7 +157,7 @@
                     </div>
                 </div>
                 <div class="controls__vertical-separator controls__vertical-separator--right"></div>
-                <div class="controls__button controls__button--tomato controls__button--fifth">
+                <div id="btn-stop" class="controls__button controls__button--tomato controls__button--fifth" disabled>
                     <div class="controls__icon controls__stop-icon"></div>
                 </div>
                 <div id="btn-close" class="controls__button controls__button--tomato controls__button--sixth">
@@ -171,7 +171,7 @@
         </div>
         <div class="status-bar">
             <div class="status-bar__status-icon"></div>
-            <div class="status-bar__message">Set configurations and then hit ► button to begin.</div>
+            <div id="lbl-status-text" class="status-bar__message">Set configurations and then hit ► button to begin.</div>
         </div>
         <script src="script.js"></script>
     </body>
