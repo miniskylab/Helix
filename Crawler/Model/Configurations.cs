@@ -5,18 +5,18 @@ namespace CrawlerBackendBusiness
     public class Configurations
     {
         public string DomainName { get; }
-        public bool EnableDebugMode { get; }
-        public int MaxThreadCount { get; }
         public bool ReportBrokenLinksOnly { get; }
         public int RequestTimeoutDuration { get; }
+        public bool ShowWebBrowsers { get; }
         public string StartUrl { get; }
         public string UserAgent { get; }
+        public int WebBrowserCount { get; }
 
         public Configurations(string configurationJsonString)
         {
             var tokens = JObject.Parse(configurationJsonString);
-            EnableDebugMode = (bool) tokens.SelectToken(nameof(EnableDebugMode));
-            MaxThreadCount = (int) tokens.SelectToken(nameof(MaxThreadCount));
+            ShowWebBrowsers = (bool) tokens.SelectToken(nameof(ShowWebBrowsers));
+            WebBrowserCount = (int) tokens.SelectToken(nameof(WebBrowserCount));
             ReportBrokenLinksOnly = (bool) tokens.SelectToken(nameof(ReportBrokenLinksOnly));
             RequestTimeoutDuration = (int) tokens.SelectToken(nameof(RequestTimeoutDuration));
             StartUrl = ((string) tokens.SelectToken(nameof(StartUrl))).ToLower();

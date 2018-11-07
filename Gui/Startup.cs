@@ -72,6 +72,11 @@ namespace Gui
             Electron.IpcMain.Send(_gui, "redraw", JsonConvert.SerializeObject(new ViewModel
             {
                 CrawlerState = Crawler.State,
+                VerifiedUrlCount = Crawler.VerifiedUrlCount,
+                ValidUrlCount = null,
+                BrokenUrlCount = null,
+                RemainingUrlCount = Crawler.RemainingUrlCount,
+                IdleWebBrowserCount = Crawler.IdleWebBrowserCount,
                 ElapsedTime = Stopwatch.Elapsed.ToString("hh' : 'mm' : 'ss")
             }));
         }
@@ -93,7 +98,15 @@ namespace Gui
             Electron.IpcMain.On("btnStartClicked", configurationJsonString =>
             {
                 if (Crawler.State != CrawlerState.Ready) return;
-                Task.Run(() => { Crawler.StartWorking(new Configurations((string) configurationJsonString)); });
+                var configurations = new Configurations((string) configurationJsonString);
+                Crawler.OnWebBrowserOpened += openedWebBrowserCount =>
+                {
+                    Electron.IpcMain.Send(_gui, "redraw", JsonConvert.SerializeObject(new ViewModel
+                    {
+                        StatusText = $"Openning web browsers ... ({openedWebBrowserCount}/{configurations.WebBrowserCount})"
+                    }));
+                };
+                Task.Run(() => { Crawler.StartWorking(configurations); });
                 RedrawGuiEvery(TimeSpan.FromSeconds(1));
                 Stopwatch.Start();
             });

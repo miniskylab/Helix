@@ -10,7 +10,7 @@ namespace CrawlerBackendBusiness
 {
     public static class Crawler
     {
-        static int _activeThreadCount;
+        static int _activeWebBrowserCount;
         static CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
         static Configurations _configurations;
         static Task[] _tasks;
@@ -22,8 +22,13 @@ namespace CrawlerBackendBusiness
         static readonly object StaticLock = new object();
         static readonly BlockingCollection<RawResource> TobeVerifiedRawResources = new BlockingCollection<RawResource>();
 
-        public static CrawlerState State { get; private set; }
+        public static CrawlerState State { get; private set; } = CrawlerState.Ready;
         public static CancellationToken CancellationToken => _cancellationTokenSource.Token;
+        public static int IdleWebBrowserCount => _configurations.WebBrowserCount - _activeWebBrowserCount;
+        public static int RemainingUrlCount => TobeVerifiedRawResources.Count;
+        public static int VerifiedUrlCount => AlreadyVerifiedUrls.Count;
+
+        public static event WebBrowserOpenedEvent OnWebBrowserOpened;
 
         static Crawler() { EnsureErrorLogFileIsRecreated(); }
 
@@ -31,14 +36,14 @@ namespace CrawlerBackendBusiness
         {
             lock (StaticLock)
             {
-                if (State != CrawlerState.Ready) return;
+                if (State == CrawlerState.Unknown || State != CrawlerState.Ready) return;
                 State = CrawlerState.Working;
             }
 
             _configurations = configurations;
             _cancellationTokenSource = new CancellationTokenSource();
-            _tasks = new Task[configurations.MaxThreadCount];
-            _activeThreadCount = 0;
+            _tasks = new Task[configurations.WebBrowserCount];
+            _activeWebBrowserCount = 0;
 
             try
             {
@@ -65,7 +70,7 @@ namespace CrawlerBackendBusiness
         {
             lock (StaticLock)
             {
-                if (State == CrawlerState.Ready) return;
+                if (State == CrawlerState.Unknown || State == CrawlerState.Ready) return;
                 State = CrawlerState.Ready;
             }
 
@@ -81,12 +86,12 @@ namespace CrawlerBackendBusiness
             while (ResourceVerifierPool.Any()) ResourceVerifierPool.Take().Dispose();
             while (TobeVerifiedRawResources.Any()) TobeVerifiedRawResources.Take();
             lock (StaticLock) { AlreadyVerifiedUrls.Clear(); }
-            _activeThreadCount = 0;
+            _activeWebBrowserCount = 0;
         }
 
         static void Crawl()
         {
-            while (TobeVerifiedRawResources.Any() || _activeThreadCount > 0)
+            while (TobeVerifiedRawResources.Any() || _activeWebBrowserCount > 0)
             {
                 Thread.Sleep(100);
                 if (_cancellationTokenSource.IsCancellationRequested) return;
@@ -94,15 +99,15 @@ namespace CrawlerBackendBusiness
                 {
                     try
                     {
-                        Interlocked.Increment(ref _activeThreadCount);
+                        Interlocked.Increment(ref _activeWebBrowserCount);
                         var verificationResult = ResourceVerifierPool.Take(_cancellationTokenSource.Token).Verify(tobeVerifiedRawResource);
                         if (verificationResult.IsBrokenResource || !verificationResult.IsInternalResource)
                         {
-                            Interlocked.Decrement(ref _activeThreadCount);
+                            Interlocked.Decrement(ref _activeWebBrowserCount);
                             continue;
                         }
                         ResourceCollectorPool.Take(_cancellationTokenSource.Token).CollectNewRawResourcesFrom(verificationResult.Resource);
-                        Interlocked.Decrement(ref _activeThreadCount);
+                        Interlocked.Decrement(ref _activeWebBrowserCount);
                         if (_cancellationTokenSource.IsCancellationRequested) return;
                     }
                     catch (OperationCanceledException operationCanceledException)
@@ -116,7 +121,7 @@ namespace CrawlerBackendBusiness
 
         static void DoWorkInParallel()
         {
-            for (var taskId = 0; taskId < _configurations.MaxThreadCount; taskId++) _tasks[taskId] = Task.Factory.StartNew(Crawl);
+            for (var taskId = 0; taskId < _configurations.WebBrowserCount; taskId++) _tasks[taskId] = Task.Factory.StartNew(Crawl);
             Task.WhenAll(_tasks).Wait();
         }
 
@@ -127,7 +132,7 @@ namespace CrawlerBackendBusiness
 
         static void InitializeResourceCollectorPool()
         {
-            for (var resourceCollectorId = 0; resourceCollectorId < _configurations.MaxThreadCount; resourceCollectorId++)
+            for (var resourceCollectorId = 0; resourceCollectorId < _configurations.WebBrowserCount; resourceCollectorId++)
             {
                 var resourceCollector = new ResourceCollector(_configurations);
                 resourceCollector.OnRawResourceCollected += rawResource =>
@@ -149,17 +154,20 @@ namespace CrawlerBackendBusiness
                 };
                 resourceCollector.OnIdle += () => ResourceCollectorPool.Add(resourceCollector);
                 ResourceCollectorPool.Add(resourceCollector);
+                OnWebBrowserOpened?.Invoke(resourceCollectorId + 1);
             }
         }
 
         static void InitializeResourceVerifierPool()
         {
-            for (var resourceVerifierId = 0; resourceVerifierId < _configurations.MaxThreadCount; resourceVerifierId++)
+            for (var resourceVerifierId = 0; resourceVerifierId < _configurations.WebBrowserCount; resourceVerifierId++)
             {
                 var resourceVerifier = new ResourceVerifier(_configurations);
                 resourceVerifier.OnIdle += () => ResourceVerifierPool.Add(resourceVerifier);
                 ResourceVerifierPool.Add(resourceVerifier);
             }
         }
+
+        public delegate void WebBrowserOpenedEvent(int openedWebBrowserCount);
     }
 }

@@ -5,21 +5,21 @@ namespace CrawlerBackendBusiness
 {
     public class ViewModel
     {
-        public int BrokenUrlCount { get; set; }
+        public int? BrokenUrlCount { get; set; }
 
         [JsonConverter(typeof(StringEnumConverter))]
         public CrawlerState CrawlerState { get; set; }
 
         public string ElapsedTime { get; set; }
 
-        public int IdleThreadCount { get; set; }
+        public int? IdleWebBrowserCount { get; set; }
 
-        public int RemainingUrlCount { get; set; }
+        public int? RemainingUrlCount { get; set; }
 
         public string StatusText { get; set; }
 
-        public int ValidUrlCount { get; set; }
+        public int? ValidUrlCount { get; set; }
 
-        public int VerifiedUrlCount { get; set; }
+        public int? VerifiedUrlCount { get; set; }
     }
 }

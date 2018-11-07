@@ -26,7 +26,7 @@ namespace CrawlerBackendBusiness
             chromeDriverService.HideCommandPromptWindow = true;
 
             var chromeOptions = new ChromeOptions();
-            if (!configurations.EnableDebugMode) chromeOptions.AddArgument("--headless");
+            if (!configurations.ShowWebBrowsers) chromeOptions.AddArgument("--headless");
 
             _chromeDriver = new ChromeDriver(chromeDriverService, chromeOptions);
         }
