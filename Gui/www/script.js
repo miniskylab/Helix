@@ -1,6 +1,10 @@
 ﻿const {ipcRenderer} = require("electron");
 
-document.getElementById("btn-main").addEventListener("click", () => {
+setInterval(() => { ipcRenderer.send("keep-alive"); }, 1000);
+
+const btnMain = document.getElementById("btn-main");
+btnMain.addEventListener("click", () => {
+    if (!btnMain.hasAttribute("disabled")) btnMain.setAttribute("disabled", "");
     ipcRenderer.send("btnStartClicked", JSON.stringify({
         StartUrl: document.getElementById("inp-start-url").value,
         DomainName: document.getElementById("ipn-domain-name").value,
@@ -24,16 +28,17 @@ ipcRenderer.on("redraw", (_, viewModelJson) => {
     if (viewModel.ElapsedTime) document.getElementById("lbl-elapsed-time").textContent = viewModel.ElapsedTime;
     if (viewModel.StatusText) document.getElementById("lbl-status-text").textContent = viewModel.StatusText;
 
-    const btnMain = document.getElementById("btn-main");
     const btnStop = document.getElementById("btn-stop");
     switch (viewModel.CrawlerState) {
         case "Ready":
             if (!btnStop.hasAttribute("disabled")) btnStop.setAttribute("disabled", "");
+            if (btnMain.hasAttribute("disabled")) btnMain.removeAttribute("disabled");
             if (btnMain.classList.contains("controls__main-button--amber")) btnMain.classList.remove("controls__main-button--amber");
             if (btnMain.firstChild.className !== "controls__play-icon") btnMain.firstChild.className = "controls__play-icon";
             break;
         case "Working":
             if (btnStop.hasAttribute("disabled")) btnStop.removeAttribute("disabled");
+            if (btnMain.hasAttribute("disabled")) btnMain.removeAttribute("disabled");
             if (!btnMain.classList.contains("controls__main-button--amber")) btnMain.classList.add("controls__main-button--amber");
             if (btnMain.firstChild.className !== "controls__pause-icon") btnMain.firstElementChild.className = "controls__pause-icon";
     }

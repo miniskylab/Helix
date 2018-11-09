@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
@@ -20,6 +21,7 @@ namespace Gui
     class Startup
     {
         static BrowserWindow _gui;
+        static readonly List<Task> BackgroundTasks = new List<Task>();
         static readonly Stopwatch Stopwatch = new Stopwatch();
 
         static FileServerOptions FileServerOptions
@@ -57,6 +59,18 @@ namespace Gui
         [UsedImplicitly]
         public void ConfigureServices(IServiceCollection services) { services.AddMvcCore().AddJsonFormatters(); }
 
+        static void KeepAlive()
+        {
+            BackgroundTasks.Add(Task.Run(() =>
+            {
+                while (!Crawler.CancellationToken.IsCancellationRequested)
+                {
+                    Electron.IpcMain.Send(_gui, "keep-alive");
+                    Thread.Sleep(TimeSpan.FromSeconds(1));
+                }
+            }, Crawler.CancellationToken));
+        }
+
         static void Main(string[] args)
         {
             new WebHostBuilder()
@@ -83,14 +97,14 @@ namespace Gui
 
         static void RedrawGuiEvery(TimeSpan timeSpan)
         {
-            Task.Run(() =>
+            BackgroundTasks.Add(Task.Run(() =>
             {
                 while (!Crawler.CancellationToken.IsCancellationRequested)
                 {
                     RedrawGui();
                     Thread.Sleep(timeSpan);
                 }
-            }, Crawler.CancellationToken);
+            }, Crawler.CancellationToken));
         }
 
         static void SetupGuiEventHandlers()
@@ -114,12 +128,15 @@ namespace Gui
             {
                 Stopwatch.Stop();
                 Crawler.StopWorking();
+                Task.WhenAll(BackgroundTasks).Wait();
+                Crawler.Dispose();
                 Electron.App.Quit();
             });
         }
 
         static async void ShowGui()
         {
+            if (_gui != null) return;
             _gui = await Electron.WindowManager.CreateWindowAsync(new BrowserWindowOptions
             {
                 Width = 500,
@@ -133,7 +150,11 @@ namespace Gui
             });
 
             _gui.SetMenuBarVisibility(false);
-            _gui.OnReadyToShow += () => _gui.Show();
+            _gui.OnReadyToShow += () =>
+            {
+                KeepAlive();
+                _gui.Show();
+            };
         }
     }
 }

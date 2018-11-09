@@ -84,6 +84,12 @@
 
 .controls__main-button--amber:active { background-color: #FFBF47; }
 
+.controls__main-button[disabled] {
+    pointer-events: none;
+    border-color: #9B9B9B;
+    opacity: 0.35;
+}
+
 .controls__main-button-background {
     width: 90px;
     height: 90px;

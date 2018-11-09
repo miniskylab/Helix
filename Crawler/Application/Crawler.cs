@@ -32,6 +32,12 @@ namespace CrawlerBackendBusiness
 
         static Crawler() { EnsureErrorLogFileIsRecreated(); }
 
+        public static void Dispose()
+        {
+            StopWorking();
+            _cancellationTokenSource?.Dispose();
+        }
+
         public static void StartWorking(Configurations configurations)
         {
             lock (StaticLock)
@@ -77,8 +83,7 @@ namespace CrawlerBackendBusiness
             if (_tasks != null && _tasks.Any())
             {
                 _cancellationTokenSource.Cancel();
-                Task.WhenAll(_tasks).Wait();
-                _cancellationTokenSource.Dispose();
+                Task.WhenAll(_tasks.Where(task => task != null)).Wait();
                 _tasks = null;
             }
 
