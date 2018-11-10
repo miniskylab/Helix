@@ -1,42 +1,36 @@
 using System;
-using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace CrawlerBackendBusiness
 {
-    class ResourceVerifier : IDisposable
+    sealed class ResourceVerifier : IDisposable
     {
+        readonly CancellationTokenSource _cancellationTokenSource;
         readonly Configurations _configurations;
         readonly HttpClient _httpClient;
-        static TextWriter _textWriter;
-        static readonly CancellationTokenSource CancellationTokenSource = new CancellationTokenSource();
+        Task<HttpResponseMessage> _sendingGETRequestTask;
 
         public event IdleEvent OnIdle;
 
         public ResourceVerifier(Configurations configurations)
         {
             _configurations = configurations;
+            _cancellationTokenSource = new CancellationTokenSource();
 
             _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(_configurations.RequestTimeoutDuration) };
             _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(_configurations.UserAgent);
-
-            EnsureReportFileIsRecreated();
-            FlushDataToDiskEvery(TimeSpan.FromSeconds(5));
         }
 
         public void Dispose()
         {
-            CancellationTokenSource?.Cancel();
+            _cancellationTokenSource?.Cancel();
+            _sendingGETRequestTask?.Wait();
+            _cancellationTokenSource?.Dispose();
             _httpClient?.Dispose();
-
-            _textWriter?.Flush();
-            _textWriter?.Dispose();
-            _textWriter = null;
         }
 
         public VerificationResult Verify(RawResource rawResource)
@@ -48,7 +42,6 @@ namespace CrawlerBackendBusiness
                 verificationResult.StatusCode = (int) HttpStatusCode.ExpectationFailed;
                 verificationResult.IsInternalResource = false;
 
-                WriteReport(verificationResult);
                 OnIdle?.Invoke();
                 return verificationResult;
             }
@@ -57,14 +50,18 @@ namespace CrawlerBackendBusiness
             {
                 verificationResult.Resource = resource;
                 verificationResult.IsInternalResource = IsInternalResource(resource);
-                verificationResult.StatusCode = (int) _httpClient.GetAsync(resource.Uri).Result.StatusCode;
+
+                _sendingGETRequestTask = _httpClient.GetAsync(resource.Uri, _cancellationTokenSource.Token);
+                verificationResult.StatusCode = (int) _sendingGETRequestTask.Result.StatusCode;
             }
             catch (AggregateException aggregateException)
             {
                 switch (aggregateException.InnerException)
                 {
                     case TaskCanceledException _:
-                        verificationResult.StatusCode = (int) HttpStatusCode.RequestTimeout;
+                        verificationResult.StatusCode = _cancellationTokenSource.Token.IsCancellationRequested
+                            ? (int) HttpStatusCode.Processing
+                            : (int) HttpStatusCode.RequestTimeout;
                         break;
                     case HttpRequestException _:
                     case SocketException _:
@@ -76,7 +73,6 @@ namespace CrawlerBackendBusiness
                 }
             }
 
-            WriteReport(verificationResult);
             OnIdle?.Invoke();
             return verificationResult;
         }
@@ -88,28 +84,6 @@ namespace CrawlerBackendBusiness
                 ? $"{parentUri.Scheme}:"
                 : $"{parentUri.Scheme}://{parentUri.Host}:{parentUri.Port}";
             return $"{baseString}/{possiblyRelativeUrl}";
-        }
-
-        static void EnsureReportFileIsRecreated()
-        {
-            if (_textWriter != null) return;
-
-            var reportFilePath = $@"{Path.GetDirectoryName(Assembly.GetEntryAssembly().Location)}\Report.csv";
-            if (File.Exists(reportFilePath)) File.Delete(reportFilePath);
-            _textWriter = TextWriter.Synchronized(new StreamWriter(reportFilePath));
-        }
-
-        static void FlushDataToDiskEvery(TimeSpan timeSpan)
-        {
-            var cancellationToken = CancellationTokenSource.Token;
-            Task.Run(() =>
-            {
-                while (!cancellationToken.IsCancellationRequested)
-                {
-                    _textWriter.Flush();
-                    Thread.Sleep(timeSpan);
-                }
-            }, cancellationToken);
         }
 
         bool IsInternalResource(Resource resource)
@@ -139,13 +113,6 @@ namespace CrawlerBackendBusiness
 
             resource = new Resource { Uri = uri, ParentUri = parentUri };
             return true;
-        }
-
-        void WriteReport(VerificationResult verificationResult)
-        {
-            if (_configurations.ReportBrokenLinksOnly && !verificationResult.IsBrokenResource) return;
-            var verifiedUrl = verificationResult.Resource?.Uri.OriginalString ?? verificationResult.RawResource.Url;
-            _textWriter.WriteLine($"{verificationResult.StatusCode},{verifiedUrl}");
         }
 
         public delegate void IdleEvent();

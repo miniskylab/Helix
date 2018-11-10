@@ -11,7 +11,7 @@ using OpenQA.Selenium.Chrome;
 
 namespace CrawlerBackendBusiness
 {
-    class ResourceCollector : IDisposable
+    sealed class ResourceCollector : IDisposable
     {
         readonly ChromeDriver _chromeDriver;
         public event AllAttemptsToCollectNewRawResourcesFailedEvent OnAllAttemptsToCollectNewRawResourcesFailed;
@@ -59,7 +59,13 @@ namespace CrawlerBackendBusiness
             }
         }
 
-        public void Dispose() { _chromeDriver?.Quit(); }
+        public void Dispose()
+        {
+            ReleaseUnmanagedResources();
+            GC.SuppressFinalize(this);
+        }
+
+        void ReleaseUnmanagedResources() { _chromeDriver?.Quit(); }
 
         IEnumerable<string> TryGetUrls(string tagName, string attributeName)
         {
@@ -90,5 +96,7 @@ namespace CrawlerBackendBusiness
         public delegate void ExceptionOccurredEvent(WebDriverException webDriverException, Resource resourceThatTriggeredThisException);
         public delegate void IdleEvent();
         public delegate void RawResourceCollectedEvent(RawResource rawResource);
+
+        ~ResourceCollector() { ReleaseUnmanagedResources(); }
     }
 }

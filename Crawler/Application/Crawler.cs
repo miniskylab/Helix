@@ -13,7 +13,8 @@ namespace CrawlerBackendBusiness
         static int _activeWebBrowserCount;
         static CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
         static Configurations _configurations;
-        static Task[] _tasks;
+        static Task[] _crawlingTasks = { };
+        static Task _mainWorkingTask;
         static readonly ConcurrentDictionary<string, bool> AlreadyVerifiedUrls = new ConcurrentDictionary<string, bool>();
         static readonly string WorkingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
         static readonly string ErrorFilePath = Path.Combine(WorkingDirectory, "error.txt");
@@ -28,6 +29,7 @@ namespace CrawlerBackendBusiness
         public static int RemainingUrlCount => TobeVerifiedRawResources.Count;
         public static int VerifiedUrlCount => AlreadyVerifiedUrls.Count;
 
+        public static event StoppedEvent OnStopped;
         public static event WebBrowserOpenedEvent OnWebBrowserOpened;
 
         static Crawler() { EnsureErrorLogFileIsRecreated(); }
@@ -48,28 +50,33 @@ namespace CrawlerBackendBusiness
 
             _configurations = configurations;
             _cancellationTokenSource = new CancellationTokenSource();
-            _tasks = new Task[configurations.WebBrowserCount];
+            _crawlingTasks = new Task[configurations.WebBrowserCount];
             _activeWebBrowserCount = 0;
-
-            try
+            _mainWorkingTask = Task.Run(() =>
             {
-                lock (StaticLock)
+                try
                 {
-                    AlreadyVerifiedUrls.TryAdd(_configurations.StartUrl, true);
-                    TobeVerifiedRawResources.Add(new RawResource { Url = _configurations.StartUrl, ParentUrl = null });
+                    while (TobeVerifiedRawResources.Any()) TobeVerifiedRawResources.Take();
+                    lock (StaticLock)
+                    {
+                        AlreadyVerifiedUrls.Clear();
+                        AlreadyVerifiedUrls.TryAdd(_configurations.StartUrl, true);
+                        TobeVerifiedRawResources.Add(new RawResource { Url = _configurations.StartUrl, ParentUrl = null });
+                    }
+                    InitializeResourceCollectorPool();
+                    InitializeResourceVerifierPool();
+                    DoWorkInParallel();
                 }
-                InitializeResourceCollectorPool();
-                InitializeResourceVerifierPool();
-                DoWorkInParallel();
-            }
-            catch (Exception exception)
-            {
-                File.WriteAllText(ErrorFilePath, exception.ToString());
-            }
-            finally
-            {
-                StopWorking();
-            }
+                catch (Exception exception)
+                {
+                    if (exception is TaskCanceledException && _cancellationTokenSource.Token.IsCancellationRequested) return;
+                    File.WriteAllText(ErrorFilePath, exception.ToString());
+                }
+                finally
+                {
+                    Task.Run(StopWorking);
+                }
+            });
         }
 
         public static void StopWorking()
@@ -80,18 +87,20 @@ namespace CrawlerBackendBusiness
                 State = CrawlerState.Ready;
             }
 
-            if (_tasks != null && _tasks.Any())
+            _cancellationTokenSource.Cancel();
+            _mainWorkingTask.Wait();
+            if (_crawlingTasks != null && _crawlingTasks.Any())
             {
-                _cancellationTokenSource.Cancel();
-                Task.WhenAll(_tasks.Where(task => task != null)).Wait();
-                _tasks = null;
+                Task.WhenAll(_crawlingTasks.Where(task => task != null)).Wait();
+                _crawlingTasks = null;
             }
 
+            var isAllWorkDone = !TobeVerifiedRawResources.Any() && _activeWebBrowserCount == 0;
             while (ResourceCollectorPool.Any()) ResourceCollectorPool.Take().Dispose();
             while (ResourceVerifierPool.Any()) ResourceVerifierPool.Take().Dispose();
-            while (TobeVerifiedRawResources.Any()) TobeVerifiedRawResources.Take();
-            lock (StaticLock) { AlreadyVerifiedUrls.Clear(); }
+            ReportWriter.Instance.Dispose();
             _activeWebBrowserCount = 0;
+            OnStopped?.Invoke(isAllWorkDone);
         }
 
         static void Crawl()
@@ -106,6 +115,8 @@ namespace CrawlerBackendBusiness
                     {
                         Interlocked.Increment(ref _activeWebBrowserCount);
                         var verificationResult = ResourceVerifierPool.Take(_cancellationTokenSource.Token).Verify(tobeVerifiedRawResource);
+                        ReportWriter.Instance.WriteReport(verificationResult, _configurations.ReportBrokenLinksOnly);
+
                         if (verificationResult.IsBrokenResource || !verificationResult.IsInternalResource)
                         {
                             Interlocked.Decrement(ref _activeWebBrowserCount);
@@ -126,8 +137,8 @@ namespace CrawlerBackendBusiness
 
         static void DoWorkInParallel()
         {
-            for (var taskId = 0; taskId < _configurations.WebBrowserCount; taskId++) _tasks[taskId] = Task.Factory.StartNew(Crawl);
-            Task.WhenAll(_tasks).Wait();
+            for (var taskId = 0; taskId < _configurations.WebBrowserCount; taskId++) _crawlingTasks[taskId] = Task.Factory.StartNew(Crawl);
+            Task.WhenAll(_crawlingTasks).Wait();
         }
 
         static void EnsureErrorLogFileIsRecreated()
@@ -139,6 +150,7 @@ namespace CrawlerBackendBusiness
         {
             for (var resourceCollectorId = 0; resourceCollectorId < _configurations.WebBrowserCount; resourceCollectorId++)
             {
+                if (_cancellationTokenSource.Token.IsCancellationRequested) throw new TaskCanceledException();
                 var resourceCollector = new ResourceCollector(_configurations);
                 resourceCollector.OnRawResourceCollected += rawResource =>
                 {
@@ -167,12 +179,14 @@ namespace CrawlerBackendBusiness
         {
             for (var resourceVerifierId = 0; resourceVerifierId < _configurations.WebBrowserCount; resourceVerifierId++)
             {
+                if (_cancellationTokenSource.Token.IsCancellationRequested) throw new TaskCanceledException();
                 var resourceVerifier = new ResourceVerifier(_configurations);
                 resourceVerifier.OnIdle += () => ResourceVerifierPool.Add(resourceVerifier);
                 ResourceVerifierPool.Add(resourceVerifier);
             }
         }
 
+        public delegate void StoppedEvent(bool isAllWorkDone = false);
         public delegate void WebBrowserOpenedEvent(int openedWebBrowserCount);
     }
 }

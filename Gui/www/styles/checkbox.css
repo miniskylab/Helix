@@ -28,10 +28,9 @@
 /* Begin: Disabled */
 .checkbox[disabled] {
     pointer-events: none;
-    opacity: .3;
+    filter: grayscale(65%);
+    opacity: .65;
 }
-
-.checkbox[disabled] .checkbox__content { border-color: #9B9B9B; }
 /* End: Disabled */
 
 /* Begin: Border Color */
