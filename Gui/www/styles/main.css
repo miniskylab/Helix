@@ -12,16 +12,30 @@
 
 html {
     overflow: hidden;
+    margin: 0 1px 1px 0;
+    border: 3px solid #FFFFFF;
 }
 
 body {
     background-color: #1E1E1E;
     color: #9B9B9B;
-    margin: 20px;
+    margin: 0 20px 20px 20px;
 }
 
 #configuration-panel[disabled] {
     pointer-events: none;
     filter: grayscale(85%);
     opacity: .65;
+}
+
+.title-bar {
+    -webkit-app-region: drag;
+    font-size: 20px;
+    font-weight: bold;
+    color: #FFFFFF;
+    padding: 7px 0 5px 0;
+    margin: 0 -20px 10px;
+    border-bottom: 1px solid #323232;
+    text-align: center;
+    user-select: none;
 }

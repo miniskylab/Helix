@@ -146,7 +146,7 @@ namespace CrawlerFrontendGui
                 Fullscreenable = false,
                 Maximizable = false,
                 Resizable = false,
-                Title = "Helix"
+                Frame = false
             }).Result;
 
             _gui.SetMenuBarVisibility(false);
