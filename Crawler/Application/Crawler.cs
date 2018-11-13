@@ -27,7 +27,7 @@ namespace CrawlerBackendBusiness
         public static CancellationToken CancellationToken => _cancellationTokenSource.Token;
         public static int IdleWebBrowserCount => _configurations.WebBrowserCount - _activeWebBrowserCount;
         public static int RemainingUrlCount => TobeVerifiedRawResources.Count;
-        public static int VerifiedUrlCount => AlreadyVerifiedUrls.Count;
+        public static int VerifiedUrlCount => AlreadyVerifiedUrls.Count - TobeVerifiedRawResources.Count;
 
         public static event StoppedEvent OnStopped;
         public static event WebBrowserOpenedEvent OnWebBrowserOpened;

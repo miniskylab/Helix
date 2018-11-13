@@ -32,7 +32,7 @@
 
 .controls__button[disabled] {
     pointer-events: none;
-    filter: grayscale(65%);
+    filter: grayscale(85%);
     opacity: .65;
 }
 
@@ -73,7 +73,7 @@
 
 .controls__main-button--amber {
     border-color: #FFBF47;
-    filter: grayscale(65%);
+    filter: grayscale(85%);
     opacity: .65;
     pointer-events: none;
 }
@@ -87,7 +87,7 @@
 
 .controls__main-button[disabled] {
     pointer-events: none;
-    filter: grayscale(65%);
+    filter: grayscale(85%);
     opacity: .65;
 }
 

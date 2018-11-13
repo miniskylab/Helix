@@ -22,6 +22,6 @@ body {
 
 #configuration-panel[disabled] {
     pointer-events: none;
-    filter: grayscale(65%);
+    filter: grayscale(85%);
     opacity: .65;
 }
