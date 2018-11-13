@@ -2,18 +2,24 @@
 const port = ipcRenderer.sendSync("get-web-port", "");
 
 const btnMain = document.getElementById("btn-main");
+const txtStartUrl = document.getElementById("txt-start-url");
+const txtDomainName = document.getElementById("txt-domain-name");
+const txtWebBrowserCount = document.getElementById("txt-web-browser-count");
+const txtRequestTimeoutDuration = document.getElementById("txt-request-timeout-duration");
+const ckbReportBrokenLinksOnly = document.getElementById("ckb-report-broken-links-only");
+const ckbShowWebBrowsers = document.getElementById("ckb-show-web-browsers");
 btnMain.addEventListener("click", () => {
     if (!btnMain.hasAttribute("disabled")) btnMain.setAttribute("disabled", "");
     const http = new XMLHttpRequest();
     http.open("POST", `http://localhost:${port}/btn-start-clicked`);
     http.setRequestHeader("Content-Type", "application/json");
     http.send(JSON.stringify(JSON.stringify({
-        StartUrl: document.getElementById("inp-start-url").value,
-        DomainName: document.getElementById("ipn-domain-name").value,
-        WebBrowserCount: document.getElementById("ipn-web-browser-count").value,
-        RequestTimeoutDuration: document.getElementById("ipn-request-timeout-duration").value,
-        ReportBrokenLinksOnly: document.getElementById("ipn-report-broken-links-only").checked,
-        ShowWebBrowsers: document.getElementById("ipn-show-web-browsers").checked,
+        StartUrl: txtStartUrl.value,
+        DomainName: txtDomainName.value,
+        WebBrowserCount: txtWebBrowserCount.value,
+        RequestTimeoutDuration: txtRequestTimeoutDuration.value,
+        ReportBrokenLinksOnly: ckbReportBrokenLinksOnly.checked,
+        ShowWebBrowsers: ckbShowWebBrowsers.checked,
         UserAgent: "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36"
     })));
 });
@@ -24,15 +30,22 @@ document.getElementById("btn-close").addEventListener("click", () => {
     http.send();
 });
 
-ipcRenderer.on("redraw", (_, viewModelJson) => {
-    const lblVerifiedUrls = document.getElementById("lbl-verified-urls");
-    const lblValidUrls = document.getElementById("lbl-valid-urls");
-    const lblBrokenUrls = document.getElementById("lbl-broken-urls");
-    const lblRemainingUrls = document.getElementById("lbl-remaining-urls");
-    const lblIdleWebBrowsers = document.getElementById("lbl-idle-web-browsers");
-    const lblElapsedTime = document.getElementById("lbl-elapsed-time");
-    const lblStatusText = document.getElementById("lbl-status-text");
+document.getElementById("btn-minimize").addEventListener("click", event => {
+    const http = new XMLHttpRequest();
+    http.open("POST", `http://localhost:${port}/btn-minimize-clicked`);
+    http.send();
+});
 
+const lblVerifiedUrls = document.getElementById("lbl-verified-urls");
+const lblValidUrls = document.getElementById("lbl-valid-urls");
+const lblBrokenUrls = document.getElementById("lbl-broken-urls");
+const lblRemainingUrls = document.getElementById("lbl-remaining-urls");
+const lblIdleWebBrowsers = document.getElementById("lbl-idle-web-browsers");
+const lblElapsedTime = document.getElementById("lbl-elapsed-time");
+const lblStatusText = document.getElementById("lbl-status-text");
+const btnStop = document.getElementById("btn-stop");
+const configurationPanel = document.getElementById("configuration-panel");
+ipcRenderer.on("redraw", (_, viewModelJson) => {
     const viewModel = JSON.parse(viewModelJson);
     if (isNumeric(viewModel.VerifiedUrlCount)) lblVerifiedUrls.textContent = viewModel.VerifiedUrlCount;
     if (isNumeric(viewModel.ValidUrlCount)) lblValidUrls.textContent = viewModel.ValidUrlCount;
@@ -42,8 +55,6 @@ ipcRenderer.on("redraw", (_, viewModelJson) => {
     if (viewModel.ElapsedTime) lblElapsedTime.textContent = viewModel.ElapsedTime;
     if (viewModel.StatusText) lblStatusText.textContent = viewModel.StatusText;
 
-    const btnStop = document.getElementById("btn-stop");
-    const configurationPanel = document.getElementById("configuration-panel");
     const btnMainIsStartButton = btnMain.firstElementChild.className === "controls__play-icon";
     const btnMainIsPauseButton = btnMain.firstElementChild.className === "controls__pause-icon";
     switch (viewModel.CrawlerState) {

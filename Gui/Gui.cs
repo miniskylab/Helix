@@ -74,6 +74,16 @@ namespace CrawlerFrontendGui
             }
         }
 
+        [HttpPost("btn-minimize-clicked")]
+        public IActionResult OnBtnMinimizeClicked()
+        {
+            lock (StaticLock)
+            {
+                if (!_gui.IsMinimizedAsync().Result) _gui.Minimize();
+                return Ok();
+            }
+        }
+
         [HttpPost("btn-start-clicked")]
         public IActionResult OnBtnStartClicked([FromBody] string configurationJsonString)
         {
@@ -140,7 +150,7 @@ namespace CrawlerFrontendGui
             _gui = Electron.WindowManager.CreateWindowAsync(new BrowserWindowOptions
             {
                 Width = 500,
-                Height = 700,
+                Height = 695,
                 Show = false,
                 Center = true,
                 Fullscreenable = false,

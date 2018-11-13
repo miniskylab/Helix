@@ -11,28 +11,28 @@
         <link href="styles/field.css" rel="stylesheet" />
     </head>
     <body>
-        <div class="title-bar">HELIX</div>
+        <div class="title-bar">HELIX - 2.1</div>
         <div id="configuration-panel">
             <div class="field-group">
                 <div class="field">
                     <div class="input-field-label">Start URL</div>
-                    <input id="inp-start-url" class="input-field" type="text" />
+                    <input id="txt-start-url" class="input-field" type="text" />
                 </div>
             </div>
             <div class="field-group">
                 <div class="field">
                     <div class="input-field-label">Domain Name</div>
-                    <input id="ipn-domain-name" class="input-field" type="text" />
+                    <input id="txt-domain-name" class="input-field" type="text" />
                 </div>
             </div>
             <div class="field-group">
                 <div class="field field--one-half">
                     <div class="input-field-label">Web Browser Count</div>
-                    <input id="ipn-web-browser-count" class="input-field" type="text" value="6" />
+                    <input id="txt-web-browser-count" class="input-field" type="text" value="6" />
                 </div>
                 <div class="field field--one-half">
                     <div class="input-field-label">Request Timeout Duration</div>
-                    <input id="ipn-request-timeout-duration" class="input-field" type="text" value="30" />
+                    <input id="txt-request-timeout-duration" class="input-field" type="text" value="30" />
                 </div>
             </div>
             <div class="field-group">
@@ -71,7 +71,7 @@
                 <div class="field field--one-half">
                     <div class="input-field-label">Miscellaneous</div>
                     <div class="checkbox">
-                        <input type="checkbox" id="ipn-report-broken-links-only" />
+                        <input type="checkbox" id="ckb-report-broken-links-only" />
                         <div class="checkbox__content">
                             <div class="checkbox__checkmark-icon"></div>
                             <div class="checkbox__text">Report Broken Links Only</div>
@@ -81,7 +81,7 @@
                 <div class="field field--one-half">
                     <div class="input-field-label"></div>
                     <div class="checkbox checkbox--tomato">
-                        <input type="checkbox" id="ipn-show-web-browsers" />
+                        <input type="checkbox" id="ckb-show-web-browsers" />
                         <div class="checkbox__content">
                             <div class="checkbox__checkmark-icon"></div>
                             <div class="checkbox__text">Show Web Browsers</div>
@@ -136,7 +136,7 @@
                     </div>
                 </div>
                 <div class="controls__vertical-separator controls__vertical-separator--left"></div>
-                <div class="controls__button controls__button--second" disabled>
+                <div id="btn-minimize" class="controls__button controls__button--second">
                     <div class="controls__svg-icon">
                         <svg viewBox="0 0 488.9 488.9">
                             <path d="M200.5,40.4l2.2,151.3c0.1,7.7-6.2,14-13.9,13.9l-151.4-2.1c-12.1-0.2-18.1-14.8-9.5-23.4L70,138L0,68L65,3l70,70l42.1-42.1C185.7,22.4,200.3,28.3,200.5,40.4z M353.8,73.9l-42.1-42.1c-8.6-8.6-23.2-2.6-23.4,9.5l-2.2,151.3c-0.1,7.7,6.2,14,13.9,13.9l151.3-2.2c12.1-0.2,18.1-14.8,9.5-23.4l-42.1-42.1l70-70l-65-65L353.8,73.9z M460.9,308.9c8.6-8.6,2.6-23.2-9.5-23.4l-151.3-2.2c-7.7-0.1-14,6.2-13.9,13.9l2.2,151.3c0.2,12.1,14.8,18.1,23.4,9.5l42.1-42.1l70,70l65-65l-70-70L460.9,308.9z M188.8,282.4l-151.4,2.2c-12.1,0.2-18.1,14.8-9.5,23.4L70,350.1l-70,70l65,65l70-70l42.1,42.1c8.6,8.6,23.2,2.6,23.4-9.5l2.2-151.3C202.8,288.6,196.5,282.3,188.8,282.4z"></path>
