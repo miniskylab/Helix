@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -18,7 +19,7 @@ namespace CrawlerBackendBusiness
     {
         const int HttpProxyPort = 18882;
         readonly ChromeDriver _chromeDriver;
-        readonly ProxyServer _httpProxyServer;
+        static ProxyServer _httpProxyServer;
         public event AllAttemptsToCollectNewRawResourcesFailedEvent OnAllAttemptsToCollectNewRawResourcesFailed;
         public event ExceptionOccurredEvent OnExceptionOccurred;
         public event IdleEvent OnIdle;
@@ -26,20 +27,7 @@ namespace CrawlerBackendBusiness
 
         public ResourceCollector(Configurations configurations)
         {
-            var explicitProxyEndPoint = new ExplicitProxyEndPoint(IPAddress.Any, HttpProxyPort);
-            _httpProxyServer = new ProxyServer();
-            _httpProxyServer.AddEndPoint(explicitProxyEndPoint);
-            _httpProxyServer.Start();
-            _httpProxyServer.SetAsSystemHttpProxy(explicitProxyEndPoint);
-            _httpProxyServer.SetAsSystemHttpsProxy(explicitProxyEndPoint);
-            _httpProxyServer.BeforeResponse += async (sender, sessionEventArguments) =>
-            {
-                await Task.Run(() =>
-                {
-                    var response = sessionEventArguments.WebSession.Response;
-                });
-            };
-
+            SetupHttpProxyServer();
             var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
             var chromeDriverService = ChromeDriverService.CreateDefaultService(workingDirectory);
             chromeDriverService.HideCommandPromptWindow = true;
@@ -54,7 +42,6 @@ namespace CrawlerBackendBusiness
             };
 
             _chromeDriver = new ChromeDriver(chromeDriverService, chromeOptions);
-            _httpProxyServer.Dispose();
         }
 
         public void CollectNewRawResourcesFrom(Resource parentResource)
@@ -96,6 +83,27 @@ namespace CrawlerBackendBusiness
             _chromeDriver?.Quit();
             _httpProxyServer?.Stop();
             _httpProxyServer?.Dispose();
+            _httpProxyServer = null;
+        }
+
+        static void SetupHttpProxyServer()
+        {
+            if (_httpProxyServer != null) return;
+            var explicitProxyEndPoint = new ExplicitProxyEndPoint(IPAddress.Any, HttpProxyPort);
+            _httpProxyServer = new ProxyServer();
+            _httpProxyServer.AddEndPoint(explicitProxyEndPoint);
+            _httpProxyServer.Start();
+            _httpProxyServer.SetAsSystemHttpProxy(explicitProxyEndPoint);
+            _httpProxyServer.SetAsSystemHttpsProxy(explicitProxyEndPoint);
+            _httpProxyServer.BeforeResponse += async (sender, sessionEventArguments) =>
+            {
+                await Task.Run(() =>
+                {
+                    var request = sessionEventArguments.WebSession.Request;
+                    var response = sessionEventArguments.WebSession.Response;
+                    Console.WriteLine($"{response.ContentType.ToLower(CultureInfo.InvariantCulture)} - {request.OriginalUrl}");
+                });
+            };
         }
 
         IEnumerable<string> TryGetUrls(string tagName, string attributeName)
