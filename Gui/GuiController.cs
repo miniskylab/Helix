@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using CrawlerBackendBusiness;
 using ElectronNET.API;
 using ElectronNET.API.Entities;
-using JetBrains.Annotations;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
@@ -18,7 +17,7 @@ using Newtonsoft.Json;
 
 namespace CrawlerFrontendGui
 {
-    public class Gui : Controller
+    public class GuiController : Controller
     {
         static BrowserWindow _gui;
         static readonly List<Task> BackgroundTasks = new List<Task>();
@@ -47,7 +46,6 @@ namespace CrawlerFrontendGui
             }
         }
 
-        [UsedImplicitly]
         public void Configure(IApplicationBuilder app)
         {
             app.UseMvc();
@@ -57,7 +55,6 @@ namespace CrawlerFrontendGui
             Electron.IpcMain.OnSync("get-web-port", _ => BridgeSettings.WebPort);
         }
 
-        [UsedImplicitly]
         public void ConfigureServices(IServiceCollection services) { services.AddMvcCore().AddJsonFormatters(); }
 
         [HttpPost("btn-close-clicked")]
@@ -110,7 +107,7 @@ namespace CrawlerFrontendGui
         static void Main(string[] args)
         {
             new WebHostBuilder()
-                .UseStartup<Gui>()
+                .UseStartup<GuiController>()
                 .UseKestrel()
                 .UseElectron(args)
                 .Build()
