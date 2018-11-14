@@ -29,7 +29,9 @@ namespace CrawlerBackendBusiness
         public static int RemainingUrlCount => TobeVerifiedRawResources.Count;
         public static int VerifiedUrlCount => AlreadyVerifiedUrls.Count - TobeVerifiedRawResources.Count;
 
+        public static event ResourceVerifiedEvent OnResourceVerified;
         public static event StoppedEvent OnStopped;
+        public static event WebBrowserClosedEvent OnWebBrowserClosed;
         public static event WebBrowserOpenedEvent OnWebBrowserOpened;
 
         static Crawler() { EnsureErrorLogFileIsRecreated(); }
@@ -96,8 +98,12 @@ namespace CrawlerBackendBusiness
             }
 
             var isAllWorkDone = !TobeVerifiedRawResources.Any() && _activeWebBrowserCount == 0;
-            while (ResourceCollectorPool.Any()) ResourceCollectorPool.Take().Dispose();
             while (ResourceVerifierPool.Any()) ResourceVerifierPool.Take().Dispose();
+            while (ResourceCollectorPool.Any())
+            {
+                ResourceCollectorPool.Take().Dispose();
+                OnWebBrowserClosed?.Invoke(_configurations.WebBrowserCount - ResourceCollectorPool.Count);
+            }
             ReportWriter.Instance.Dispose();
             _activeWebBrowserCount = 0;
             OnStopped?.Invoke(isAllWorkDone);
@@ -116,6 +122,7 @@ namespace CrawlerBackendBusiness
                         Interlocked.Increment(ref _activeWebBrowserCount);
                         var verificationResult = ResourceVerifierPool.Take(_cancellationTokenSource.Token).Verify(tobeVerifiedRawResource);
                         ReportWriter.Instance.WriteReport(verificationResult, _configurations.ReportBrokenLinksOnly);
+                        OnResourceVerified?.Invoke(verificationResult);
 
                         if (verificationResult.IsBrokenResource || !verificationResult.IsInternalResource)
                         {
@@ -186,7 +193,9 @@ namespace CrawlerBackendBusiness
             }
         }
 
+        public delegate void ResourceVerifiedEvent(VerificationResult verificationResult);
         public delegate void StoppedEvent(bool isAllWorkDone = false);
+        public delegate void WebBrowserClosedEvent(int closedWebBrowserCount);
         public delegate void WebBrowserOpenedEvent(int openedWebBrowserCount);
     }
 }

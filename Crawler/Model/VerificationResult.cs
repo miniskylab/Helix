@@ -1,6 +1,6 @@
 namespace CrawlerBackendBusiness
 {
-    class VerificationResult
+    public class VerificationResult
     {
         public bool IsInternalResource { get; set; }
         public RawResource RawResource { get; set; }

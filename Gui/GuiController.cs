@@ -92,10 +92,18 @@ namespace CrawlerFrontendGui
                 {
                     RedrawGui($"Opening web browsers ... ({openedWebBrowserCount}/{configurations.WebBrowserCount})");
                 };
+                Crawler.OnWebBrowserClosed += closedWebBrowserCount =>
+                {
+                    RedrawGui($"Closing web browsers ... ({closedWebBrowserCount}/{configurations.WebBrowserCount})");
+                };
                 Crawler.OnStopped += isAllWorkDone =>
                 {
                     RedrawGui(isAllWorkDone ? "Done." : "Stopped.");
                     Stopwatch.Stop();
+                };
+                Crawler.OnResourceVerified += verificationResult =>
+                {
+                    RedrawGui($"{verificationResult.StatusCode} - {verificationResult.RawResource.Url}");
                 };
                 Crawler.StartWorking(configurations);
                 RedrawGuiEvery(TimeSpan.FromSeconds(1));
