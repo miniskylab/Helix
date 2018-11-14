@@ -3,17 +3,22 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
+using Titanium.Web.Proxy;
+using Titanium.Web.Proxy.Models;
 
 namespace CrawlerBackendBusiness
 {
     sealed class ResourceCollector : IDisposable
     {
+        const int HttpProxyPort = 18882;
         readonly ChromeDriver _chromeDriver;
+        readonly ProxyServer _httpProxyServer;
         public event AllAttemptsToCollectNewRawResourcesFailedEvent OnAllAttemptsToCollectNewRawResourcesFailed;
         public event ExceptionOccurredEvent OnExceptionOccurred;
         public event IdleEvent OnIdle;
@@ -21,14 +26,35 @@ namespace CrawlerBackendBusiness
 
         public ResourceCollector(Configurations configurations)
         {
+            var explicitProxyEndPoint = new ExplicitProxyEndPoint(IPAddress.Any, HttpProxyPort);
+            _httpProxyServer = new ProxyServer();
+            _httpProxyServer.AddEndPoint(explicitProxyEndPoint);
+            _httpProxyServer.Start();
+            _httpProxyServer.SetAsSystemHttpProxy(explicitProxyEndPoint);
+            _httpProxyServer.SetAsSystemHttpsProxy(explicitProxyEndPoint);
+            _httpProxyServer.BeforeResponse += async (sender, sessionEventArguments) =>
+            {
+                await Task.Run(() =>
+                {
+                    var response = sessionEventArguments.WebSession.Response;
+                });
+            };
+
             var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
             var chromeDriverService = ChromeDriverService.CreateDefaultService(workingDirectory);
             chromeDriverService.HideCommandPromptWindow = true;
 
             var chromeOptions = new ChromeOptions();
             if (!configurations.ShowWebBrowsers) chromeOptions.AddArgument("--headless");
+            chromeOptions.Proxy = new Proxy
+            {
+                HttpProxy = $"http://localhost:{HttpProxyPort}",
+                SslProxy = $"http://localhost:{HttpProxyPort}",
+                FtpProxy = $"http://localhost:{HttpProxyPort}"
+            };
 
             _chromeDriver = new ChromeDriver(chromeDriverService, chromeOptions);
+            _httpProxyServer.Dispose();
         }
 
         public void CollectNewRawResourcesFrom(Resource parentResource)
@@ -65,7 +91,12 @@ namespace CrawlerBackendBusiness
             GC.SuppressFinalize(this);
         }
 
-        void ReleaseUnmanagedResources() { _chromeDriver?.Quit(); }
+        void ReleaseUnmanagedResources()
+        {
+            _chromeDriver?.Quit();
+            _httpProxyServer?.Stop();
+            _httpProxyServer?.Dispose();
+        }
 
         IEnumerable<string> TryGetUrls(string tagName, string attributeName)
         {
