@@ -1,31 +1,34 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Helix.Abstractions;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using Titanium.Web.Proxy;
+using Titanium.Web.Proxy.EventArguments;
 using Titanium.Web.Proxy.Models;
 
-namespace CrawlerBackendBusiness
+namespace Helix.Crawler
 {
-    sealed class ResourceCollector : IDisposable
+    sealed class ResourceCollector : IResourceCollector
     {
         const int HttpProxyPort = 18882;
         readonly ChromeDriver _chromeDriver;
         static ProxyServer _httpProxyServer;
+
         public event AllAttemptsToCollectNewRawResourcesFailedEvent OnAllAttemptsToCollectNewRawResourcesFailed;
         public event ExceptionOccurredEvent OnExceptionOccurred;
         public event IdleEvent OnIdle;
+        public event NetworkTrafficCapturedEvent OnNetworkTrafficCaptured;
         public event RawResourceCollectedEvent OnRawResourceCollected;
 
-        public ResourceCollector(Configurations configurations)
+        public ResourceCollector(IConfigurations configurations)
         {
             SetupHttpProxyServer();
             var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
@@ -44,15 +47,12 @@ namespace CrawlerBackendBusiness
             _chromeDriver = new ChromeDriver(chromeDriverService, chromeOptions);
         }
 
-        public void CollectNewRawResourcesFrom(Resource parentResource)
+        public void CollectNewRawResourcesFrom(IResource parentResource)
         {
             try
             {
                 _chromeDriver.Navigate().GoToUrl(parentResource.Uri);
                 var newRawResources = TryGetUrls("a", "href")
-                    .Union(TryGetUrls("link", "href"))
-                    .Union(TryGetUrls("script", "src"))
-                    .Union(TryGetUrls("img", "src"))
                     .Select(url => url.ToLower())
                     .Where(url => url.StartsWith("http") || url.StartsWith("https") || url.StartsWith("/"))
                     .Select(url => new RawResource { Url = url, ParentUrl = parentResource.Uri.AbsoluteUri });
@@ -78,6 +78,11 @@ namespace CrawlerBackendBusiness
             GC.SuppressFinalize(this);
         }
 
+        async Task CaptureNetworkTraffic(object _, SessionEventArgsBase networkTraffic)
+        {
+            await Task.Run(() => { OnNetworkTrafficCaptured?.Invoke(networkTraffic); });
+        }
+
         void ReleaseUnmanagedResources()
         {
             _chromeDriver?.Quit();
@@ -86,7 +91,7 @@ namespace CrawlerBackendBusiness
             _httpProxyServer = null;
         }
 
-        static void SetupHttpProxyServer()
+        void SetupHttpProxyServer()
         {
             if (_httpProxyServer != null) return;
             var explicitProxyEndPoint = new ExplicitProxyEndPoint(IPAddress.Any, HttpProxyPort);
@@ -95,15 +100,7 @@ namespace CrawlerBackendBusiness
             _httpProxyServer.Start();
             _httpProxyServer.SetAsSystemHttpProxy(explicitProxyEndPoint);
             _httpProxyServer.SetAsSystemHttpsProxy(explicitProxyEndPoint);
-            _httpProxyServer.BeforeResponse += async (sender, sessionEventArguments) =>
-            {
-                await Task.Run(() =>
-                {
-                    var request = sessionEventArguments.WebSession.Request;
-                    var response = sessionEventArguments.WebSession.Response;
-                    Console.WriteLine($"{response.ContentType.ToLower(CultureInfo.InvariantCulture)} - {request.OriginalUrl}");
-                });
-            };
+            _httpProxyServer.BeforeResponse += CaptureNetworkTraffic;
         }
 
         IEnumerable<string> TryGetUrls(string tagName, string attributeName)
@@ -130,11 +127,6 @@ namespace CrawlerBackendBusiness
             stopWatch.Reset();
             throw new TaskCanceledException();
         }
-
-        public delegate void AllAttemptsToCollectNewRawResourcesFailedEvent(Resource parentResource);
-        public delegate void ExceptionOccurredEvent(WebDriverException webDriverException, Resource resourceThatTriggeredThisException);
-        public delegate void IdleEvent();
-        public delegate void RawResourceCollectedEvent(RawResource rawResource);
 
         ~ResourceCollector() { ReleaseUnmanagedResources(); }
     }

@@ -1,9 +1,10 @@
+using Helix.Abstractions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 
-namespace CrawlerBackendBusiness
+namespace Helix.Crawler
 {
-    public class ViewModel
+    public class ViewModel : IViewModel
     {
         public int? BrokenUrlCount { get; set; }
 

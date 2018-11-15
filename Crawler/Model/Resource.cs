@@ -1,10 +1,12 @@
 using System;
+using Helix.Abstractions;
 
-namespace CrawlerBackendBusiness
+namespace Helix.Crawler
 {
-    public class Resource
+    public class Resource : IResource
     {
         public Uri ParentUri { get; set; }
+
         public Uri Uri { get; set; }
     }
 }

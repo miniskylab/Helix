@@ -4,25 +4,29 @@ using System.Net.Http;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
+using Helix.Abstractions;
 
-namespace CrawlerBackendBusiness
+namespace Helix.Crawler
 {
-    sealed class ResourceVerifier : IDisposable
+    sealed class ResourceVerifier : IResourceVerifier
     {
         readonly CancellationTokenSource _cancellationTokenSource;
-        readonly Configurations _configurations;
         readonly HttpClient _httpClient;
+        readonly IRawResourceProcessor _rawResourceProcessor;
+        readonly IResourceScopeIdentifier _resourceScopeIdentifier;
         Task<HttpResponseMessage> _sendingGETRequestTask;
 
         public event IdleEvent OnIdle;
 
-        public ResourceVerifier(Configurations configurations)
+        public ResourceVerifier(IConfigurations configurations, IRawResourceProcessor rawResourceProcessor,
+            IResourceScopeIdentifier resourceScopeIdentifier)
         {
-            _configurations = configurations;
+            _rawResourceProcessor = rawResourceProcessor;
+            _resourceScopeIdentifier = resourceScopeIdentifier;
             _cancellationTokenSource = new CancellationTokenSource();
 
-            _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(_configurations.RequestTimeoutDuration) };
-            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(_configurations.UserAgent);
+            _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(configurations.RequestTimeoutDuration) };
+            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(configurations.UserAgent);
         }
 
         public void Dispose()
@@ -33,10 +37,10 @@ namespace CrawlerBackendBusiness
             _httpClient?.Dispose();
         }
 
-        public VerificationResult Verify(RawResource rawResource)
+        public IVerificationResult Verify(IRawResource rawResource)
         {
             var verificationResult = new VerificationResult { RawResource = rawResource };
-            if (!TryProcessRawResource(rawResource, out var resource))
+            if (!_rawResourceProcessor.TryProcessRawResource(rawResource, out var resource))
             {
                 verificationResult.Resource = null;
                 verificationResult.StatusCode = (int) HttpStatusCode.ExpectationFailed;
@@ -49,7 +53,7 @@ namespace CrawlerBackendBusiness
             try
             {
                 verificationResult.Resource = resource;
-                verificationResult.IsInternalResource = IsInternalResource(resource);
+                verificationResult.IsInternalResource = _resourceScopeIdentifier.IsInternalResource(resource);
 
                 _sendingGETRequestTask = _httpClient.GetAsync(resource.Uri, _cancellationTokenSource.Token);
                 verificationResult.StatusCode = (int) _sendingGETRequestTask.Result.StatusCode;
@@ -76,45 +80,5 @@ namespace CrawlerBackendBusiness
             OnIdle?.Invoke();
             return verificationResult;
         }
-
-        static string EnsureAbsolute(string possiblyRelativeUrl, Uri parentUri)
-        {
-            if (parentUri == null || !possiblyRelativeUrl.StartsWith("/")) return possiblyRelativeUrl;
-            var baseString = possiblyRelativeUrl.StartsWith("//")
-                ? $"{parentUri.Scheme}:"
-                : $"{parentUri.Scheme}://{parentUri.Host}:{parentUri.Port}";
-            return $"{baseString}/{possiblyRelativeUrl}";
-        }
-
-        bool IsInternalResource(Resource resource)
-        {
-            return IsStartUrl(resource.Uri.AbsoluteUri) ||
-                   resource.Uri.Authority.ToLower().Equals(resource.ParentUri.Authority.ToLower()) ||
-                   resource.Uri.Authority.ToLower().EndsWith(_configurations.DomainName.ToLower());
-        }
-
-        bool IsStartUrl(string url) { return url.ToLower().EnsureEndsWith('/').Equals(_configurations.StartUrl.EnsureEndsWith('/')); }
-
-        static void StripFragmentFrom(ref Uri uri)
-        {
-            if (string.IsNullOrWhiteSpace(uri.Fragment)) return;
-            uri = new Uri(uri.AbsoluteUri.Replace(uri.Fragment, string.Empty));
-        }
-
-        bool TryProcessRawResource(RawResource rawResource, out Resource resource)
-        {
-            resource = null;
-            Uri parentUri = null;
-            if (!IsStartUrl(rawResource.Url) && !Uri.TryCreate(rawResource.ParentUrl, UriKind.Absolute, out parentUri)) return false;
-
-            var absoluteUrl = EnsureAbsolute(rawResource.Url, parentUri);
-            if (!Uri.TryCreate(absoluteUrl, UriKind.Absolute, out var uri)) return false;
-            StripFragmentFrom(ref uri);
-
-            resource = new Resource { Uri = uri, ParentUri = parentUri };
-            return true;
-        }
-
-        public delegate void IdleEvent();
     }
 }

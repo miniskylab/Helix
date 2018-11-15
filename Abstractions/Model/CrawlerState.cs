@@ -1,4 +1,4 @@
-﻿namespace CrawlerBackendBusiness
+﻿namespace Helix.Abstractions
 {
     public enum CrawlerState
     {

@@ -4,17 +4,18 @@ using System.IO;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Helix.Abstractions;
 
-namespace CrawlerBackendBusiness
+namespace Helix.Crawler
 {
-    sealed class ReportWriter : IDisposable
+    sealed class ReportWriter : IReportWriter
     {
         readonly List<Task> _backgroundTasks;
         readonly CancellationTokenSource _cancellationTokenSource;
-        static ReportWriter _instance;
+        static IReportWriter _instance;
         TextWriter _textWriter;
 
-        public static ReportWriter Instance => _instance ?? (_instance = new ReportWriter());
+        public static IReportWriter Instance => _instance ?? (_instance = new ReportWriter());
 
         ReportWriter()
         {
@@ -36,7 +37,7 @@ namespace CrawlerBackendBusiness
             _instance = null;
         }
 
-        public void WriteReport(VerificationResult verificationResult, bool writeBrokenLinksOnly = false)
+        public void WriteReport(IVerificationResult verificationResult, bool writeBrokenLinksOnly = false)
         {
             if (writeBrokenLinksOnly && !verificationResult.IsBrokenResource) return;
             var verifiedUrl = verificationResult.Resource?.Uri.OriginalString ?? verificationResult.RawResource.Url;

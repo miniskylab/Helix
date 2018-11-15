@@ -1,15 +1,22 @@
+using Helix.Abstractions;
 using Newtonsoft.Json.Linq;
 
-namespace CrawlerBackendBusiness
+namespace Helix.Crawler
 {
-    public class Configurations
+    public class Configurations : IConfigurations
     {
         public string DomainName { get; }
+
         public bool ReportBrokenLinksOnly { get; }
+
         public int RequestTimeoutDuration { get; }
+
         public bool ShowWebBrowsers { get; }
+
         public string StartUrl { get; }
+
         public string UserAgent { get; }
+
         public int WebBrowserCount { get; }
 
         public Configurations(string configurationJsonString)

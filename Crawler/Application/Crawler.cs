@@ -5,8 +5,9 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Helix.Abstractions;
 
-namespace CrawlerBackendBusiness
+namespace Helix.Crawler
 {
     public static class Crawler
     {
@@ -18,10 +19,10 @@ namespace CrawlerBackendBusiness
         static readonly ConcurrentDictionary<string, bool> AlreadyVerifiedUrls = new ConcurrentDictionary<string, bool>();
         static readonly string WorkingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
         static readonly string ErrorFilePath = Path.Combine(WorkingDirectory, "error.txt");
-        static readonly BlockingCollection<ResourceCollector> ResourceCollectorPool = new BlockingCollection<ResourceCollector>();
-        static readonly BlockingCollection<ResourceVerifier> ResourceVerifierPool = new BlockingCollection<ResourceVerifier>();
+        static readonly BlockingCollection<IResourceCollector> ResourceCollectorPool = new BlockingCollection<IResourceCollector>();
+        static readonly BlockingCollection<IResourceVerifier> ResourceVerifierPool = new BlockingCollection<IResourceVerifier>();
         static readonly object StaticLock = new object();
-        static readonly BlockingCollection<RawResource> TobeVerifiedRawResources = new BlockingCollection<RawResource>();
+        static readonly BlockingCollection<IRawResource> TobeVerifiedRawResources = new BlockingCollection<IRawResource>();
 
         public static CrawlerState State { get; private set; } = CrawlerState.Ready;
         public static CancellationToken CancellationToken => _cancellationTokenSource.Token;
@@ -168,6 +169,19 @@ namespace CrawlerBackendBusiness
                     }
                     TobeVerifiedRawResources.Add(rawResource);
                 };
+                resourceCollector.OnNetworkTrafficCaptured += networkTraffic =>
+                {
+                    var request = networkTraffic.WebSession.Request;
+                    if (request.Method.ToUpperInvariant() != "GET") return;
+                    lock (StaticLock)
+                    {
+                        if (AlreadyVerifiedUrls.ContainsKey(request.OriginalUrl)) return;
+                        AlreadyVerifiedUrls.TryAdd(request.OriginalUrl, true);
+                    }
+
+                    // TODO
+                    var response = networkTraffic.WebSession.Response;
+                };
                 resourceCollector.OnExceptionOccurred += (exception, resource) =>
                 {
                     /* TODO: How and Where do we log this information? */
@@ -193,7 +207,7 @@ namespace CrawlerBackendBusiness
             }
         }
 
-        public delegate void ResourceVerifiedEvent(VerificationResult verificationResult);
+        public delegate void ResourceVerifiedEvent(IVerificationResult verificationResult);
         public delegate void StoppedEvent(bool isAllWorkDone = false);
         public delegate void WebBrowserClosedEvent(int closedWebBrowserCount);
         public delegate void WebBrowserOpenedEvent(int openedWebBrowserCount);
