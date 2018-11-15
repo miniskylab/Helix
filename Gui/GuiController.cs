@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using ElectronNET.API;
 using ElectronNET.API.Entities;
 using Helix.Abstractions;
-using Helix.Crawler;
+using Helix.Implementations;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
@@ -16,7 +16,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Newtonsoft.Json;
 
-namespace CrawlerFrontendGui
+namespace Helix.Gui
 {
     public class GuiController : Controller
     {
@@ -88,7 +88,8 @@ namespace CrawlerFrontendGui
             lock (StaticLock)
             {
                 if (Crawler.State != CrawlerState.Ready) return BadRequest();
-                var configurations = new Configurations(configurationJsonString);
+                ServiceLocator.RegisterServices(new Configurations(configurationJsonString));
+                var configurations = ServiceLocator.Get<IConfigurations>();
                 Crawler.OnWebBrowserOpened += openedWebBrowserCount =>
                 {
                     RedrawGui($"Opening web browsers ... ({openedWebBrowserCount}/{configurations.WebBrowserCount})");
@@ -106,7 +107,7 @@ namespace CrawlerFrontendGui
                 {
                     RedrawGui($"{verificationResult.StatusCode} - {verificationResult.RawResource.Url}");
                 };
-                Crawler.StartWorking(configurations);
+                Crawler.StartWorking();
                 RedrawGuiEvery(TimeSpan.FromSeconds(1));
                 Stopwatch.Restart();
                 return Ok();

@@ -2,7 +2,7 @@ using Helix.Abstractions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 
-namespace Helix.Crawler
+namespace Helix.Implementations
 {
     public class ViewModel : IViewModel
     {

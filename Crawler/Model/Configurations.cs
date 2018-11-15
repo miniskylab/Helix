@@ -1,7 +1,7 @@
 using Helix.Abstractions;
 using Newtonsoft.Json.Linq;
 
-namespace Helix.Crawler
+namespace Helix.Implementations
 {
     public class Configurations : IConfigurations
     {

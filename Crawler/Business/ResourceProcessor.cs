@@ -1,21 +1,18 @@
 ﻿using System;
 using Helix.Abstractions;
 
-namespace Helix.Crawler
+namespace Helix.Implementations
 {
-    class RawResourceProcessor : IRawResourceProcessor
+    class ResourceProcessor : IResourceProcessor
     {
-        readonly IResourceScopeIdentifier _resourceScopeIdentifier;
+        readonly IResourceScope _resourceScope;
 
-        public RawResourceProcessor(IResourceScopeIdentifier resourceScopeIdentifier)
-        {
-            _resourceScopeIdentifier = resourceScopeIdentifier;
-        }
+        public ResourceProcessor(IResourceScope resourceScope) { _resourceScope = resourceScope; }
 
         public bool TryProcessRawResource(IRawResource rawResource, out IResource resource)
         {
             resource = null;
-            var urlIsNotStartUrl = !_resourceScopeIdentifier.IsStartUrl(rawResource.Url);
+            var urlIsNotStartUrl = !_resourceScope.IsStartUrl(rawResource.Url);
             var parentUrlIsNotValid = !Uri.TryCreate(rawResource.ParentUrl, UriKind.Absolute, out var parentUri);
             if (urlIsNotStartUrl && parentUrlIsNotValid) return false;
 

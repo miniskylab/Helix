@@ -1,6 +1,6 @@
 ﻿namespace Helix.Abstractions
 {
-    public interface IRawResourceProcessor
+    public interface IResourceProcessor
     {
         bool TryProcessRawResource(IRawResource rawResource, out IResource resource);
     }

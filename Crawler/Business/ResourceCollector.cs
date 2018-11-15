@@ -14,13 +14,14 @@ using Titanium.Web.Proxy;
 using Titanium.Web.Proxy.EventArguments;
 using Titanium.Web.Proxy.Models;
 
-namespace Helix.Crawler
+namespace Helix.Implementations
 {
     sealed class ResourceCollector : IResourceCollector
     {
         const int HttpProxyPort = 18882;
         readonly ChromeDriver _chromeDriver;
         static ProxyServer _httpProxyServer;
+        readonly IResourceScope _resourceScope;
 
         public event AllAttemptsToCollectNewRawResourcesFailedEvent OnAllAttemptsToCollectNewRawResourcesFailed;
         public event ExceptionOccurredEvent OnExceptionOccurred;
@@ -28,9 +29,11 @@ namespace Helix.Crawler
         public event NetworkTrafficCapturedEvent OnNetworkTrafficCaptured;
         public event RawResourceCollectedEvent OnRawResourceCollected;
 
-        public ResourceCollector(IConfigurations configurations)
+        public ResourceCollector(IConfigurations configurations, IResourceScope resourceScope)
         {
+            _resourceScope = resourceScope;
             SetupHttpProxyServer();
+
             var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
             var chromeDriverService = ChromeDriverService.CreateDefaultService(workingDirectory);
             chromeDriverService.HideCommandPromptWindow = true;
@@ -78,9 +81,14 @@ namespace Helix.Crawler
             GC.SuppressFinalize(this);
         }
 
-        async Task CaptureNetworkTraffic(object _, SessionEventArgsBase networkTraffic)
+        async Task CaptureNetworkTraffic(object _, SessionEventArgs networkTraffic)
         {
             await Task.Run(() => { OnNetworkTrafficCaptured?.Invoke(networkTraffic); });
+        }
+
+        async Task EnsureInternal(object _, SessionEventArgs networkTraffic)
+        {
+            await Task.Run(() => { _resourceScope.EnsureInternal(networkTraffic.WebSession.Request.RequestUri); });
         }
 
         void ReleaseUnmanagedResources()
@@ -100,6 +108,7 @@ namespace Helix.Crawler
             _httpProxyServer.Start();
             _httpProxyServer.SetAsSystemHttpProxy(explicitProxyEndPoint);
             _httpProxyServer.SetAsSystemHttpsProxy(explicitProxyEndPoint);
+            _httpProxyServer.BeforeRequest += EnsureInternal;
             _httpProxyServer.BeforeResponse += CaptureNetworkTraffic;
         }
 

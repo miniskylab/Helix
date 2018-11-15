@@ -6,23 +6,23 @@ using System.Threading;
 using System.Threading.Tasks;
 using Helix.Abstractions;
 
-namespace Helix.Crawler
+namespace Helix.Implementations
 {
     sealed class ResourceVerifier : IResourceVerifier
     {
         readonly CancellationTokenSource _cancellationTokenSource;
         readonly HttpClient _httpClient;
-        readonly IRawResourceProcessor _rawResourceProcessor;
-        readonly IResourceScopeIdentifier _resourceScopeIdentifier;
+        readonly IResourceProcessor _resourceProcessor;
+        readonly IResourceScope _resourceScope;
         Task<HttpResponseMessage> _sendingGETRequestTask;
 
         public event IdleEvent OnIdle;
 
-        public ResourceVerifier(IConfigurations configurations, IRawResourceProcessor rawResourceProcessor,
-            IResourceScopeIdentifier resourceScopeIdentifier)
+        public ResourceVerifier(IConfigurations configurations, IResourceProcessor resourceProcessor,
+            IResourceScope resourceScope)
         {
-            _rawResourceProcessor = rawResourceProcessor;
-            _resourceScopeIdentifier = resourceScopeIdentifier;
+            _resourceProcessor = resourceProcessor;
+            _resourceScope = resourceScope;
             _cancellationTokenSource = new CancellationTokenSource();
 
             _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(configurations.RequestTimeoutDuration) };
@@ -40,7 +40,7 @@ namespace Helix.Crawler
         public IVerificationResult Verify(IRawResource rawResource)
         {
             var verificationResult = new VerificationResult { RawResource = rawResource };
-            if (!_rawResourceProcessor.TryProcessRawResource(rawResource, out var resource))
+            if (!_resourceProcessor.TryProcessRawResource(rawResource, out var resource))
             {
                 verificationResult.Resource = null;
                 verificationResult.StatusCode = (int) HttpStatusCode.ExpectationFailed;
@@ -53,7 +53,7 @@ namespace Helix.Crawler
             try
             {
                 verificationResult.Resource = resource;
-                verificationResult.IsInternalResource = _resourceScopeIdentifier.IsInternalResource(resource);
+                verificationResult.IsInternalResource = _resourceScope.IsInternalResource(resource);
 
                 _sendingGETRequestTask = _httpClient.GetAsync(resource.Uri, _cancellationTokenSource.Token);
                 verificationResult.StatusCode = (int) _sendingGETRequestTask.Result.StatusCode;

@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Helix.Crawler
+namespace Helix.Implementations
 {
     static class Extensions
     {

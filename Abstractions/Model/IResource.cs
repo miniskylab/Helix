@@ -6,6 +6,8 @@ namespace Helix.Abstractions
     {
         Uri ParentUri { get; set; }
 
+        bool Transformed { get; set; }
+
         Uri Uri { get; set; }
     }
 }

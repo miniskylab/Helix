@@ -6,7 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Helix.Abstractions;
 
-namespace Helix.Crawler
+namespace Helix.Implementations
 {
     sealed class ReportWriter : IReportWriter
     {

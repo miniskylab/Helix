@@ -1,6 +1,6 @@
 using Helix.Abstractions;
 
-namespace Helix.Crawler
+namespace Helix.Implementations
 {
     public class VerificationResult : IVerificationResult
     {

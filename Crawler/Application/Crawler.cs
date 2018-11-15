@@ -2,18 +2,19 @@
 using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Helix.Abstractions;
 
-namespace Helix.Crawler
+namespace Helix.Implementations
 {
     public static class Crawler
     {
         static int _activeWebBrowserCount;
         static CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
-        static Configurations _configurations;
+        static IConfigurations _configurations;
         static Task[] _crawlingTasks = { };
         static Task _mainWorkingTask;
         static readonly ConcurrentDictionary<string, bool> AlreadyVerifiedUrls = new ConcurrentDictionary<string, bool>();
@@ -43,7 +44,7 @@ namespace Helix.Crawler
             _cancellationTokenSource?.Dispose();
         }
 
-        public static void StartWorking(Configurations configurations)
+        public static void StartWorking()
         {
             lock (StaticLock)
             {
@@ -51,9 +52,9 @@ namespace Helix.Crawler
                 State = CrawlerState.Working;
             }
 
-            _configurations = configurations;
+            _configurations = ServiceLocator.Get<IConfigurations>();
             _cancellationTokenSource = new CancellationTokenSource();
-            _crawlingTasks = new Task[configurations.WebBrowserCount];
+            _crawlingTasks = new Task[_configurations.WebBrowserCount];
             _activeWebBrowserCount = 0;
             _mainWorkingTask = Task.Run(() =>
             {
@@ -159,7 +160,7 @@ namespace Helix.Crawler
             for (var resourceCollectorId = 0; resourceCollectorId < _configurations.WebBrowserCount; resourceCollectorId++)
             {
                 if (_cancellationTokenSource.Token.IsCancellationRequested) throw new TaskCanceledException();
-                var resourceCollector = new ResourceCollector(_configurations);
+                var resourceCollector = ServiceLocator.Get<IResourceCollector>();
                 resourceCollector.OnRawResourceCollected += rawResource =>
                 {
                     lock (StaticLock)
@@ -179,8 +180,27 @@ namespace Helix.Crawler
                         AlreadyVerifiedUrls.TryAdd(request.OriginalUrl, true);
                     }
 
-                    // TODO
-                    var response = networkTraffic.WebSession.Response;
+                    var verificationResult = new VerificationResult
+                    {
+                        StatusCode = networkTraffic.WebSession.Response.StatusCode,
+                        RawResource = new RawResource
+                        {
+                            Url = request.Url,
+                            ParentUrl = request.OriginalUrl
+                        }
+                    };
+                    if (ServiceLocator.Get<IResourceProcessor>().TryProcessRawResource(verificationResult.RawResource, out var resource))
+                    {
+                        verificationResult.Resource = resource;
+                        verificationResult.IsInternalResource = ServiceLocator.Get<IResourceScope>().IsInternalResource(resource);
+                    }
+                    else
+                    {
+                        verificationResult.StatusCode = (int) HttpStatusCode.ExpectationFailed;
+                        verificationResult.Resource = null;
+                        verificationResult.IsInternalResource = false;
+                    }
+                    ReportWriter.Instance.WriteReport(verificationResult, _configurations.ReportBrokenLinksOnly);
                 };
                 resourceCollector.OnExceptionOccurred += (exception, resource) =>
                 {
@@ -201,7 +221,7 @@ namespace Helix.Crawler
             for (var resourceVerifierId = 0; resourceVerifierId < _configurations.WebBrowserCount; resourceVerifierId++)
             {
                 if (_cancellationTokenSource.Token.IsCancellationRequested) throw new TaskCanceledException();
-                var resourceVerifier = new ResourceVerifier(_configurations);
+                var resourceVerifier = ServiceLocator.Get<IResourceVerifier>();
                 resourceVerifier.OnIdle += () => ResourceVerifierPool.Add(resourceVerifier);
                 ResourceVerifierPool.Add(resourceVerifier);
             }

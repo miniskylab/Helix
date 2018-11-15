@@ -1,12 +1,18 @@
-﻿using Helix.Abstractions;
+﻿using System;
+using Helix.Abstractions;
 
-namespace Helix.Crawler
+namespace Helix.Implementations
 {
-    public class ResourceScopeIdentifier : IResourceScopeIdentifier
+    public class ResourceScope : IResourceScope
     {
         readonly IConfigurations _configurations;
 
-        public ResourceScopeIdentifier(IConfigurations configurations) { _configurations = configurations; }
+        public ResourceScope(IConfigurations configurations) { _configurations = configurations; }
+
+        public void EnsureInternal(Uri uri)
+        {
+            /*TODO:*/
+        }
 
         public bool IsInternalResource(IResource resource)
         {
