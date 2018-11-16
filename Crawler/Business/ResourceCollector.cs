@@ -104,12 +104,9 @@ namespace Helix.Implementations
         void SetupHttpProxyServer()
         {
             if (_httpProxyServer != null) return;
-            var explicitProxyEndPoint = new ExplicitProxyEndPoint(IPAddress.Any, HttpProxyPort);
             _httpProxyServer = new ProxyServer();
-            _httpProxyServer.AddEndPoint(explicitProxyEndPoint);
+            _httpProxyServer.AddEndPoint(new ExplicitProxyEndPoint(IPAddress.Any, HttpProxyPort));
             _httpProxyServer.Start();
-            _httpProxyServer.SetAsSystemHttpProxy(explicitProxyEndPoint);
-            _httpProxyServer.SetAsSystemHttpsProxy(explicitProxyEndPoint);
             _httpProxyServer.BeforeRequest += EnsureInternal;
             _httpProxyServer.BeforeResponse += CaptureNetworkTraffic;
         }

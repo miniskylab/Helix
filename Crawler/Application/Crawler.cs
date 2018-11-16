@@ -19,18 +19,19 @@ namespace Helix.Implementations
         static Task _mainWorkingTask;
         static readonly ConcurrentDictionary<string, bool> AlreadyVerifiedUrls = new ConcurrentDictionary<string, bool>();
         static readonly string WorkingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
-        static readonly string ErrorFilePath = Path.Combine(WorkingDirectory, "error.txt");
+        static readonly string ErrorFilePath = Path.Combine(WorkingDirectory, "errors.txt");
         static readonly BlockingCollection<IResourceCollector> ResourceCollectorPool = new BlockingCollection<IResourceCollector>();
         static readonly BlockingCollection<IResourceVerifier> ResourceVerifierPool = new BlockingCollection<IResourceVerifier>();
         static readonly object StaticLock = new object();
-        static readonly BlockingCollection<IRawResource> TobeVerifiedRawResources = new BlockingCollection<IRawResource>();
+        static readonly BlockingCollection<IRawResource> ToBeVerifiedRawResources = new BlockingCollection<IRawResource>();
 
         public static CrawlerState State { get; private set; } = CrawlerState.Ready;
         public static CancellationToken CancellationToken => _cancellationTokenSource.Token;
         public static int IdleWebBrowserCount => _configurations.WebBrowserCount - _activeWebBrowserCount;
-        public static int RemainingUrlCount => TobeVerifiedRawResources.Count;
-        public static int VerifiedUrlCount => AlreadyVerifiedUrls.Count - TobeVerifiedRawResources.Count;
+        public static int RemainingUrlCount => ToBeVerifiedRawResources.Count;
+        public static int VerifiedUrlCount => AlreadyVerifiedUrls.Count - ToBeVerifiedRawResources.Count;
 
+        public static event ExceptionOccurredEvent OnExceptionOccurred;
         public static event ResourceVerifiedEvent OnResourceVerified;
         public static event StoppedEvent OnStopped;
         public static event WebBrowserClosedEvent OnWebBrowserClosed;
@@ -60,12 +61,12 @@ namespace Helix.Implementations
             {
                 try
                 {
-                    while (TobeVerifiedRawResources.Any()) TobeVerifiedRawResources.Take();
+                    while (ToBeVerifiedRawResources.Any()) ToBeVerifiedRawResources.Take();
                     lock (StaticLock)
                     {
                         AlreadyVerifiedUrls.Clear();
                         AlreadyVerifiedUrls.TryAdd(_configurations.StartUrl, true);
-                        TobeVerifiedRawResources.Add(new RawResource { Url = _configurations.StartUrl, ParentUrl = null });
+                        ToBeVerifiedRawResources.Add(new RawResource { Url = _configurations.StartUrl, ParentUrl = null });
                     }
                     InitializeResourceCollectorPool();
                     InitializeResourceVerifierPool();
@@ -75,8 +76,9 @@ namespace Helix.Implementations
                 {
                     if (exception is TaskCanceledException && _cancellationTokenSource.Token.IsCancellationRequested) return;
                     File.WriteAllText(ErrorFilePath, exception.ToString());
+                    OnExceptionOccurred?.Invoke(exception);
                 }
-                finally { Task.Run(() => { StopWorking(); }); }
+                finally { Task.Run(StopWorking); }
             });
         }
 
@@ -96,7 +98,7 @@ namespace Helix.Implementations
                 _crawlingTasks = null;
             }
 
-            var isAllWorkDone = !TobeVerifiedRawResources.Any() && _activeWebBrowserCount == 0;
+            var isAllWorkDone = !ToBeVerifiedRawResources.Any() && _activeWebBrowserCount == 0;
             while (ResourceVerifierPool.Any()) ResourceVerifierPool.Take().Dispose();
             while (ResourceCollectorPool.Any())
             {
@@ -110,16 +112,16 @@ namespace Helix.Implementations
 
         static void Crawl()
         {
-            while (TobeVerifiedRawResources.Any() || _activeWebBrowserCount > 0)
+            while (ToBeVerifiedRawResources.Any() || _activeWebBrowserCount > 0)
             {
                 Thread.Sleep(100);
                 if (_cancellationTokenSource.IsCancellationRequested) return;
-                while (TobeVerifiedRawResources.TryTake(out var tobeVerifiedRawResource))
+                while (ToBeVerifiedRawResources.TryTake(out var toBeVerifiedRawResource))
                 {
                     try
                     {
                         Interlocked.Increment(ref _activeWebBrowserCount);
-                        var verificationResult = ResourceVerifierPool.Take(_cancellationTokenSource.Token).Verify(tobeVerifiedRawResource);
+                        var verificationResult = ResourceVerifierPool.Take(_cancellationTokenSource.Token).Verify(toBeVerifiedRawResource);
                         ReportWriter.Instance.WriteReport(verificationResult, _configurations.ReportBrokenLinksOnly);
                         OnResourceVerified?.Invoke(verificationResult);
 
@@ -135,6 +137,12 @@ namespace Helix.Implementations
                     catch (OperationCanceledException operationCanceledException)
                     {
                         if (operationCanceledException.CancellationToken.IsCancellationRequested) return;
+                        Task.Run(StopWorking);
+                        throw;
+                    }
+                    catch (Exception)
+                    {
+                        Task.Run(StopWorking);
                         throw;
                     }
                 }
@@ -165,7 +173,7 @@ namespace Helix.Implementations
                         if (AlreadyVerifiedUrls.TryGetValue(rawResource.Url.StripFragment(), out _)) return;
                         AlreadyVerifiedUrls.TryAdd(rawResource.Url.StripFragment(), true);
                     }
-                    TobeVerifiedRawResources.Add(rawResource);
+                    ToBeVerifiedRawResources.Add(rawResource);
                 };
                 resourceCollector.OnNetworkTrafficCaptured += networkTraffic =>
                 {
@@ -223,6 +231,8 @@ namespace Helix.Implementations
                 ResourceVerifierPool.Add(resourceVerifier);
             }
         }
+
+        public delegate void ExceptionOccurredEvent(Exception exception);
 
         public delegate void ResourceVerifiedEvent(IVerificationResult verificationResult);
         public delegate void StoppedEvent(bool isAllWorkDone = false);

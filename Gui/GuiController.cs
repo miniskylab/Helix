@@ -106,6 +106,7 @@ namespace Helix.Gui
                 {
                     RedrawGui($"{verificationResult.StatusCode} - {verificationResult.RawResource.Url}");
                 };
+                Crawler.OnExceptionOccurred += exception => { RedrawGui(exception.Message); };
                 Crawler.StartWorking();
                 RedrawGuiEvery(TimeSpan.FromSeconds(1));
                 Stopwatch.Restart();
