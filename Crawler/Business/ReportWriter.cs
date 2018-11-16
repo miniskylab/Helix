@@ -8,14 +8,14 @@ using Helix.Abstractions;
 
 namespace Helix.Implementations
 {
-    sealed class ReportWriter : IReportWriter
+    sealed class ReportWriter
     {
         readonly List<Task> _backgroundTasks;
         readonly CancellationTokenSource _cancellationTokenSource;
-        static IReportWriter _instance;
+        static ReportWriter _instance;
         TextWriter _textWriter;
 
-        public static IReportWriter Instance => _instance ?? (_instance = new ReportWriter());
+        public static ReportWriter Instance => _instance ?? (_instance = new ReportWriter());
 
         ReportWriter()
         {

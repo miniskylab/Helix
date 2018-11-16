@@ -9,7 +9,7 @@ namespace Helix.Implementations
 
         public static TService Get<TService>() { return _serviceProvider.GetService<TService>(); }
 
-        public static void RegisterServices(IConfigurations configurations)
+        public static void RegisterServices(Configurations configurations)
         {
             if (_serviceProvider != null) return;
             _serviceProvider = new ServiceCollection()

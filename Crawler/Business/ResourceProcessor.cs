@@ -1,8 +1,10 @@
 ﻿using System;
 using Helix.Abstractions;
+using JetBrains.Annotations;
 
 namespace Helix.Implementations
 {
+    [UsedImplicitly]
     class ResourceProcessor : IResourceProcessor
     {
         readonly IResourceScope _resourceScope;

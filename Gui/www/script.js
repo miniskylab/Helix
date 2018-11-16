@@ -30,7 +30,7 @@ document.getElementById("btn-close").addEventListener("click", () => {
     http.send();
 });
 
-document.getElementById("btn-minimize").addEventListener("click", event => {
+document.getElementById("btn-minimize").addEventListener("click", () => {
     const http = new XMLHttpRequest();
     http.open("POST", `http://localhost:${port}/btn-minimize-clicked`);
     http.send();

@@ -8,6 +8,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Helix.Abstractions;
+using JetBrains.Annotations;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using Titanium.Web.Proxy;
@@ -16,6 +17,7 @@ using Titanium.Web.Proxy.Models;
 
 namespace Helix.Implementations
 {
+    [UsedImplicitly]
     sealed class ResourceCollector : IResourceCollector
     {
         const int HttpProxyPort = 18882;
@@ -29,7 +31,7 @@ namespace Helix.Implementations
         public event NetworkTrafficCapturedEvent OnNetworkTrafficCaptured;
         public event RawResourceCollectedEvent OnRawResourceCollected;
 
-        public ResourceCollector(IConfigurations configurations, IResourceScope resourceScope)
+        public ResourceCollector(Configurations configurations, IResourceScope resourceScope)
         {
             _resourceScope = resourceScope;
             SetupHttpProxyServer();

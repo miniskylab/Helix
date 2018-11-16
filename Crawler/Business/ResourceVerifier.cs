@@ -5,9 +5,11 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Helix.Abstractions;
+using JetBrains.Annotations;
 
 namespace Helix.Implementations
 {
+    [UsedImplicitly]
     sealed class ResourceVerifier : IResourceVerifier
     {
         readonly CancellationTokenSource _cancellationTokenSource;
@@ -18,8 +20,7 @@ namespace Helix.Implementations
 
         public event IdleEvent OnIdle;
 
-        public ResourceVerifier(IConfigurations configurations, IResourceProcessor resourceProcessor,
-            IResourceScope resourceScope)
+        public ResourceVerifier(Configurations configurations, IResourceProcessor resourceProcessor, IResourceScope resourceScope)
         {
             _resourceProcessor = resourceProcessor;
             _resourceScope = resourceScope;

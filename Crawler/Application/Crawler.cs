@@ -14,7 +14,7 @@ namespace Helix.Implementations
     {
         static int _activeWebBrowserCount;
         static CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
-        static IConfigurations _configurations;
+        static Configurations _configurations;
         static Task[] _crawlingTasks = { };
         static Task _mainWorkingTask;
         static readonly ConcurrentDictionary<string, bool> AlreadyVerifiedUrls = new ConcurrentDictionary<string, bool>();
@@ -52,7 +52,7 @@ namespace Helix.Implementations
                 State = CrawlerState.Working;
             }
 
-            _configurations = ServiceLocator.Get<IConfigurations>();
+            _configurations = ServiceLocator.Get<Configurations>();
             _cancellationTokenSource = new CancellationTokenSource();
             _crawlingTasks = new Task[_configurations.WebBrowserCount];
             _activeWebBrowserCount = 0;
@@ -76,10 +76,7 @@ namespace Helix.Implementations
                     if (exception is TaskCanceledException && _cancellationTokenSource.Token.IsCancellationRequested) return;
                     File.WriteAllText(ErrorFilePath, exception.ToString());
                 }
-                finally
-                {
-                    Task.Run(StopWorking);
-                }
+                finally { Task.Run(() => { StopWorking(); }); }
             });
         }
 

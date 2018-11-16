@@ -1,13 +1,15 @@
 ﻿using System;
 using Helix.Abstractions;
+using JetBrains.Annotations;
 
 namespace Helix.Implementations
 {
+    [UsedImplicitly]
     public class ResourceScope : IResourceScope
     {
-        readonly IConfigurations _configurations;
+        readonly Configurations _configurations;
 
-        public ResourceScope(IConfigurations configurations) { _configurations = configurations; }
+        public ResourceScope(Configurations configurations) { _configurations = configurations; }
 
         public void EnsureInternal(Uri uri)
         {

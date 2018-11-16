@@ -1,9 +1,8 @@
-using Helix.Abstractions;
 using Newtonsoft.Json.Linq;
 
 namespace Helix.Implementations
 {
-    public class Configurations : IConfigurations
+    public class Configurations
     {
         public string DomainName { get; }
 

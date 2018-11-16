@@ -1,10 +1,9 @@
-using Helix.Abstractions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 
 namespace Helix.Implementations
 {
-    public class ViewModel : IViewModel
+    public class ViewModel
     {
         public int? BrokenUrlCount { get; set; }
 

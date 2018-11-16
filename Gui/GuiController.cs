@@ -7,7 +7,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using ElectronNET.API;
 using ElectronNET.API.Entities;
-using Helix.Abstractions;
 using Helix.Implementations;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -89,7 +88,7 @@ namespace Helix.Gui
             {
                 if (Crawler.State != CrawlerState.Ready) return BadRequest();
                 ServiceLocator.RegisterServices(new Configurations(configurationJsonString));
-                var configurations = ServiceLocator.Get<IConfigurations>();
+                var configurations = ServiceLocator.Get<Configurations>();
                 Crawler.OnWebBrowserOpened += openedWebBrowserCount =>
                 {
                     RedrawGui($"Opening web browsers ... ({openedWebBrowserCount}/{configurations.WebBrowserCount})");
