@@ -106,6 +106,7 @@ namespace Helix.Implementations
                 OnWebBrowserClosed?.Invoke(_configurations.WebBrowserCount - ResourceCollectorPool.Count);
             }
             ReportWriter.Instance.Dispose();
+            ServiceLocator.Dispose();
             _activeWebBrowserCount = 0;
             OnStopped?.Invoke(isAllWorkDone);
         }
@@ -178,11 +179,10 @@ namespace Helix.Implementations
                 resourceCollector.OnNetworkTrafficCaptured += networkTraffic =>
                 {
                     var request = networkTraffic.WebSession.Request;
-                    if (request.Method.ToUpperInvariant() != "GET") return;
                     lock (StaticLock)
                     {
-                        if (AlreadyVerifiedUrls.ContainsKey(request.OriginalUrl)) return;
-                        AlreadyVerifiedUrls.TryAdd(request.OriginalUrl, true);
+                        if (AlreadyVerifiedUrls.ContainsKey(request.Url)) return;
+                        AlreadyVerifiedUrls.TryAdd(request.Url, true);
                     }
 
                     var verificationResult = new VerificationResult
@@ -206,6 +206,7 @@ namespace Helix.Implementations
                         verificationResult.IsInternalResource = false;
                     }
                     ReportWriter.Instance.WriteReport(verificationResult, _configurations.ReportBrokenLinksOnly);
+                    OnResourceVerified?.Invoke(verificationResult);
                 };
                 resourceCollector.OnExceptionOccurred += (exception, resource) =>
                 {

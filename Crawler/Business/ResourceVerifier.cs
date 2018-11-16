@@ -13,10 +13,11 @@ namespace Helix.Implementations
     sealed class ResourceVerifier : IResourceVerifier
     {
         readonly CancellationTokenSource _cancellationTokenSource;
+        bool _disposed;
         readonly HttpClient _httpClient;
         readonly IResourceProcessor _resourceProcessor;
         readonly IResourceScope _resourceScope;
-        Task<HttpResponseMessage> _sendingGETRequestTask;
+        Task<HttpResponseMessage> _sendingHEADRequestTask;
 
         public event IdleEvent OnIdle;
 
@@ -32,8 +33,10 @@ namespace Helix.Implementations
 
         public void Dispose()
         {
+            if (_disposed) return;
+            _disposed = true;
             _cancellationTokenSource?.Cancel();
-            _sendingGETRequestTask?.Wait();
+            _sendingHEADRequestTask?.Wait();
             _cancellationTokenSource?.Dispose();
             _httpClient?.Dispose();
         }
@@ -56,8 +59,9 @@ namespace Helix.Implementations
                 verificationResult.Resource = resource;
                 verificationResult.IsInternalResource = _resourceScope.IsInternalResource(resource);
 
-                _sendingGETRequestTask = _httpClient.GetAsync(resource.Uri, _cancellationTokenSource.Token);
-                verificationResult.StatusCode = (int) _sendingGETRequestTask.Result.StatusCode;
+                var httpRequestMessage = new HttpRequestMessage(HttpMethod.Head, resource.Uri);
+                _sendingHEADRequestTask = _httpClient.SendAsync(httpRequestMessage, _cancellationTokenSource.Token);
+                verificationResult.StatusCode = (int) _sendingHEADRequestTask.Result.StatusCode;
             }
             catch (AggregateException aggregateException)
             {

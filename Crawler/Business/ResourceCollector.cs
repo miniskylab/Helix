@@ -22,6 +22,7 @@ namespace Helix.Implementations
     {
         const int HttpProxyPort = 18882;
         readonly ChromeDriver _chromeDriver;
+        bool _disposed;
         static ProxyServer _httpProxyServer;
         readonly IResourceScope _resourceScope;
 
@@ -85,7 +86,17 @@ namespace Helix.Implementations
 
         async Task CaptureNetworkTraffic(object _, SessionEventArgs networkTraffic)
         {
-            await Task.Run(() => { OnNetworkTrafficCaptured?.Invoke(networkTraffic); });
+            await Task.Run(() =>
+            {
+                var response = networkTraffic.WebSession.Response;
+                var isText = response.ContentType.StartsWith("text/", StringComparison.OrdinalIgnoreCase);
+                var isImage = response.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
+                var isAudio = response.ContentType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase);
+                var isVideo = response.ContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase);
+                var isFont = response.ContentType.StartsWith("font/", StringComparison.OrdinalIgnoreCase);
+                var isApplication = response.ContentType.StartsWith("application/", StringComparison.OrdinalIgnoreCase);
+                if (isText || isImage || isAudio || isVideo || isFont || isApplication) OnNetworkTrafficCaptured?.Invoke(networkTraffic);
+            });
         }
 
         async Task EnsureInternal(object _, SessionEventArgs networkTraffic)
@@ -95,6 +106,8 @@ namespace Helix.Implementations
 
         void ReleaseUnmanagedResources()
         {
+            if (_disposed) return;
+            _disposed = true;
             _chromeDriver?.Quit();
             _httpProxyServer?.Stop();
             _httpProxyServer?.Dispose();
