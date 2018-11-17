@@ -25,11 +25,11 @@ namespace Helix.Implementations
         bool _disposed;
         static ProxyServer _httpProxyServer;
         readonly IResourceScope _resourceScope;
+        static readonly object StaticLock = new object();
 
         public event AllAttemptsToCollectNewRawResourcesFailedEvent OnAllAttemptsToCollectNewRawResourcesFailed;
-        public event ExceptionOccurredEvent OnExceptionOccurred;
+        public event BrowserExceptionOccurredEvent OnBrowserExceptionOccurred;
         public event IdleEvent OnIdle;
-        public event NetworkTrafficCapturedEvent OnNetworkTrafficCaptured;
         public event RawResourceCollectedEvent OnRawResourceCollected;
 
         public ResourceCollector(Configurations configurations, IResourceScope resourceScope)
@@ -42,7 +42,7 @@ namespace Helix.Implementations
             chromeDriverService.HideCommandPromptWindow = true;
 
             var chromeOptions = new ChromeOptions();
-            if (!configurations.ShowWebBrowsers) chromeOptions.AddArgument("--headless");
+            if (!configurations.ShowWebBrowsers) chromeOptions.AddArguments("--headless", "--incognito");
             chromeOptions.Proxy = new Proxy
             {
                 HttpProxy = $"http://localhost:{HttpProxyPort}",
@@ -62,11 +62,11 @@ namespace Helix.Implementations
                     .Select(url => url.ToLower())
                     .Where(url => url.StartsWith("http") || url.StartsWith("https") || url.StartsWith("/"))
                     .Select(url => new RawResource { Url = url, ParentUrl = parentResource.Uri.AbsoluteUri });
-                foreach (var newRawResource in newRawResources) OnRawResourceCollected?.Invoke(newRawResource);
+                Parallel.ForEach(newRawResources, newRawResource => { OnRawResourceCollected?.Invoke(newRawResource); });
             }
             catch (WebDriverException webDriverException)
             {
-                OnExceptionOccurred?.Invoke(webDriverException, parentResource);
+                OnBrowserExceptionOccurred?.Invoke(webDriverException, parentResource);
             }
             catch (TaskCanceledException)
             {
@@ -89,13 +89,23 @@ namespace Helix.Implementations
             await Task.Run(() =>
             {
                 var response = networkTraffic.WebSession.Response;
-                var isText = response.ContentType.StartsWith("text/", StringComparison.OrdinalIgnoreCase);
-                var isImage = response.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
-                var isAudio = response.ContentType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase);
-                var isVideo = response.ContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase);
-                var isFont = response.ContentType.StartsWith("font/", StringComparison.OrdinalIgnoreCase);
-                var isApplication = response.ContentType.StartsWith("application/", StringComparison.OrdinalIgnoreCase);
-                if (isText || isImage || isAudio || isVideo || isFont || isApplication) OnNetworkTrafficCaptured?.Invoke(networkTraffic);
+                var request = networkTraffic.WebSession.Request;
+                var isNotGETRequest = request.Method.ToUpperInvariant() != "GET";
+                var isNotCss = !response.ContentType.StartsWith("text/css", StringComparison.OrdinalIgnoreCase);
+                var isNotImage = !response.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
+                var isNotAudio = !response.ContentType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase);
+                var isNotVideo = !response.ContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase);
+                var isNotFont = !response.ContentType.StartsWith("font/", StringComparison.OrdinalIgnoreCase);
+                var isNotJavaScript = !response.ContentType.StartsWith("application/javascript", StringComparison.OrdinalIgnoreCase) &&
+                                      !response.ContentType.StartsWith("application/ecmascript", StringComparison.OrdinalIgnoreCase);
+                if (isNotGETRequest || isNotCss && isNotFont && isNotJavaScript && isNotImage && isNotAudio && isNotVideo) return;
+                var newRawResource = new RawResource
+                {
+                    Url = request.Url,
+                    ParentUrl = request.OriginalUrl,
+                    HttpStatusCode = response.StatusCode
+                };
+                OnRawResourceCollected?.Invoke(newRawResource);
             });
         }
 
@@ -116,12 +126,15 @@ namespace Helix.Implementations
 
         void SetupHttpProxyServer()
         {
-            if (_httpProxyServer != null) return;
-            _httpProxyServer = new ProxyServer();
-            _httpProxyServer.AddEndPoint(new ExplicitProxyEndPoint(IPAddress.Any, HttpProxyPort));
-            _httpProxyServer.Start();
-            _httpProxyServer.BeforeRequest += EnsureInternal;
-            _httpProxyServer.BeforeResponse += CaptureNetworkTraffic;
+            lock (StaticLock)
+            {
+                if (_httpProxyServer != null) return;
+                _httpProxyServer = new ProxyServer();
+                _httpProxyServer.AddEndPoint(new ExplicitProxyEndPoint(IPAddress.Any, HttpProxyPort));
+                _httpProxyServer.Start();
+                _httpProxyServer.BeforeRequest += EnsureInternal;
+                _httpProxyServer.BeforeResponse += CaptureNetworkTraffic;
+            }
         }
 
         IEnumerable<string> TryGetUrls(string tagName, string attributeName)

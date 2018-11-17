@@ -2,11 +2,11 @@ using System;
 
 namespace Helix.Abstractions
 {
-    public interface IResource
+    public interface IResource : INetworkResource
     {
-        Uri ParentUri { get; set; }
+        bool Localized { get; set; }
 
-        bool Transformed { get; set; }
+        Uri ParentUri { get; set; }
 
         Uri Uri { get; set; }
     }

@@ -35,6 +35,7 @@ namespace Helix.Implementations
         {
             if (_disposed) return;
             _disposed = true;
+
             _cancellationTokenSource?.Cancel();
             _sendingHEADRequestTask?.Wait();
             _cancellationTokenSource?.Dispose();
@@ -47,7 +48,7 @@ namespace Helix.Implementations
             if (!_resourceProcessor.TryProcessRawResource(rawResource, out var resource))
             {
                 verificationResult.Resource = null;
-                verificationResult.StatusCode = (int) HttpStatusCode.ExpectationFailed;
+                verificationResult.HttpStatusCode = (int) HttpStatusCode.ExpectationFailed;
                 verificationResult.IsInternalResource = false;
 
                 OnIdle?.Invoke();
@@ -58,23 +59,26 @@ namespace Helix.Implementations
             {
                 verificationResult.Resource = resource;
                 verificationResult.IsInternalResource = _resourceScope.IsInternalResource(resource);
-
-                var httpRequestMessage = new HttpRequestMessage(HttpMethod.Head, resource.Uri);
-                _sendingHEADRequestTask = _httpClient.SendAsync(httpRequestMessage, _cancellationTokenSource.Token);
-                verificationResult.StatusCode = (int) _sendingHEADRequestTask.Result.StatusCode;
+                verificationResult.HttpStatusCode = rawResource.HttpStatusCode;
+                if (verificationResult.HttpStatusCode == 0)
+                {
+                    var httpRequestMessage = new HttpRequestMessage(HttpMethod.Head, resource.Uri);
+                    _sendingHEADRequestTask = _httpClient.SendAsync(httpRequestMessage, _cancellationTokenSource.Token);
+                    verificationResult.HttpStatusCode = (int) _sendingHEADRequestTask.Result.StatusCode;
+                }
             }
             catch (AggregateException aggregateException)
             {
                 switch (aggregateException.InnerException)
                 {
                     case TaskCanceledException _:
-                        verificationResult.StatusCode = _cancellationTokenSource.Token.IsCancellationRequested
+                        verificationResult.HttpStatusCode = _cancellationTokenSource.Token.IsCancellationRequested
                             ? (int) HttpStatusCode.Processing
                             : (int) HttpStatusCode.RequestTimeout;
                         break;
                     case HttpRequestException _:
                     case SocketException _:
-                        verificationResult.StatusCode = (int) HttpStatusCode.BadRequest;
+                        verificationResult.HttpStatusCode = (int) HttpStatusCode.BadRequest;
                         break;
                     default:
                         OnIdle?.Invoke();

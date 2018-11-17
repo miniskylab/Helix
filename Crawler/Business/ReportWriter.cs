@@ -41,7 +41,7 @@ namespace Helix.Implementations
         {
             if (writeBrokenLinksOnly && !verificationResult.IsBrokenResource) return;
             var verifiedUrl = verificationResult.Resource?.Uri.OriginalString ?? verificationResult.RawResource.Url;
-            _textWriter.WriteLine($"{verificationResult.StatusCode},{verifiedUrl}");
+            _textWriter.WriteLineAsync($"{verificationResult.HttpStatusCode},{verifiedUrl}");
         }
 
         void EnsureReportFileIsRecreated()

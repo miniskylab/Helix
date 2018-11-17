@@ -2,6 +2,8 @@ namespace Helix.Abstractions
 {
     public interface IVerificationResult
     {
+        int HttpStatusCode { get; set; }
+
         bool IsBrokenResource { get; }
 
         bool IsInternalResource { get; set; }
@@ -9,7 +11,5 @@ namespace Helix.Abstractions
         IRawResource RawResource { get; set; }
 
         IResource Resource { get; set; }
-
-        int StatusCode { get; set; }
     }
 }

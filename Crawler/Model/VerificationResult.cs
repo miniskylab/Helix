@@ -4,14 +4,14 @@ namespace Helix.Implementations
 {
     public class VerificationResult : IVerificationResult
     {
+        public int HttpStatusCode { get; set; }
+
         public bool IsInternalResource { get; set; }
 
         public IRawResource RawResource { get; set; }
 
         public IResource Resource { get; set; }
 
-        public int StatusCode { get; set; }
-
-        public bool IsBrokenResource => StatusCode < 0 || 400 <= StatusCode;
+        public bool IsBrokenResource => HttpStatusCode < 0 || 400 <= HttpStatusCode;
     }
 }

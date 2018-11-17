@@ -1,11 +1,10 @@
-﻿using OpenQA.Selenium;
-using Titanium.Web.Proxy.EventArguments;
+﻿using System.Threading.Tasks;
+using OpenQA.Selenium;
 
 namespace Helix.Abstractions
 {
     public delegate void AllAttemptsToCollectNewRawResourcesFailedEvent(IResource parentResource);
-    public delegate void ExceptionOccurredEvent(WebDriverException webDriverException, IResource resourceThatTriggeredThisException);
+    public delegate void BrowserExceptionOccurredEvent(WebDriverException webDriverException, IResource resourceThatTriggeredThisException);
     public delegate void IdleEvent();
-    public delegate void NetworkTrafficCapturedEvent(SessionEventArgsBase networkTraffic);
-    public delegate void RawResourceCollectedEvent(IRawResource rawResource);
+    public delegate Task RawResourceCollectedEvent(IRawResource rawResource);
 }

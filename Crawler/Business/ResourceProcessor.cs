@@ -22,7 +22,7 @@ namespace Helix.Implementations
             if (!Uri.TryCreate(absoluteUrl, UriKind.Absolute, out var uri)) return false;
             StripFragmentFrom(ref uri);
 
-            resource = new Resource { Uri = uri, ParentUri = parentUri };
+            resource = new Resource { Uri = uri, ParentUri = parentUri, HttpStatusCode = rawResource.HttpStatusCode };
             return true;
         }
 

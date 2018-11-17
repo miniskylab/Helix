@@ -102,10 +102,10 @@ namespace Helix.Gui
                     RedrawGui(isAllWorkDone ? "Done." : "Stopped.");
                     Stopwatch.Stop();
                 };
-                Crawler.OnResourceVerified += verificationResult =>
+                Crawler.OnResourceVerified += verificationResult => Task.Run(() =>
                 {
-                    RedrawGui($"{verificationResult.StatusCode} - {verificationResult.RawResource.Url}");
-                };
+                    RedrawGui($"{verificationResult.HttpStatusCode} - {verificationResult.RawResource.Url}");
+                });
                 Crawler.OnExceptionOccurred += exception => { RedrawGui(exception.Message); };
                 Crawler.StartWorking();
                 RedrawGuiEvery(TimeSpan.FromSeconds(1));
@@ -133,7 +133,6 @@ namespace Helix.Gui
                 ValidUrlCount = null,
                 BrokenUrlCount = null,
                 RemainingUrlCount = Crawler.RemainingUrlCount,
-                IdleWebBrowserCount = Crawler.IdleWebBrowserCount,
                 ElapsedTime = Stopwatch.Elapsed.ToString("hh' : 'mm' : 'ss"),
                 StatusText = statusText
             }));

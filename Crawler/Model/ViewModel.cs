@@ -12,8 +12,6 @@ namespace Helix.Implementations
 
         public string ElapsedTime { get; set; }
 
-        public int? IdleWebBrowserCount { get; set; }
-
         public int? RemainingUrlCount { get; set; }
 
         public string StatusText { get; set; }

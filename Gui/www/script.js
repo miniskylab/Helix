@@ -40,7 +40,6 @@ const lblVerifiedUrls = document.getElementById("lbl-verified-urls");
 const lblValidUrls = document.getElementById("lbl-valid-urls");
 const lblBrokenUrls = document.getElementById("lbl-broken-urls");
 const lblRemainingUrls = document.getElementById("lbl-remaining-urls");
-const lblIdleWebBrowsers = document.getElementById("lbl-idle-web-browsers");
 const lblElapsedTime = document.getElementById("lbl-elapsed-time");
 const lblStatusText = document.getElementById("lbl-status-text");
 const btnStop = document.getElementById("btn-stop");
@@ -51,7 +50,6 @@ ipcRenderer.on("redraw", (_, viewModelJson) => {
     if (isNumeric(viewModel.ValidUrlCount)) lblValidUrls.textContent = viewModel.ValidUrlCount;
     if (isNumeric(viewModel.BrokenUrlCount)) lblBrokenUrls.textContent = viewModel.BrokenUrlCount;
     if (isNumeric(viewModel.RemainingUrlCount)) lblRemainingUrls.textContent = viewModel.RemainingUrlCount;
-    if (isNumeric(viewModel.IdleWebBrowserCount)) lblIdleWebBrowsers.textContent = viewModel.IdleWebBrowserCount;
     if (viewModel.ElapsedTime) lblElapsedTime.textContent = viewModel.ElapsedTime;
     if (viewModel.StatusText) lblStatusText.textContent = viewModel.StatusText;
 
