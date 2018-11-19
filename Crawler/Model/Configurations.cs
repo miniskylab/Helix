@@ -14,8 +14,6 @@ namespace Helix.Implementations
 
         public string StartUrl { get; }
 
-        public string UserAgent { get; }
-
         public int WebBrowserCount { get; }
 
         public Configurations(string configurationJsonString)
@@ -26,7 +24,6 @@ namespace Helix.Implementations
             ReportBrokenLinksOnly = (bool) tokens.SelectToken(nameof(ReportBrokenLinksOnly));
             RequestTimeoutDuration = (int) tokens.SelectToken(nameof(RequestTimeoutDuration));
             StartUrl = ((string) tokens.SelectToken(nameof(StartUrl))).ToLower();
-            UserAgent = (string) tokens.SelectToken(nameof(UserAgent));
 
             DomainName = (string) tokens.SelectToken(nameof(DomainName));
             if (string.IsNullOrWhiteSpace(DomainName)) DomainName = "_";

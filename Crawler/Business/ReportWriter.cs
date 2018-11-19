@@ -40,8 +40,9 @@ namespace Helix.Implementations
         public void WriteReport(IVerificationResult verificationResult, bool writeBrokenLinksOnly = false)
         {
             if (writeBrokenLinksOnly && !verificationResult.IsBrokenResource) return;
+            var parentUrl = verificationResult.Resource?.ParentUri?.OriginalString ?? verificationResult.RawResource.ParentUrl;
             var verifiedUrl = verificationResult.Resource?.Uri.OriginalString ?? verificationResult.RawResource.Url;
-            _textWriter.WriteLineAsync($"{verificationResult.HttpStatusCode},{verifiedUrl}");
+            _textWriter.WriteLineAsync($"{verificationResult.HttpStatusCode},{parentUrl},{verifiedUrl}");
         }
 
         void EnsureReportFileIsRecreated()
@@ -50,6 +51,7 @@ namespace Helix.Implementations
             var reportFilePath = $@"{Path.GetDirectoryName(Assembly.GetEntryAssembly().Location)}\Report.csv";
             if (File.Exists(reportFilePath)) File.Delete(reportFilePath);
             _textWriter = TextWriter.Synchronized(new StreamWriter(reportFilePath));
+            _textWriter.WriteLineAsync("HTTP Status Code,Parent Url,Verified Url");
         }
 
         void FlushDataToDiskEvery(TimeSpan timeSpan)

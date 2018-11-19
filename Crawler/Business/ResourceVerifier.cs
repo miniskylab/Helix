@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -28,7 +29,14 @@ namespace Helix.Implementations
             _cancellationTokenSource = new CancellationTokenSource();
 
             _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(configurations.RequestTimeoutDuration) };
-            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(configurations.UserAgent);
+            _httpClient.DefaultRequestHeaders.Accept.ParseAdd("*/*");
+            _httpClient.DefaultRequestHeaders.AcceptEncoding.ParseAdd("*");
+            _httpClient.DefaultRequestHeaders.AcceptLanguage.ParseAdd("*");
+            _httpClient.DefaultRequestHeaders.CacheControl = CacheControlHeaderValue.Parse("no-cache");
+            _httpClient.DefaultRequestHeaders.Pragma.ParseAdd("no-cache");
+            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36"
+            );
         }
 
         public void Dispose()

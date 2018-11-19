@@ -12,13 +12,11 @@ namespace Helix.Implementations
 {
     public static class Crawler
     {
-        static int _activeThreadCount;
         static CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
         static Configurations _configurations;
-        static Task[] _crawlingTasks = { };
         static Task _mainWorkingTask;
-        static int _verifiedUrlCount;
         static readonly ConcurrentDictionary<string, bool> AlreadyVerifiedUrls = new ConcurrentDictionary<string, bool>();
+        static readonly ConcurrentBag<Task> BackgroundCrawlingTasks = new ConcurrentBag<Task>();
         static readonly string WorkingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
         static readonly string ErrorFilePath = Path.Combine(WorkingDirectory, "errors.txt");
         static readonly BlockingCollection<IResourceCollector> ResourceCollectorPool = new BlockingCollection<IResourceCollector>();
@@ -28,8 +26,8 @@ namespace Helix.Implementations
 
         public static CrawlerState State { get; private set; } = CrawlerState.Ready;
         public static CancellationToken CancellationToken => _cancellationTokenSource.Token;
-        public static int RemainingUrlCount => _activeThreadCount;
-        public static int VerifiedUrlCount => _verifiedUrlCount;
+        public static int RemainingUrlCount => BackgroundCrawlingTasks.Count(t => !t.IsCompleted && t.Status != TaskStatus.Running);
+        public static int VerifiedUrlCount => BackgroundCrawlingTasks.Count(t => t.IsCompletedSuccessfully);
 
         public static event ExceptionOccurredEvent OnExceptionOccurred;
         public static event ResourceVerifiedEvent OnResourceVerified;
@@ -55,8 +53,7 @@ namespace Helix.Implementations
 
             _configurations = ServiceLocator.Get<Configurations>();
             _cancellationTokenSource = new CancellationTokenSource();
-            _crawlingTasks = new Task[_configurations.WebBrowserCount];
-            _activeThreadCount = 0;
+            BackgroundCrawlingTasks.Clear();
             _mainWorkingTask = Task.Run(() =>
             {
                 try
@@ -79,6 +76,14 @@ namespace Helix.Implementations
                         case OperationCanceledException operationCanceledException:
                             if (operationCanceledException.CancellationToken.IsCancellationRequested) return;
                             break;
+                        case AggregateException aggregateException:
+                            var thereIsNoUnhandledException = !aggregateException.InnerExceptions.Any(innerException =>
+                            {
+                                if (!(innerException is OperationCanceledException operationCanceledException)) return true;
+                                return !operationCanceledException.CancellationToken.IsCancellationRequested;
+                            });
+                            if (thereIsNoUnhandledException) return;
+                            break;
                     }
                     File.WriteAllText(ErrorFilePath, exception.ToString());
                     OnExceptionOccurred?.Invoke(exception);
@@ -97,13 +102,6 @@ namespace Helix.Implementations
 
             _cancellationTokenSource.Cancel();
             _mainWorkingTask.Wait();
-            if (_crawlingTasks != null && _crawlingTasks.Any())
-            {
-                Task.WhenAll(_crawlingTasks.Where(task => task != null)).Wait();
-                _crawlingTasks = null;
-            }
-
-            var isAllWorkDone = !ToBeVerifiedRawResources.Any() && _activeThreadCount == 0;
             while (ResourceVerifierPool.Any()) ResourceVerifierPool.Take().Dispose();
             while (ResourceCollectorPool.Any())
             {
@@ -112,52 +110,37 @@ namespace Helix.Implementations
             }
             ReportWriter.Instance.Dispose();
             ServiceLocator.Dispose();
-            _activeThreadCount = 0;
-            OnStopped?.Invoke(isAllWorkDone);
+            BackgroundCrawlingTasks.Clear();
+            OnStopped?.Invoke(!ToBeVerifiedRawResources.Any() && Task.WhenAll(BackgroundCrawlingTasks).IsCompletedSuccessfully);
         }
 
         static void Crawl()
         {
-            while (ToBeVerifiedRawResources.TryTake(out var rawResource) || _activeThreadCount > 0)
+            while (ToBeVerifiedRawResources.TryTake(out var rawResource) || !Task.WhenAll(BackgroundCrawlingTasks).IsCompleted)
             {
                 if (rawResource != null)
                 {
                     var toBeVerifiedRawResource = rawResource;
-                    Interlocked.Increment(ref _activeThreadCount);
-                    Task.Run(() =>
+                    BackgroundCrawlingTasks.Add(Task.Run(() =>
                     {
-                        if (_cancellationTokenSource.Token.IsCancellationRequested)
-                        {
-                            Interlocked.Decrement(ref _activeThreadCount);
-                            return;
-                        }
-
+                        if (_cancellationTokenSource.Token.IsCancellationRequested) return;
                         var verificationResult = ResourceVerifierPool.Take(_cancellationTokenSource.Token).Verify(toBeVerifiedRawResource);
                         if (verificationResult.HttpStatusCode != (int) HttpStatusCode.ExpectationFailed)
                         {
                             ReportWriter.Instance.WriteReport(verificationResult, _configurations.ReportBrokenLinksOnly);
-                            Interlocked.Increment(ref _verifiedUrlCount);
                             OnResourceVerified?.Invoke(verificationResult);
                         }
 
-                        if (verificationResult.IsBrokenResource || !verificationResult.IsInternalResource)
-                        {
-                            Interlocked.Decrement(ref _activeThreadCount);
-                            return;
-                        }
-
-                        if (toBeVerifiedRawResource.HttpStatusCode == 0)
-                        {
-                            var resource = verificationResult.Resource;
-                            ResourceCollectorPool.Take(_cancellationTokenSource.Token).CollectNewRawResourcesFrom(resource);
-                        }
-                        Interlocked.Decrement(ref _activeThreadCount);
-                    }, _cancellationTokenSource.Token);
+                        var resourceIsNotCrawlable = toBeVerifiedRawResource.HttpStatusCode != 0;
+                        if (verificationResult.IsBrokenResource || !verificationResult.IsInternalResource || resourceIsNotCrawlable) return;
+                        ResourceCollectorPool.Take(_cancellationTokenSource.Token).CollectNewRawResourcesFrom(verificationResult.Resource);
+                    }, _cancellationTokenSource.Token));
                 }
 
                 Thread.Sleep(100);
-                if (_cancellationTokenSource.Token.IsCancellationRequested) return;
+                if (_cancellationTokenSource.Token.IsCancellationRequested) break;
             }
+            Task.WhenAll(BackgroundCrawlingTasks).Wait();
         }
 
         static void EnsureErrorLogFileIsRecreated()
@@ -197,7 +180,7 @@ namespace Helix.Implementations
 
         static void InitializeResourceVerifierPool()
         {
-            for (var resourceVerifierId = 0; resourceVerifierId < 10 * _configurations.WebBrowserCount; resourceVerifierId++)
+            for (var resourceVerifierId = 0; resourceVerifierId < 1000 * _configurations.WebBrowserCount; resourceVerifierId++)
             {
                 if (_cancellationTokenSource.Token.IsCancellationRequested) throw new TaskCanceledException();
                 var resourceVerifier = ServiceLocator.Get<IResourceVerifier>();

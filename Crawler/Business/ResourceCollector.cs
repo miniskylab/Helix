@@ -89,6 +89,8 @@ namespace Helix.Implementations
             await Task.Run(() =>
             {
                 var response = networkTraffic.WebSession.Response;
+                if (response.ContentType == null) return;
+
                 var request = networkTraffic.WebSession.Request;
                 var isNotGETRequest = request.Method.ToUpperInvariant() != "GET";
                 var isNotCss = !response.ContentType.StartsWith("text/css", StringComparison.OrdinalIgnoreCase);
