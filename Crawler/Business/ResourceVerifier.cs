@@ -18,7 +18,7 @@ namespace Helix.Implementations
         readonly HttpClient _httpClient;
         readonly IResourceProcessor _resourceProcessor;
         readonly IResourceScope _resourceScope;
-        Task<HttpResponseMessage> _sendingHEADRequestTask;
+        Task<HttpResponseMessage> _sendingGETRequestTask;
 
         public event IdleEvent OnIdle;
 
@@ -45,7 +45,7 @@ namespace Helix.Implementations
             _disposed = true;
 
             _cancellationTokenSource?.Cancel();
-            _sendingHEADRequestTask?.Wait();
+            _sendingGETRequestTask?.Wait();
             _cancellationTokenSource?.Dispose();
             _httpClient?.Dispose();
         }
@@ -70,9 +70,8 @@ namespace Helix.Implementations
                 verificationResult.HttpStatusCode = rawResource.HttpStatusCode;
                 if (verificationResult.HttpStatusCode == 0)
                 {
-                    var httpRequestMessage = new HttpRequestMessage(HttpMethod.Head, resource.Uri);
-                    _sendingHEADRequestTask = _httpClient.SendAsync(httpRequestMessage, _cancellationTokenSource.Token);
-                    verificationResult.HttpStatusCode = (int) _sendingHEADRequestTask.Result.StatusCode;
+                    _sendingGETRequestTask = _httpClient.GetAsync(resource.Uri, _cancellationTokenSource.Token);
+                    verificationResult.HttpStatusCode = (int) _sendingGETRequestTask.Result.StatusCode;
                 }
             }
             catch (AggregateException aggregateException)

@@ -129,7 +129,7 @@ namespace Helix.Gui
             Electron.IpcMain.Send(_gui, "redraw", JsonConvert.SerializeObject(new ViewModel
             {
                 CrawlerState = Crawler.State,
-                VerifiedUrlCount = Crawler.VerifiedUrlCount,
+                VerifiedUrlCount = null,
                 ValidUrlCount = null,
                 BrokenUrlCount = null,
                 RemainingUrlCount = Crawler.RemainingUrlCount,

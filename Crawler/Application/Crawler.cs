@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -16,7 +17,7 @@ namespace Helix.Implementations
         static Configurations _configurations;
         static Task _mainWorkingTask;
         static readonly ConcurrentDictionary<string, bool> AlreadyVerifiedUrls = new ConcurrentDictionary<string, bool>();
-        static readonly ConcurrentBag<Task> BackgroundCrawlingTasks = new ConcurrentBag<Task>();
+        static readonly SynchronizedCollection<Task> BackgroundCrawlingTasks = new SynchronizedCollection<Task>();
         static readonly string WorkingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
         static readonly string ErrorFilePath = Path.Combine(WorkingDirectory, "errors.txt");
         static readonly BlockingCollection<IResourceCollector> ResourceCollectorPool = new BlockingCollection<IResourceCollector>();
@@ -26,8 +27,7 @@ namespace Helix.Implementations
 
         public static CrawlerState State { get; private set; } = CrawlerState.Ready;
         public static CancellationToken CancellationToken => _cancellationTokenSource.Token;
-        public static int RemainingUrlCount => BackgroundCrawlingTasks.Count(t => !t.IsCompleted && t.Status != TaskStatus.Running);
-        public static int VerifiedUrlCount => BackgroundCrawlingTasks.Count(t => t.IsCompletedSuccessfully);
+        public static int RemainingUrlCount => BackgroundCrawlingTasks.Count + ToBeVerifiedRawResources.Count;
 
         public static event ExceptionOccurredEvent OnExceptionOccurred;
         public static event ResourceVerifiedEvent OnResourceVerified;
@@ -121,7 +121,7 @@ namespace Helix.Implementations
                 if (rawResource != null)
                 {
                     var toBeVerifiedRawResource = rawResource;
-                    BackgroundCrawlingTasks.Add(Task.Run(() =>
+                    var backgroundCrawlingTask = Task.Run(() =>
                     {
                         if (_cancellationTokenSource.Token.IsCancellationRequested) return;
                         var verificationResult = ResourceVerifierPool.Take(_cancellationTokenSource.Token).Verify(toBeVerifiedRawResource);
@@ -134,7 +134,13 @@ namespace Helix.Implementations
                         var resourceIsNotCrawlable = toBeVerifiedRawResource.HttpStatusCode != 0;
                         if (verificationResult.IsBrokenResource || !verificationResult.IsInternalResource || resourceIsNotCrawlable) return;
                         ResourceCollectorPool.Take(_cancellationTokenSource.Token).CollectNewRawResourcesFrom(verificationResult.Resource);
-                    }, _cancellationTokenSource.Token));
+                    }, _cancellationTokenSource.Token);
+                    backgroundCrawlingTask.ContinueWith(t =>
+                    {
+                        if (t.IsCompletedSuccessfully)
+                            BackgroundCrawlingTasks.Remove(t);
+                    });
+                    BackgroundCrawlingTasks.Add(backgroundCrawlingTask);
                 }
 
                 Thread.Sleep(100);
