@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -17,7 +16,7 @@ namespace Helix.Implementations
         static Configurations _configurations;
         static Task _mainWorkingTask;
         static readonly ConcurrentDictionary<string, bool> AlreadyVerifiedUrls = new ConcurrentDictionary<string, bool>();
-        static readonly SynchronizedCollection<Task> BackgroundCrawlingTasks = new SynchronizedCollection<Task>();
+        static readonly ConcurrentSet<Task> BackgroundCrawlingTasks = new ConcurrentSet<Task>();
         static readonly string WorkingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
         static readonly string ErrorFilePath = Path.Combine(WorkingDirectory, "errors.txt");
         static readonly BlockingCollection<IResourceCollector> ResourceCollectorPool = new BlockingCollection<IResourceCollector>();

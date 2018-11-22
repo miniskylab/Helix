@@ -58,10 +58,12 @@ namespace Helix.Implementations
             try
             {
                 _chromeDriver.Navigate().GoToUrl(parentResource.Uri);
+                var hrefSchemeIsSupported = new Func<string, bool>(href => href.StartsWith("http", StringComparison.OrdinalIgnoreCase) ||
+                                                                           href.StartsWith("https", StringComparison.OrdinalIgnoreCase) ||
+                                                                           href.StartsWith("/", StringComparison.OrdinalIgnoreCase));
                 var newRawResources = TryGetUrls("a", "href")
-                    .Select(url => url.ToLower())
-                    .Where(url => url.StartsWith("http") || url.StartsWith("https") || url.StartsWith("/"))
-                    .Select(url => new RawResource { Url = url, ParentUrl = parentResource.Uri.AbsoluteUri });
+                    .Where(hrefSchemeIsSupported)
+                    .Select(href => new RawResource { Url = href, ParentUrl = parentResource.Uri.AbsoluteUri });
                 Parallel.ForEach(newRawResources, newRawResource => { OnRawResourceCollected?.Invoke(newRawResource); });
             }
             catch (WebDriverException webDriverException)
