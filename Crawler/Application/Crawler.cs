@@ -134,11 +134,10 @@ namespace Helix.Implementations
                         if (verificationResult.IsBrokenResource || !verificationResult.IsInternalResource || resourceIsNotCrawlable) return;
                         ResourceCollectorPool.Take(_cancellationTokenSource.Token).CollectNewRawResourcesFrom(verificationResult.Resource);
                     }, _cancellationTokenSource.Token);
-                    backgroundCrawlingTask.ContinueWith(t =>
-                    {
-                        if (t.IsCompletedSuccessfully)
-                            BackgroundCrawlingTasks.Remove(t);
-                    });
+                    backgroundCrawlingTask.ContinueWith(
+                        antecedentTask => BackgroundCrawlingTasks.Remove(antecedentTask),
+                        TaskContinuationOptions.OnlyOnRanToCompletion
+                    );
                     BackgroundCrawlingTasks.Add(backgroundCrawlingTask);
                 }
 
