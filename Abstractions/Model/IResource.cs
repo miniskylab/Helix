@@ -6,8 +6,8 @@ namespace Helix.Abstractions
     {
         bool Localized { get; set; }
 
-        Uri ParentUri { get; set; }
+        Uri ParentUri { get; }
 
-        Uri Uri { get; set; }
+        Uri Uri { get; }
     }
 }

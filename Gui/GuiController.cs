@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using ElectronNET.API;
 using ElectronNET.API.Entities;
+using Helix.Abstractions;
 using Helix.Implementations;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -86,9 +87,8 @@ namespace Helix.Gui
         {
             lock (StaticLock)
             {
-                if (Crawler.State != CrawlerState.Ready) return BadRequest();
-                ServiceLocator.RegisterServices(new Configurations(configurationJsonString));
-                var configurations = ServiceLocator.Get<Configurations>();
+                if (Crawler.Memory.CrawlerState != CrawlerState.Ready) return BadRequest();
+                var configurations = new Configurations(configurationJsonString);
                 Crawler.OnWebBrowserOpened += openedWebBrowserCount =>
                 {
                     RedrawGui($"Opening web browsers ... ({openedWebBrowserCount}/{configurations.WebBrowserCount})");
@@ -107,7 +107,7 @@ namespace Helix.Gui
                     RedrawGui($"{verificationResult.HttpStatusCode} - {verificationResult.RawResource.Url}");
                 });
                 Crawler.OnExceptionOccurred += exception => { RedrawGui(exception.Message); };
-                Crawler.StartWorking();
+                Crawler.StartWorking(configurations);
                 RedrawGuiEvery(TimeSpan.FromSeconds(1));
                 Stopwatch.Restart();
                 return Ok();
@@ -128,11 +128,11 @@ namespace Helix.Gui
         {
             Electron.IpcMain.Send(_gui, "redraw", JsonConvert.SerializeObject(new ViewModel
             {
-                CrawlerState = Crawler.State,
+                CrawlerState = Crawler.Memory.CrawlerState,
                 VerifiedUrlCount = null,
                 ValidUrlCount = null,
                 BrokenUrlCount = null,
-                RemainingUrlCount = Crawler.RemainingUrlCount,
+                RemainingUrlCount = Crawler.Memory.RemainingUrlCount,
                 ElapsedTime = Stopwatch.Elapsed.ToString("hh' : 'mm' : 'ss"),
                 StatusText = statusText
             }));
@@ -142,12 +142,12 @@ namespace Helix.Gui
         {
             BackgroundTasks.Add(Task.Run(() =>
             {
-                while (!Crawler.CancellationToken.IsCancellationRequested)
+                while (!Crawler.Memory.CancellationToken.IsCancellationRequested)
                 {
                     RedrawGui();
                     Thread.Sleep(timeSpan);
                 }
-            }, Crawler.CancellationToken));
+            }, Crawler.Memory.CancellationToken));
         }
 
         static void ShowGui()

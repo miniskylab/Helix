@@ -3,9 +3,16 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Helix.Implementations
 {
-    public static class ServiceLocator
+    static class ServiceLocator
     {
         static ServiceProvider _serviceProvider;
+
+        static ServiceLocator()
+        {
+            _serviceProvider = new ServiceCollection()
+                .AddSingleton<IMemory, Memory>()
+                .BuildServiceProvider();
+        }
 
         public static void Dispose()
         {
@@ -17,13 +24,15 @@ namespace Helix.Implementations
 
         public static void RegisterServices(Configurations configurations)
         {
-            if (_serviceProvider != null) return;
+            if (_serviceProvider.GetService<Configurations>() != null) return;
+            _serviceProvider.Dispose();
             _serviceProvider = new ServiceCollection()
                 .AddTransient<IResourceCollector, ResourceCollector>()
                 .AddTransient<IResourceVerifier, ResourceVerifier>()
                 .AddTransient<IResourceProcessor, ResourceProcessor>()
                 .AddTransient<IResourceScope, ResourceScope>()
                 .AddSingleton(configurations)
+                .AddSingleton<IMemory, Memory>()
                 .BuildServiceProvider();
         }
     }

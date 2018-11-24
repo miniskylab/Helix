@@ -1,4 +1,4 @@
-﻿namespace Helix.Implementations
+﻿namespace Helix.Abstractions
 {
     public enum CrawlerState
     {
