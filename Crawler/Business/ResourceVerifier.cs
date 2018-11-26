@@ -45,7 +45,14 @@ namespace Helix.Implementations
             _disposed = true;
 
             _cancellationTokenSource?.Cancel();
-            _sendingGETRequestTask?.Wait();
+            try { _sendingGETRequestTask?.Wait(); }
+            catch
+            {
+                /* At this point, all exceptions should be fully handled.
+                 * I just want to wait for the task to complete.
+                 * I don't care about the result of the task. */
+            }
+
             _cancellationTokenSource?.Dispose();
             _httpClient?.Dispose();
         }

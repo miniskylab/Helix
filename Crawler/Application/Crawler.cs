@@ -90,34 +90,34 @@ namespace Helix.Implementations
         {
             while (Memory.TryTakeToBeVerifiedRawResource(out var rawResource) || !Memory.AllBackgroundCrawlingTasks.IsCompleted)
             {
-                if (rawResource != null)
+                if (Memory.CancellationToken.IsCancellationRequested) break;
+                if (rawResource == null)
                 {
-                    var toBeVerifiedRawResource = rawResource;
-                    var backgroundCrawlingTask = Task.Run(() =>
-                    {
-                        if (Memory.CancellationToken.IsCancellationRequested) return;
-                        var verificationResult = ResourceVerifierPool.Take(Memory.CancellationToken).Verify(toBeVerifiedRawResource);
-                        if (verificationResult.HttpStatusCode != (int) HttpStatusCode.ExpectationFailed)
-                        {
-                            ReportWriter.Instance.WriteReport(verificationResult, Memory.Configurations.ReportBrokenLinksOnly);
-                            OnResourceVerified?.Invoke(verificationResult);
-                        }
-
-                        var resourceIsNotCrawlable = toBeVerifiedRawResource.HttpStatusCode != 0;
-                        if (verificationResult.IsBrokenResource || !verificationResult.IsInternalResource || resourceIsNotCrawlable) return;
-                        ResourceCollectorPool.Take(Memory.CancellationToken).CollectNewRawResourcesFrom(verificationResult.Resource);
-                    }, Memory.CancellationToken);
-                    backgroundCrawlingTask.ContinueWith(
-                        _ => Memory.Forget(backgroundCrawlingTask),
-                        Memory.CancellationToken,
-                        TaskContinuationOptions.OnlyOnRanToCompletion,
-                        TaskScheduler.Default
-                    );
-                    Memory.Memorize(backgroundCrawlingTask);
+                    Thread.Sleep(100);
+                    continue;
                 }
 
-                Thread.Sleep(100);
-                if (Memory.CancellationToken.IsCancellationRequested) break;
+                var toBeVerifiedRawResource = rawResource;
+                Task backgroundCrawlingTask = null;
+                backgroundCrawlingTask = new Task(() =>
+                {
+                    if (Memory.CancellationToken.IsCancellationRequested) return;
+                    var verificationResult = ResourceVerifierPool.Take(Memory.CancellationToken).Verify(toBeVerifiedRawResource);
+                    if (verificationResult.HttpStatusCode != (int) HttpStatusCode.ExpectationFailed)
+                    {
+                        ReportWriter.Instance.WriteReport(verificationResult, Memory.Configurations.ReportBrokenLinksOnly);
+                        OnResourceVerified?.Invoke(verificationResult);
+                    }
+
+                    var resourceIsNotCrawlable = toBeVerifiedRawResource.HttpStatusCode != 0;
+                    if (verificationResult.IsBrokenResource || !verificationResult.IsInternalResource || resourceIsNotCrawlable) return;
+                    ResourceCollectorPool.Take(Memory.CancellationToken).CollectNewRawResourcesFrom(verificationResult.Resource);
+
+                    // ReSharper disable once AccessToModifiedClosure
+                    Memory.Forget(backgroundCrawlingTask);
+                }, Memory.CancellationToken);
+                Memory.Memorize(backgroundCrawlingTask);
+                backgroundCrawlingTask.Start(TaskScheduler.Default);
             }
             Memory.AllBackgroundCrawlingTasks.Wait();
         }
