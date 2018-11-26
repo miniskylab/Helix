@@ -5,6 +5,7 @@
         Unknown,
         Ready,
         Working,
+        Stopping,
         Paused
     }
 }

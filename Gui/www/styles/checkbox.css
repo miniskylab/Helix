@@ -65,8 +65,8 @@
 }
 /* End: Highlight */
 
-/* Begin: Checkmark Icon */
-.checkbox__checkmark-icon {
+/* Begin: Check-mark Icon */
+.checkbox__check-mark-icon {
     width: 12px;
     height: 12px;
     border: 2px solid #9B9B9B;
@@ -74,7 +74,7 @@
     pointer-events: none;
 }
 
-.checkbox:hover input:not(:checked) ~ .checkbox__content .checkbox__checkmark-icon {
+.checkbox:hover input:not(:checked) ~ .checkbox__content .checkbox__check-mark-icon {
     width: 5px;
     height: 10px;
     border: solid #FFFFFF;
@@ -84,7 +84,7 @@
     transform: rotate(45deg);
 }
 
-.checkbox input:checked ~ .checkbox__content .checkbox__checkmark-icon {
+.checkbox input:checked ~ .checkbox__content .checkbox__check-mark-icon {
     width: 5px;
     height: 10px;
     border: solid #FFFFFF;
@@ -93,7 +93,7 @@
     margin: 0 2px 3px 4px;
     transform: rotate(45deg);
 }
-/* End: Checkmark Icon */
+/* End: Check-mark Icon */
 
 .checkbox__text {
     display: flex;

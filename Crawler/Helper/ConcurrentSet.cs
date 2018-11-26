@@ -16,7 +16,7 @@ namespace Helix.Implementations
         public void Add(T item)
         {
             if (!_concurrentDictionary.TryAdd(item, false))
-                throw new InvalidOperationException();
+                throw new InvalidOperationException("Cannot add the same item twice.");
         }
 
         public void Clear() { _concurrentDictionary.Clear(); }

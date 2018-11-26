@@ -80,30 +80,42 @@ namespace Helix.Implementations
 
         public bool TryTransitTo(CrawlerState crawlerState)
         {
+            if (CrawlerState == CrawlerState.Unknown) return false;
             switch (crawlerState)
             {
                 case CrawlerState.Ready:
                     lock (StaticLock)
                     {
-                        if (CrawlerState == CrawlerState.Unknown || CrawlerState == CrawlerState.Ready) break;
+                        if (CrawlerState != CrawlerState.Stopping) return false;
                         CrawlerState = CrawlerState.Ready;
                         return true;
                     }
                 case CrawlerState.Working:
                     lock (StaticLock)
                     {
-                        if (CrawlerState == CrawlerState.Unknown || CrawlerState != CrawlerState.Ready) break;
+                        if (CrawlerState != CrawlerState.Ready && CrawlerState != CrawlerState.Paused) return false;
                         CrawlerState = CrawlerState.Working;
                         return true;
                     }
+                case CrawlerState.Stopping:
+                    lock (StaticLock)
+                    {
+                        if (CrawlerState != CrawlerState.Working && CrawlerState != CrawlerState.Paused) return false;
+                        CrawlerState = CrawlerState.Stopping;
+                        return true;
+                    }
                 case CrawlerState.Paused:
-                    throw new NotSupportedException();
+                    lock (StaticLock)
+                    {
+                        if (CrawlerState != CrawlerState.Working) return false;
+                        CrawlerState = CrawlerState.Paused;
+                        return true;
+                    }
                 case CrawlerState.Unknown:
-                    throw new NotSupportedException();
+                    throw new NotSupportedException($"Cannot transit to [{nameof(CrawlerState.Unknown)}] state.");
                 default:
-                    return false;
+                    throw new ArgumentOutOfRangeException(nameof(crawlerState), crawlerState, null);
             }
-            return false;
         }
 
         ~Memory()

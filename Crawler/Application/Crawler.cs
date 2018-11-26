@@ -35,6 +35,7 @@ namespace Helix.Implementations
         {
             ServiceLocator.RegisterServices(configurations);
             Memory = ServiceLocator.Get<IMemory>();
+
             if (!Memory.TryTransitTo(CrawlerState.Working)) return;
             _mainWorkingTask = Task.Run(() =>
             {
@@ -69,7 +70,7 @@ namespace Helix.Implementations
 
         public static void StopWorking()
         {
-            if (!Memory.TryTransitTo(CrawlerState.Ready)) return;
+            if (!Memory.TryTransitTo(CrawlerState.Stopping)) return;
             Memory.CancellationTokenSource.Cancel();
             _mainWorkingTask.Wait();
             while (ResourceVerifierPool.Any()) ResourceVerifierPool.Take().Dispose();
@@ -81,6 +82,7 @@ namespace Helix.Implementations
             Memory.ForgetAllBackgroundCrawlingTasks();
             ReportWriter.Instance.Dispose();
             ServiceLocator.Dispose();
+            Memory.TryTransitTo(CrawlerState.Ready);
             OnStopped?.Invoke(Memory.IsAllWorkDone);
         }
 
