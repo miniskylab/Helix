@@ -22,8 +22,6 @@ namespace Helix.Implementations
         public static event WebBrowserClosedEvent OnWebBrowserClosed;
         public static event WebBrowserOpenedEvent OnWebBrowserOpened;
 
-        static Crawler() { EnsureErrorLogFileIsRecreated(); }
-
         public static void Dispose()
         {
             StopWorking();
@@ -33,6 +31,7 @@ namespace Helix.Implementations
 
         public static void StartWorking(Configurations configurations)
         {
+            EnsureErrorLogFileIsRecreated();
             ServiceLocator.RegisterServices(configurations);
             Memory = ServiceLocator.Get<IMemory>();
 
@@ -45,25 +44,7 @@ namespace Helix.Implementations
                     InitializeResourceVerifierPool();
                     Crawl();
                 }
-                catch (Exception exception)
-                {
-                    switch (exception)
-                    {
-                        case OperationCanceledException operationCanceledException:
-                            if (operationCanceledException.CancellationToken.IsCancellationRequested) return;
-                            break;
-                        case AggregateException aggregateException:
-                            var thereIsNoUnhandledException = !aggregateException.InnerExceptions.Any(innerException =>
-                            {
-                                if (!(innerException is OperationCanceledException operationCanceledException)) return true;
-                                return !operationCanceledException.CancellationToken.IsCancellationRequested;
-                            });
-                            if (thereIsNoUnhandledException) return;
-                            break;
-                    }
-                    File.WriteAllText(Memory.ErrorFilePath, exception.ToString());
-                    OnExceptionOccurred?.Invoke(exception);
-                }
+                catch (Exception exception) { HandleException(exception); }
                 finally { Task.Run(StopWorking); }
             }, Memory.CancellationToken);
         }
@@ -101,20 +82,26 @@ namespace Helix.Implementations
                 Task backgroundCrawlingTask = null;
                 backgroundCrawlingTask = new Task(() =>
                 {
-                    if (Memory.CancellationToken.IsCancellationRequested) return;
-                    var verificationResult = ResourceVerifierPool.Take(Memory.CancellationToken).Verify(toBeVerifiedRawResource);
-                    if (verificationResult.HttpStatusCode != (int) HttpStatusCode.ExpectationFailed)
+                    try
                     {
-                        ReportWriter.Instance.WriteReport(verificationResult, Memory.Configurations.ReportBrokenLinksOnly);
-                        OnResourceVerified?.Invoke(verificationResult);
+                        if (Memory.CancellationToken.IsCancellationRequested) return;
+                        var verificationResult = ResourceVerifierPool.Take(Memory.CancellationToken).Verify(toBeVerifiedRawResource);
+                        if (verificationResult.HttpStatusCode != (int) HttpStatusCode.ExpectationFailed)
+                        {
+                            ReportWriter.Instance.WriteReport(verificationResult, Memory.Configurations.ReportBrokenLinksOnly);
+                            OnResourceVerified?.Invoke(verificationResult);
+                        }
+
+                        var resourceIsCrawlable = toBeVerifiedRawResource.HttpStatusCode == 0;
+                        if (!verificationResult.IsBrokenResource && verificationResult.IsInternalResource && resourceIsCrawlable)
+                            ResourceCollectorPool.Take(Memory.CancellationToken).CollectNewRawResourcesFrom(verificationResult.Resource);
                     }
-
-                    var resourceIsCrawlable = toBeVerifiedRawResource.HttpStatusCode == 0;
-                    if (!verificationResult.IsBrokenResource && verificationResult.IsInternalResource && resourceIsCrawlable)
-                        ResourceCollectorPool.Take(Memory.CancellationToken).CollectNewRawResourcesFrom(verificationResult.Resource);
-
-                    // ReSharper disable once AccessToModifiedClosure
-                    Memory.Forget(backgroundCrawlingTask);
+                    catch (Exception exception) { HandleException(exception); }
+                    finally
+                    {
+                        // ReSharper disable once AccessToModifiedClosure
+                        Memory.Forget(backgroundCrawlingTask);
+                    }
                 }, Memory.CancellationToken);
                 Memory.Memorize(backgroundCrawlingTask);
                 backgroundCrawlingTask.Start(TaskScheduler.Default);
@@ -126,6 +113,26 @@ namespace Helix.Implementations
         static void EnsureErrorLogFileIsRecreated()
         {
             if (File.Exists(Memory.ErrorFilePath)) File.Delete(Memory.ErrorFilePath);
+        }
+
+        static void HandleException(Exception exception)
+        {
+            switch (exception)
+            {
+                case OperationCanceledException operationCanceledException:
+                    if (operationCanceledException.CancellationToken.IsCancellationRequested) return;
+                    break;
+                case AggregateException aggregateException:
+                    var thereIsNoUnhandledInnerException = !aggregateException.InnerExceptions.Any(innerException =>
+                    {
+                        if (!(innerException is OperationCanceledException operationCanceledException)) return true;
+                        return !operationCanceledException.CancellationToken.IsCancellationRequested;
+                    });
+                    if (thereIsNoUnhandledInnerException) return;
+                    break;
+            }
+            File.WriteAllText(Memory.ErrorFilePath, exception.ToString());
+            OnExceptionOccurred?.Invoke(exception);
         }
 
         static void InitializeResourceCollectorPool()
