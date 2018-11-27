@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -5,7 +6,9 @@ namespace Helix.Abstractions
 {
     public interface IMemory
     {
-        Task AllBackgroundCrawlingTasks { get; }
+        bool AllBackgroundCrawlingTasksAreDone { get; }
+
+        IEnumerable<Task> BackgroundCrawlingTasks { get; }
 
         CancellationToken CancellationToken { get; }
 

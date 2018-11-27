@@ -7,11 +7,13 @@ namespace Helix.Implementations
 {
     class ConcurrentSet<T> : ICollection<T>
     {
-        readonly ConcurrentDictionary<T, bool> _concurrentDictionary = new ConcurrentDictionary<T, bool>();
+        readonly ConcurrentDictionary<T, bool> _concurrentDictionary;
 
         public int Count => _concurrentDictionary.Count;
 
-        public bool IsReadOnly => _concurrentDictionary.Keys.IsReadOnly;
+        public bool IsReadOnly => false;
+
+        public ConcurrentSet() { _concurrentDictionary = new ConcurrentDictionary<T, bool>(Environment.ProcessorCount * 4, 10000); }
 
         public void Add(T item)
         {

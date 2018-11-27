@@ -88,7 +88,7 @@ namespace Helix.Implementations
 
         static void Crawl()
         {
-            while (Memory.TryTakeToBeVerifiedRawResource(out var rawResource) || !Memory.AllBackgroundCrawlingTasks.IsCompleted)
+            while (Memory.TryTakeToBeVerifiedRawResource(out var rawResource) || !Memory.AllBackgroundCrawlingTasksAreDone)
             {
                 if (Memory.CancellationToken.IsCancellationRequested) break;
                 if (rawResource == null)
@@ -109,9 +109,9 @@ namespace Helix.Implementations
                         OnResourceVerified?.Invoke(verificationResult);
                     }
 
-                    var resourceIsNotCrawlable = toBeVerifiedRawResource.HttpStatusCode != 0;
-                    if (verificationResult.IsBrokenResource || !verificationResult.IsInternalResource || resourceIsNotCrawlable) return;
-                    ResourceCollectorPool.Take(Memory.CancellationToken).CollectNewRawResourcesFrom(verificationResult.Resource);
+                    var resourceIsCrawlable = toBeVerifiedRawResource.HttpStatusCode == 0;
+                    if (!verificationResult.IsBrokenResource && verificationResult.IsInternalResource && resourceIsCrawlable)
+                        ResourceCollectorPool.Take(Memory.CancellationToken).CollectNewRawResourcesFrom(verificationResult.Resource);
 
                     // ReSharper disable once AccessToModifiedClosure
                     Memory.Forget(backgroundCrawlingTask);
@@ -119,7 +119,8 @@ namespace Helix.Implementations
                 Memory.Memorize(backgroundCrawlingTask);
                 backgroundCrawlingTask.Start(TaskScheduler.Default);
             }
-            Memory.AllBackgroundCrawlingTasks.Wait();
+            while (Memory.BackgroundCrawlingTasks.Any(t => t.Status == TaskStatus.Running)) Thread.Sleep(500);
+            Task.WhenAll(Memory.BackgroundCrawlingTasks).Wait();
         }
 
         static void EnsureErrorLogFileIsRecreated()

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -26,11 +27,13 @@ namespace Helix.Implementations
 
         public string ErrorFilePath { get; }
 
-        public Task AllBackgroundCrawlingTasks => Task.WhenAll(_backgroundCrawlingTasks);
+        public bool AllBackgroundCrawlingTasksAreDone => !_backgroundCrawlingTasks.Any();
+
+        public IEnumerable<Task> BackgroundCrawlingTasks => _backgroundCrawlingTasks;
 
         public CancellationToken CancellationToken => CancellationTokenSource.Token;
 
-        public bool IsAllWorkDone => !_toBeVerifiedRawResources.Any() && Task.WhenAll(_backgroundCrawlingTasks).IsCompletedSuccessfully;
+        public bool IsAllWorkDone => !_toBeVerifiedRawResources.Any() && AllBackgroundCrawlingTasksAreDone;
 
         public int RemainingUrlCount => _backgroundCrawlingTasks.Count + _toBeVerifiedRawResources.Count;
 
