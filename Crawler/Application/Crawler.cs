@@ -31,7 +31,7 @@ namespace Helix.Implementations
 
         public static void StartWorking(Configurations configurations)
         {
-            EnsureErrorLogFileIsRecreated();
+            EnsureErrorLogFileIsDeleted();
             ServiceLocator.RegisterServices(configurations);
             Memory = ServiceLocator.Get<IMemory>();
 
@@ -110,7 +110,7 @@ namespace Helix.Implementations
             Task.WhenAll(Memory.BackgroundCrawlingTasks).Wait();
         }
 
-        static void EnsureErrorLogFileIsRecreated()
+        static void EnsureErrorLogFileIsDeleted()
         {
             if (File.Exists(Memory.ErrorFilePath)) File.Delete(Memory.ErrorFilePath);
         }
@@ -131,7 +131,7 @@ namespace Helix.Implementations
                     if (thereIsNoUnhandledInnerException) return;
                     break;
             }
-            File.WriteAllText(Memory.ErrorFilePath, exception.ToString());
+            File.AppendAllText(Memory.ErrorFilePath, exception.ToString());
             OnExceptionOccurred?.Invoke(exception);
         }
 
