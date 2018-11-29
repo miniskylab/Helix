@@ -14,7 +14,8 @@ namespace Helix.Implementations
     class Memory : IMemory
     {
         readonly ConcurrentSet<string> _alreadyVerifiedUrls = new ConcurrentSet<string>();
-        readonly ConcurrentSet<Task> _backgroundCrawlingTasks = new ConcurrentSet<Task>();
+        readonly ConcurrentSet<Task> _backgroundTasks = new ConcurrentSet<Task>();
+        readonly BlockingCollection<IResource> _toBeCrawledResources = new BlockingCollection<IResource>();
         readonly BlockingCollection<IRawResource> _toBeVerifiedRawResources = new BlockingCollection<IRawResource>();
         readonly string _workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
         static readonly object StaticLock = new object();
@@ -27,22 +28,22 @@ namespace Helix.Implementations
 
         public string ErrorFilePath { get; }
 
-        public bool AllBackgroundCrawlingTasksAreDone => !_backgroundCrawlingTasks.Any();
+        public bool AllBackgroundTasksAreDone => !_backgroundTasks.Any();
 
-        public IEnumerable<Task> BackgroundCrawlingTasks => _backgroundCrawlingTasks;
+        public IEnumerable<Task> BackgroundTasks => _backgroundTasks;
 
         public CancellationToken CancellationToken => CancellationTokenSource.Token;
 
-        public bool IsAllWorkDone => !_toBeVerifiedRawResources.Any() && AllBackgroundCrawlingTasksAreDone;
+        public bool EverythingIsDone => !_toBeVerifiedRawResources.Any() && !_toBeCrawledResources.Any() && AllBackgroundTasksAreDone;
 
-        public int RemainingUrlCount => _backgroundCrawlingTasks.Count + _toBeVerifiedRawResources.Count;
+        public int RemainingUrlCount => _backgroundTasks.Count + _toBeVerifiedRawResources.Count;
 
         public Memory(Configurations configurations)
         {
             Configurations = configurations;
             ErrorFilePath = Path.Combine(_workingDirectory, "errors.txt");
             CancellationTokenSource = new CancellationTokenSource();
-            _backgroundCrawlingTasks.Clear();
+            _backgroundTasks.Clear();
             while (_toBeVerifiedRawResources.Any()) _toBeVerifiedRawResources.Take();
             lock (StaticLock)
             {
@@ -55,30 +56,41 @@ namespace Helix.Implementations
         [UsedImplicitly]
         public Memory() { }
 
-        public void Forget(Task backgroundCrawlingTask)
+        public void Forget(Task backgroundTask)
         {
             if (CancellationToken.IsCancellationRequested) return;
-            _backgroundCrawlingTasks.Remove(backgroundCrawlingTask);
+            _backgroundTasks.Remove(backgroundTask);
         }
 
-        public void ForgetAllBackgroundCrawlingTasks() { _backgroundCrawlingTasks.Clear(); }
+        public void ForgetAllBackgroundTasks() { _backgroundTasks.Clear(); }
 
-        public void Memorize(IRawResource rawResource)
+        public void Memorize(IRawResource toBeVerifiedRawResource)
         {
             if (CancellationToken.IsCancellationRequested) return;
             lock (StaticLock)
             {
-                if (_alreadyVerifiedUrls.Contains(rawResource.Url.StripFragment())) return;
-                _alreadyVerifiedUrls.Add(rawResource.Url.StripFragment());
+                if (_alreadyVerifiedUrls.Contains(toBeVerifiedRawResource.Url.StripFragment())) return;
+                _alreadyVerifiedUrls.Add(toBeVerifiedRawResource.Url.StripFragment());
             }
-            _toBeVerifiedRawResources.Add(rawResource, CancellationToken);
+            _toBeVerifiedRawResources.Add(toBeVerifiedRawResource, CancellationToken);
         }
 
-        public void Memorize(Task backgroundCrawlingTask) { _backgroundCrawlingTasks.Add(backgroundCrawlingTask); }
-
-        public bool TryTakeToBeVerifiedRawResource(out IRawResource rawResource)
+        public void Memorize(IResource toBeCrawledResource)
         {
-            return _toBeVerifiedRawResources.TryTake(out rawResource);
+            if (CancellationToken.IsCancellationRequested) return;
+            _toBeCrawledResources.Add(toBeCrawledResource, CancellationToken);
+        }
+
+        public void Memorize(Task backgroundTask) { _backgroundTasks.Add(backgroundTask); }
+
+        public bool TryTakeToBeCrawledResource(out IResource toBeCrawledResource)
+        {
+            return _toBeCrawledResources.TryTake(out toBeCrawledResource);
+        }
+
+        public bool TryTakeToBeVerifiedRawResource(out IRawResource toBeVerifiedRawResource)
+        {
+            return _toBeVerifiedRawResources.TryTake(out toBeVerifiedRawResource);
         }
 
         public bool TryTransitTo(CrawlerState crawlerState)

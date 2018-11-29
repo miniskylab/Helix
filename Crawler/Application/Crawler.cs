@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -31,18 +32,25 @@ namespace Helix.Implementations
 
         public static void StartWorking(Configurations configurations)
         {
-            EnsureErrorLogFileIsDeleted();
             ServiceLocator.RegisterServices(configurations);
             Memory = ServiceLocator.Get<IMemory>();
-
             if (!Memory.TryTransitTo(CrawlerState.Working)) return;
             _mainWorkingTask = Task.Run(() =>
             {
                 try
                 {
+                    EnsureErrorLogFileIsRecreated();
                     InitializeResourceCollectorPool();
                     InitializeResourceVerifierPool();
-                    Crawl();
+
+                    var verificationTask = new Task(Verify, Memory.CancellationToken);
+                    var crawlingTask = new Task(Crawl, Memory.CancellationToken);
+                    Memory.Memorize(verificationTask);
+                    Memory.Memorize(crawlingTask);
+                    verificationTask.Start(TaskScheduler.Default);
+                    crawlingTask.Start(TaskScheduler.Default);
+                    Task.WhenAll(verificationTask, crawlingTask).Wait();
+                    while (Memory.BackgroundTasks.Any()) Thread.Sleep(500);
                 }
                 catch (Exception exception) { HandleException(exception); }
                 finally { Task.Run(StopWorking); }
@@ -60,42 +68,28 @@ namespace Helix.Implementations
                 ResourceCollectorPool.Take().Dispose();
                 OnWebBrowserClosed?.Invoke(Memory.Configurations.WebBrowserCount - ResourceCollectorPool.Count);
             }
-            Memory.ForgetAllBackgroundCrawlingTasks();
+            Memory.ForgetAllBackgroundTasks();
             ReportWriter.Instance.Dispose();
             ServiceLocator.Dispose();
             Memory.TryTransitTo(CrawlerState.Ready);
-            OnStopped?.Invoke(Memory.IsAllWorkDone);
+            OnStopped?.Invoke(Memory.EverythingIsDone);
         }
 
         static void Crawl()
         {
-            while (Memory.TryTakeToBeVerifiedRawResource(out var rawResource) || !Memory.AllBackgroundCrawlingTasksAreDone)
+            while (!Memory.EverythingIsDone)
             {
                 if (Memory.CancellationToken.IsCancellationRequested) break;
-                if (rawResource == null)
+                if (!Memory.TryTakeToBeCrawledResource(out var toBeCrawledResource))
                 {
                     Thread.Sleep(100);
                     continue;
                 }
 
-                var toBeVerifiedRawResource = rawResource;
                 Task backgroundCrawlingTask = null;
                 backgroundCrawlingTask = new Task(() =>
                 {
-                    try
-                    {
-                        if (Memory.CancellationToken.IsCancellationRequested) return;
-                        var verificationResult = ResourceVerifierPool.Take(Memory.CancellationToken).Verify(toBeVerifiedRawResource);
-                        if (verificationResult.HttpStatusCode != (int) HttpStatusCode.ExpectationFailed)
-                        {
-                            ReportWriter.Instance.WriteReport(verificationResult, Memory.Configurations.ReportBrokenLinksOnly);
-                            OnResourceVerified?.Invoke(verificationResult);
-                        }
-
-                        var resourceIsCrawlable = toBeVerifiedRawResource.HttpStatusCode == 0;
-                        if (!verificationResult.IsBrokenResource && verificationResult.IsInternalResource && resourceIsCrawlable)
-                            ResourceCollectorPool.Take(Memory.CancellationToken).CollectNewRawResourcesFrom(verificationResult.Resource);
-                    }
+                    try { ResourceCollectorPool.Take(Memory.CancellationToken).CollectNewRawResourcesFrom(toBeCrawledResource); }
                     catch (Exception exception) { HandleException(exception); }
                     finally
                     {
@@ -106,13 +100,12 @@ namespace Helix.Implementations
                 Memory.Memorize(backgroundCrawlingTask);
                 backgroundCrawlingTask.Start(TaskScheduler.Default);
             }
-            while (Memory.BackgroundCrawlingTasks.Any(t => t.Status == TaskStatus.Running)) Thread.Sleep(500);
-            Task.WhenAll(Memory.BackgroundCrawlingTasks).Wait();
         }
 
-        static void EnsureErrorLogFileIsDeleted()
+        static void EnsureErrorLogFileIsRecreated()
         {
             if (File.Exists(Memory.ErrorFilePath)) File.Delete(Memory.ErrorFilePath);
+            File.AppendAllText(Memory.ErrorFilePath, DateTime.Now.ToString(CultureInfo.InvariantCulture));
         }
 
         static void HandleException(Exception exception)
@@ -165,6 +158,46 @@ namespace Helix.Implementations
                 var resourceVerifier = ServiceLocator.Get<IResourceVerifier>();
                 resourceVerifier.OnIdle += () => ResourceVerifierPool.Add(resourceVerifier);
                 ResourceVerifierPool.Add(resourceVerifier);
+            }
+        }
+
+        static void Verify()
+        {
+            while (!Memory.EverythingIsDone)
+            {
+                if (Memory.CancellationToken.IsCancellationRequested) break;
+                if (!Memory.TryTakeToBeVerifiedRawResource(out var toBeVerifiedRawResource))
+                {
+                    Thread.Sleep(100);
+                    continue;
+                }
+
+                Task backgroundVerificationTask = null;
+                backgroundVerificationTask = new Task(() =>
+                {
+                    try
+                    {
+                        if (Memory.CancellationToken.IsCancellationRequested) return;
+                        var verificationResult = ResourceVerifierPool.Take(Memory.CancellationToken).Verify(toBeVerifiedRawResource);
+                        if (verificationResult.HttpStatusCode != (int) HttpStatusCode.ExpectationFailed)
+                        {
+                            ReportWriter.Instance.WriteReport(verificationResult, Memory.Configurations.ReportBrokenLinksOnly);
+                            OnResourceVerified?.Invoke(verificationResult);
+                        }
+
+                        var resourceIsCrawlable = toBeVerifiedRawResource.HttpStatusCode == 0;
+                        if (!verificationResult.IsBrokenResource && verificationResult.IsInternalResource && resourceIsCrawlable)
+                            Memory.Memorize(verificationResult.Resource);
+                    }
+                    catch (Exception exception) { HandleException(exception); }
+                    finally
+                    {
+                        // ReSharper disable once AccessToModifiedClosure
+                        Memory.Forget(backgroundVerificationTask);
+                    }
+                }, Memory.CancellationToken);
+                Memory.Memorize(backgroundVerificationTask);
+                backgroundVerificationTask.Start(TaskScheduler.Default);
             }
         }
 
