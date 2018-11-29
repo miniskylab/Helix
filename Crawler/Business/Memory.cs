@@ -1,11 +1,9 @@
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
-using System.Threading.Tasks;
 using Helix.Abstractions;
 using JetBrains.Annotations;
 
@@ -13,8 +11,8 @@ namespace Helix.Implementations
 {
     class Memory : IMemory
     {
+        int _activeThreadCount;
         readonly ConcurrentSet<string> _alreadyVerifiedUrls = new ConcurrentSet<string>();
-        readonly ConcurrentSet<Task> _backgroundTasks = new ConcurrentSet<Task>();
         readonly BlockingCollection<IResource> _toBeCrawledResources = new BlockingCollection<IResource>();
         readonly BlockingCollection<IRawResource> _toBeVerifiedRawResources = new BlockingCollection<IRawResource>();
         readonly string _workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
@@ -28,22 +26,18 @@ namespace Helix.Implementations
 
         public string ErrorFilePath { get; }
 
-        public bool AllBackgroundTasksAreDone => !_backgroundTasks.Any();
-
-        public IEnumerable<Task> BackgroundTasks => _backgroundTasks;
-
         public CancellationToken CancellationToken => CancellationTokenSource.Token;
 
-        public bool EverythingIsDone => !_toBeVerifiedRawResources.Any() && !_toBeCrawledResources.Any() && AllBackgroundTasksAreDone;
+        public bool EverythingIsDone => !_toBeVerifiedRawResources.Any() && !_toBeCrawledResources.Any() && _activeThreadCount == 0;
 
-        public int RemainingUrlCount => _backgroundTasks.Count + _toBeVerifiedRawResources.Count;
+        public int RemainingUrlCount => _activeThreadCount + _toBeVerifiedRawResources.Count;
 
         public Memory(Configurations configurations)
         {
             Configurations = configurations;
             ErrorFilePath = Path.Combine(_workingDirectory, "errors.txt");
             CancellationTokenSource = new CancellationTokenSource();
-            _backgroundTasks.Clear();
+            Interlocked.Exchange(ref _activeThreadCount, 0);
             while (_toBeVerifiedRawResources.Any()) _toBeVerifiedRawResources.Take();
             lock (StaticLock)
             {
@@ -56,13 +50,9 @@ namespace Helix.Implementations
         [UsedImplicitly]
         public Memory() { }
 
-        public void Forget(Task backgroundTask)
-        {
-            if (CancellationToken.IsCancellationRequested) return;
-            _backgroundTasks.Remove(backgroundTask);
-        }
+        public void DecrementActiveThreadCount() { Interlocked.Decrement(ref _activeThreadCount); }
 
-        public void ForgetAllBackgroundTasks() { _backgroundTasks.Clear(); }
+        public void IncrementActiveThreadCount() { Interlocked.Increment(ref _activeThreadCount); }
 
         public void Memorize(IRawResource toBeVerifiedRawResource)
         {
@@ -80,8 +70,6 @@ namespace Helix.Implementations
             if (CancellationToken.IsCancellationRequested) return;
             _toBeCrawledResources.Add(toBeCrawledResource, CancellationToken);
         }
-
-        public void Memorize(Task backgroundTask) { _backgroundTasks.Add(backgroundTask); }
 
         public bool TryTakeToBeCrawledResource(out IResource toBeCrawledResource)
         {

@@ -42,15 +42,7 @@ namespace Helix.Implementations
                     EnsureErrorLogFileIsRecreated();
                     InitializeResourceCollectorPool();
                     InitializeResourceVerifierPool();
-
-                    var verificationTask = new Task(Verify, Memory.CancellationToken);
-                    var crawlingTask = new Task(Crawl, Memory.CancellationToken);
-                    Memory.Memorize(verificationTask);
-                    Memory.Memorize(crawlingTask);
-                    verificationTask.Start(TaskScheduler.Default);
-                    crawlingTask.Start(TaskScheduler.Default);
-                    Task.WhenAll(verificationTask, crawlingTask).Wait();
-                    while (Memory.BackgroundTasks.Any()) Thread.Sleep(500);
+                    Task.WhenAll(Task.Run(Verify, Memory.CancellationToken), Task.Run(Crawl, Memory.CancellationToken)).Wait();
                 }
                 catch (Exception exception) { HandleException(exception); }
                 finally { Task.Run(StopWorking); }
@@ -68,7 +60,6 @@ namespace Helix.Implementations
                 ResourceCollectorPool.Take().Dispose();
                 OnWebBrowserClosed?.Invoke(Memory.Configurations.WebBrowserCount - ResourceCollectorPool.Count);
             }
-            Memory.ForgetAllBackgroundTasks();
             ReportWriter.Instance.Dispose();
             ServiceLocator.Dispose();
             Memory.TryTransitTo(CrawlerState.Ready);
@@ -80,25 +71,20 @@ namespace Helix.Implementations
             while (!Memory.EverythingIsDone)
             {
                 if (Memory.CancellationToken.IsCancellationRequested) break;
+                Memory.IncrementActiveThreadCount();
                 if (!Memory.TryTakeToBeCrawledResource(out var toBeCrawledResource))
                 {
+                    Memory.DecrementActiveThreadCount();
                     Thread.Sleep(100);
                     continue;
                 }
 
-                Task backgroundCrawlingTask = null;
-                backgroundCrawlingTask = new Task(() =>
+                Task.Run(() =>
                 {
                     try { ResourceCollectorPool.Take(Memory.CancellationToken).CollectNewRawResourcesFrom(toBeCrawledResource); }
                     catch (Exception exception) { HandleException(exception); }
-                    finally
-                    {
-                        // ReSharper disable once AccessToModifiedClosure
-                        Memory.Forget(backgroundCrawlingTask);
-                    }
+                    finally { Memory.DecrementActiveThreadCount(); }
                 }, Memory.CancellationToken);
-                Memory.Memorize(backgroundCrawlingTask);
-                backgroundCrawlingTask.Start(TaskScheduler.Default);
             }
         }
 
@@ -152,7 +138,7 @@ namespace Helix.Implementations
 
         static void InitializeResourceVerifierPool()
         {
-            for (var resourceVerifierId = 0; resourceVerifierId < 1000 * Memory.Configurations.WebBrowserCount; resourceVerifierId++)
+            for (var resourceVerifierId = 0; resourceVerifierId < 100 * Memory.Configurations.WebBrowserCount; resourceVerifierId++)
             {
                 if (Memory.CancellationToken.IsCancellationRequested) throw new OperationCanceledException(Memory.CancellationToken);
                 var resourceVerifier = ServiceLocator.Get<IResourceVerifier>();
@@ -166,14 +152,15 @@ namespace Helix.Implementations
             while (!Memory.EverythingIsDone)
             {
                 if (Memory.CancellationToken.IsCancellationRequested) break;
+                Memory.IncrementActiveThreadCount();
                 if (!Memory.TryTakeToBeVerifiedRawResource(out var toBeVerifiedRawResource))
                 {
+                    Memory.DecrementActiveThreadCount();
                     Thread.Sleep(100);
                     continue;
                 }
 
-                Task backgroundVerificationTask = null;
-                backgroundVerificationTask = new Task(() =>
+                Task.Run(() =>
                 {
                     try
                     {
@@ -190,14 +177,8 @@ namespace Helix.Implementations
                             Memory.Memorize(verificationResult.Resource);
                     }
                     catch (Exception exception) { HandleException(exception); }
-                    finally
-                    {
-                        // ReSharper disable once AccessToModifiedClosure
-                        Memory.Forget(backgroundVerificationTask);
-                    }
+                    finally { Memory.DecrementActiveThreadCount(); }
                 }, Memory.CancellationToken);
-                Memory.Memorize(backgroundVerificationTask);
-                backgroundVerificationTask.Start(TaskScheduler.Default);
             }
         }
 

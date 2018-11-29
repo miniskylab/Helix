@@ -1,15 +1,9 @@
-using System.Collections.Generic;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace Helix.Abstractions
 {
     public interface IMemory
     {
-        bool AllBackgroundTasksAreDone { get; }
-
-        IEnumerable<Task> BackgroundTasks { get; }
-
         CancellationToken CancellationToken { get; }
 
         CancellationTokenSource CancellationTokenSource { get; }
@@ -24,15 +18,13 @@ namespace Helix.Abstractions
 
         int RemainingUrlCount { get; }
 
-        void Forget(Task backgroundTask);
+        void DecrementActiveThreadCount();
 
-        void ForgetAllBackgroundTasks();
+        void IncrementActiveThreadCount();
 
         void Memorize(IRawResource toBeVerifiedRawResource);
 
         void Memorize(IResource toBeCrawledResource);
-
-        void Memorize(Task backgroundTask);
 
         bool TryTakeToBeCrawledResource(out IResource toBeCrawledResource);
 

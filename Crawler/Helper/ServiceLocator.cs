@@ -24,8 +24,8 @@ namespace Helix.Implementations
 
         public static void RegisterServices(Configurations configurations)
         {
-            if (_serviceProvider.GetService<Configurations>() != null) return;
-            _serviceProvider.Dispose();
+            if (_serviceProvider?.GetService<Configurations>() != null) return;
+            _serviceProvider?.Dispose();
             _serviceProvider = new ServiceCollection()
                 .AddTransient<IResourceCollector, ResourceCollector>()
                 .AddTransient<IResourceVerifier, ResourceVerifier>()
