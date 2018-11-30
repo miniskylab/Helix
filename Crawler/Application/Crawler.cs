@@ -71,6 +71,7 @@ namespace Helix.Implementations
             while (!Memory.EverythingIsDone)
             {
                 if (Memory.CancellationToken.IsCancellationRequested) break;
+                while (Memory.RemainingUrlCount > 1000) Thread.Sleep(3000);
                 Memory.IncrementActiveThreadCount();
                 if (!Memory.TryTakeToBeCrawledResource(out var toBeCrawledResource))
                 {
@@ -138,7 +139,7 @@ namespace Helix.Implementations
 
         static void InitializeResourceVerifierPool()
         {
-            for (var resourceVerifierId = 0; resourceVerifierId < 100 * Memory.Configurations.WebBrowserCount; resourceVerifierId++)
+            for (var resourceVerifierId = 0; resourceVerifierId < 30 * Memory.Configurations.WebBrowserCount; resourceVerifierId++)
             {
                 if (Memory.CancellationToken.IsCancellationRequested) throw new OperationCanceledException(Memory.CancellationToken);
                 var resourceVerifier = ServiceLocator.Get<IResourceVerifier>();
