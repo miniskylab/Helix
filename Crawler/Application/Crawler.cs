@@ -52,7 +52,7 @@ namespace Helix.Implementations
         public static void StopWorking()
         {
             if (!Memory.TryTransitTo(CrawlerState.Stopping)) return;
-            Memory.CancellationTokenSource.Cancel();
+            Memory.CancelEverything();
             _mainWorkingTask.Wait();
             while (ResourceVerifierPool.Any()) ResourceVerifierPool.Take().Dispose();
             while (ResourceCollectorPool.Any())

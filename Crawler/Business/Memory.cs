@@ -13,12 +13,11 @@ namespace Helix.Implementations
     {
         int _activeThreadCount;
         readonly ConcurrentSet<string> _alreadyVerifiedUrls = new ConcurrentSet<string>();
+        readonly CancellationTokenSource _cancellationTokenSource;
         readonly BlockingCollection<IResource> _toBeCrawledResources = new BlockingCollection<IResource>();
         readonly BlockingCollection<IRawResource> _toBeVerifiedRawResources = new BlockingCollection<IRawResource>();
         readonly string _workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
         static readonly object StaticLock = new object();
-
-        public CancellationTokenSource CancellationTokenSource { get; }
 
         public Configurations Configurations { get; }
 
@@ -26,7 +25,7 @@ namespace Helix.Implementations
 
         public string ErrorFilePath { get; }
 
-        public CancellationToken CancellationToken => CancellationTokenSource.Token;
+        public CancellationToken CancellationToken => _cancellationTokenSource.Token;
 
         public bool EverythingIsDone => !_toBeVerifiedRawResources.Any() && !_toBeCrawledResources.Any() && _activeThreadCount == 0;
 
@@ -36,7 +35,7 @@ namespace Helix.Implementations
         {
             Configurations = configurations;
             ErrorFilePath = Path.Combine(_workingDirectory, "errors.txt");
-            CancellationTokenSource = new CancellationTokenSource();
+            _cancellationTokenSource = new CancellationTokenSource();
             Interlocked.Exchange(ref _activeThreadCount, 0);
             while (_toBeVerifiedRawResources.Any()) _toBeVerifiedRawResources.Take();
             lock (StaticLock)
@@ -49,6 +48,8 @@ namespace Helix.Implementations
 
         [UsedImplicitly]
         public Memory() { }
+
+        public void CancelEverything() { _cancellationTokenSource.Cancel(); }
 
         public void DecrementActiveThreadCount() { Interlocked.Decrement(ref _activeThreadCount); }
 
@@ -123,7 +124,7 @@ namespace Helix.Implementations
 
         ~Memory()
         {
-            CancellationTokenSource?.Dispose();
+            _cancellationTokenSource?.Dispose();
             _toBeVerifiedRawResources?.Dispose();
         }
     }

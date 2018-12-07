@@ -6,8 +6,6 @@ namespace Helix.Abstractions
     {
         CancellationToken CancellationToken { get; }
 
-        CancellationTokenSource CancellationTokenSource { get; }
-
         Configurations Configurations { get; }
 
         CrawlerState CrawlerState { get; }
@@ -17,6 +15,8 @@ namespace Helix.Abstractions
         bool EverythingIsDone { get; }
 
         int RemainingUrlCount { get; }
+
+        void CancelEverything();
 
         void DecrementActiveThreadCount();
 
