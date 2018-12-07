@@ -1,5 +1,6 @@
-﻿const {ipcRenderer} = require("electron");
-const port = ipcRenderer.sendSync("get-web-port", "");
+﻿import io from "socket.io-client";
+
+var socket = io("http://localhost:18880");
 
 const btnMain = document.getElementById("btn-main");
 const txtStartUrl = document.getElementById("txt-start-url");
@@ -44,34 +45,34 @@ const lblElapsedTime = document.getElementById("lbl-elapsed-time");
 const lblStatusText = document.getElementById("lbl-status-text");
 const btnStop = document.getElementById("btn-stop");
 const configurationPanel = document.getElementById("configuration-panel");
-ipcRenderer.on("redraw", (_, viewModelJson) => {
-    const viewModel = JSON.parse(viewModelJson);
-    if (isNumeric(viewModel.VerifiedUrlCount)) lblVerifiedUrls.textContent = viewModel.VerifiedUrlCount;
-    if (isNumeric(viewModel.ValidUrlCount)) lblValidUrls.textContent = viewModel.ValidUrlCount;
-    if (isNumeric(viewModel.BrokenUrlCount)) lblBrokenUrls.textContent = viewModel.BrokenUrlCount;
-    if (isNumeric(viewModel.RemainingUrlCount)) lblRemainingUrls.textContent = viewModel.RemainingUrlCount;
-    if (viewModel.ElapsedTime) lblElapsedTime.textContent = viewModel.ElapsedTime;
-    if (viewModel.StatusText) lblStatusText.textContent = viewModel.StatusText;
+//ipcRenderer.on("redraw", (_, viewModelJson) => {
+//    const viewModel = JSON.parse(viewModelJson);
+//    if (isNumeric(viewModel.VerifiedUrlCount)) lblVerifiedUrls.textContent = viewModel.VerifiedUrlCount;
+//    if (isNumeric(viewModel.ValidUrlCount)) lblValidUrls.textContent = viewModel.ValidUrlCount;
+//    if (isNumeric(viewModel.BrokenUrlCount)) lblBrokenUrls.textContent = viewModel.BrokenUrlCount;
+//    if (isNumeric(viewModel.RemainingUrlCount)) lblRemainingUrls.textContent = viewModel.RemainingUrlCount;
+//    if (viewModel.ElapsedTime) lblElapsedTime.textContent = viewModel.ElapsedTime;
+//    if (viewModel.StatusText) lblStatusText.textContent = viewModel.StatusText;
 
-    const btnMainIsStartButton = btnMain.firstElementChild.className === "controls__play-icon";
-    const btnMainIsPauseButton = btnMain.firstElementChild.className === "controls__pause-icon";
-    switch (viewModel.CrawlerState) {
-        case "Ready":
-            if (btnMainIsStartButton) break;
-            btnMain.firstElementChild.className = "controls__play-icon";
-            if (btnMain.classList.contains("controls__main-button--amber")) btnMain.classList.remove("controls__main-button--amber");
-            if (btnMain.hasAttribute("disabled")) btnMain.removeAttribute("disabled");
-            if (configurationPanel.hasAttribute("disabled")) configurationPanel.removeAttribute("disabled");
-            // if (!btnStop.hasAttribute("disabled")) btnStop.setAttribute("disabled", "");
-            break;
-        case "Working":
-            if (btnMainIsPauseButton) break;
-            btnMain.firstElementChild.className = "controls__pause-icon";
-            if (!btnMain.classList.contains("controls__main-button--amber")) btnMain.classList.add("controls__main-button--amber");
-            if (btnMain.hasAttribute("disabled")) btnMain.removeAttribute("disabled");
-            if (!configurationPanel.hasAttribute("disabled")) configurationPanel.setAttribute("disabled", "");
-            // if (btnStop.hasAttribute("disabled")) btnStop.removeAttribute("disabled");
-    }
-});
+//    const btnMainIsStartButton = btnMain.firstElementChild.className === "controls__play-icon";
+//    const btnMainIsPauseButton = btnMain.firstElementChild.className === "controls__pause-icon";
+//    switch (viewModel.CrawlerState) {
+//        case "Ready":
+//            if (btnMainIsStartButton) break;
+//            btnMain.firstElementChild.className = "controls__play-icon";
+//            if (btnMain.classList.contains("controls__main-button--amber")) btnMain.classList.remove("controls__main-button--amber");
+//            if (btnMain.hasAttribute("disabled")) btnMain.removeAttribute("disabled");
+//            if (configurationPanel.hasAttribute("disabled")) configurationPanel.removeAttribute("disabled");
+//            // if (!btnStop.hasAttribute("disabled")) btnStop.setAttribute("disabled", "");
+//            break;
+//        case "Working":
+//            if (btnMainIsPauseButton) break;
+//            btnMain.firstElementChild.className = "controls__pause-icon";
+//            if (!btnMain.classList.contains("controls__main-button--amber")) btnMain.classList.add("controls__main-button--amber");
+//            if (btnMain.hasAttribute("disabled")) btnMain.removeAttribute("disabled");
+//            if (!configurationPanel.hasAttribute("disabled")) configurationPanel.setAttribute("disabled", "");
+//            // if (btnStop.hasAttribute("disabled")) btnStop.removeAttribute("disabled");
+//    }
+//});
 
 function isNumeric(number) { return !isNaN(number) && typeof(number) === "number"; }

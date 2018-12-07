@@ -19,6 +19,9 @@
 ## NuGet
 packages/
 
+## Node Modules
+node_modules/
+
 ## Windows
 $RECYCLE.BIN/
 Thumbs.db
