@@ -6,11 +6,11 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using Helix.Abstractions;
+using Helix.Crawler.Abstractions;
 
-namespace Helix.Implementations
+namespace Helix.Crawler
 {
-    public static class Crawler
+    public static class CrawlerBot
     {
         public static IMemory Memory = ServiceLocator.Get<IMemory>();
         static Task _mainWorkingTask;

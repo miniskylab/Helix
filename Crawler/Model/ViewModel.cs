@@ -1,9 +1,9 @@
-using Helix.Abstractions;
+using Helix.Crawler.Abstractions;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 
-namespace Helix.Implementations
+namespace Helix.Crawler
 {
     public class ViewModel
     {

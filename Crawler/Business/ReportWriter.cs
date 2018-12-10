@@ -4,9 +4,9 @@ using System.IO;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using Helix.Abstractions;
+using Helix.Crawler.Abstractions;
 
-namespace Helix.Implementations
+namespace Helix.Crawler
 {
     sealed class ReportWriter
     {

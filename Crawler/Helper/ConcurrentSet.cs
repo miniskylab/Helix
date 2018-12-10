@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 
-namespace Helix.Implementations
+namespace Helix.Crawler
 {
     class ConcurrentSet<T> : ICollection<T>
     {

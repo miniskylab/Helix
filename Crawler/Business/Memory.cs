@@ -4,10 +4,10 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
-using Helix.Abstractions;
+using Helix.Crawler.Abstractions;
 using JetBrains.Annotations;
 
-namespace Helix.Implementations
+namespace Helix.Crawler
 {
     class Memory : IMemory
     {

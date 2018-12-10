@@ -1,7 +1,7 @@
 ﻿using System.Threading.Tasks;
 using OpenQA.Selenium;
 
-namespace Helix.Abstractions
+namespace Helix.Crawler.Abstractions
 {
     public delegate void AllAttemptsToCollectNewRawResourcesFailedEvent(IResource parentResource);
     public delegate void BrowserExceptionOccurredEvent(WebDriverException webDriverException, IResource resourceThatTriggeredThisException);

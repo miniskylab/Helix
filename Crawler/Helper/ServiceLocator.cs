@@ -1,7 +1,7 @@
-using Helix.Abstractions;
+using Helix.Crawler.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Helix.Implementations
+namespace Helix.Crawler
 {
     static class ServiceLocator
     {

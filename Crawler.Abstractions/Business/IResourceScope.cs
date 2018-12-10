@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Helix.Abstractions
+namespace Helix.Crawler.Abstractions
 {
     public interface IResourceScope
     {

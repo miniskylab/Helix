@@ -1,6 +1,6 @@
 using System.Threading;
 
-namespace Helix.Abstractions
+namespace Helix.Crawler.Abstractions
 {
     public interface IMemory
     {

@@ -7,7 +7,7 @@ using System.Net;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using Helix.Abstractions;
+using Helix.Crawler.Abstractions;
 using JetBrains.Annotations;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
@@ -15,7 +15,7 @@ using Titanium.Web.Proxy;
 using Titanium.Web.Proxy.EventArguments;
 using Titanium.Web.Proxy.Models;
 
-namespace Helix.Implementations
+namespace Helix.Crawler
 {
     [UsedImplicitly]
     sealed class ResourceCollector : IResourceCollector

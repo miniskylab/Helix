@@ -5,10 +5,10 @@ using System.Net.Http.Headers;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
-using Helix.Abstractions;
+using Helix.Crawler.Abstractions;
 using JetBrains.Annotations;
 
-namespace Helix.Implementations
+namespace Helix.Crawler
 {
     [UsedImplicitly]
     sealed class ResourceVerifier : IResourceVerifier

@@ -1,7 +1,7 @@
 using System;
-using Helix.Abstractions;
+using Helix.Crawler.Abstractions;
 
-namespace Helix.Implementations
+namespace Helix.Crawler
 {
     public class Resource : IResource
     {

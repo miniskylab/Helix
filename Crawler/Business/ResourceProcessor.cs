@@ -1,8 +1,8 @@
 ﻿using System;
-using Helix.Abstractions;
+using Helix.Crawler.Abstractions;
 using JetBrains.Annotations;
 
-namespace Helix.Implementations
+namespace Helix.Crawler
 {
     [UsedImplicitly]
     class ResourceProcessor : IResourceProcessor
