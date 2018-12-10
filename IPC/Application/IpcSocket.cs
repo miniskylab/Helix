@@ -39,8 +39,10 @@ namespace Helix.IPC
                         Array.Clear(byteBuffer, 0, byteBuffer.Length);
                         var receivedByteCount = _handlerSocket.Receive(byteBuffer);
                         var ipcRawMessageFromRemote = Encoding.ASCII.GetString(byteBuffer, 0, receivedByteCount);
+                        if (string.IsNullOrEmpty(ipcRawMessageFromRemote)) continue;
+
                         var ipcMessageFromRemote = JsonConvert.DeserializeObject<IpcMessage>(ipcRawMessageFromRemote);
-                        if (_actions.TryGetValue(ipcMessageFromRemote.Text, out var action)) action.Invoke(ipcMessageFromRemote.Payload);
+                        if (_actions.TryGetValue(ipcMessageFromRemote.Text, out var action)) action(ipcMessageFromRemote.Payload);
                     }
                 }, _cancellationTokenSource.Token)
             };
@@ -48,14 +50,23 @@ namespace Helix.IPC
 
         public void Dispose()
         {
-            _listenerSocket.Shutdown(SocketShutdown.Both);
-            _listenerSocket.Close();
+            _cancellationTokenSource.Cancel();
+            try { _listenerSocket.Shutdown(SocketShutdown.Both); }
+            catch (SocketException socketException)
+            {
+                if (socketException.SocketErrorCode != SocketError.NotConnected) throw;
+            }
 
             _handlerSocket?.Shutdown(SocketShutdown.Both);
+            _listenerSocket.Close();
             _handlerSocket?.Close();
 
-            _cancellationTokenSource.Cancel();
-            Task.WhenAll(_backgroundTasks).Wait();
+            try { Task.WhenAll(_backgroundTasks).Wait(); }
+            catch (SocketException socketException)
+            {
+                if (socketException.SocketErrorCode != SocketError.ConnectionAborted) throw;
+            }
+
             _cancellationTokenSource.Dispose();
         }
 
