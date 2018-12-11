@@ -1,5 +1,5 @@
 ﻿const child_process = require('child_process');
-child_process.execSync("npm install yauzl@latest rimraf@latest --silent", { stdio: [0, 1, 2] });
+child_process.execSync("npm install yauzl@latest rimraf@latest --silent", {stdio: [0, 1, 2]});
 
 const path = require("path");
 const fs = require("fs");
@@ -24,16 +24,17 @@ function SendGETRequestOverHttps(destinationUrl) {
             headers: {"user-agent": "node.js"}
         }, httpResponse => {
             let responseBody = "";
-            httpResponse.on("data", chunk => { responseBody += chunk; });
-            httpResponse.on("end", () => { resolve(JSON.parse(responseBody)); });
-        }).on("error", error => { reject(error.message); });
+            httpResponse.on("data", chunk => responseBody += chunk);
+            httpResponse.on("end", () => resolve(JSON.parse(responseBody)));
+        }).on("error", error => reject(error.message));
     });
 }
 
 function ExtractLatestElectronJsBinaryDownloadUrl(latestElectronJsReleaseMetadata) {
-    const electronJsWindowBinarySelector = /electron-.+-win32-x64.zip/g;
-    const electronJsWindowBinaryMetadata = latestElectronJsReleaseMetadata.assets.find(asset => electronJsWindowBinarySelector.test(asset.browser_download_url));
-    return electronJsWindowBinaryMetadata.browser_download_url;
+    const electronJsWindowsBinarySelector = /electron-.+-win32-x64.zip/g;
+    const electronJsWindowsBinaryMetadata = latestElectronJsReleaseMetadata.assets
+        .find(asset => electronJsWindowsBinarySelector.test(asset.browser_download_url));
+    return electronJsWindowsBinaryMetadata.browser_download_url;
 }
 
 function DownloadFileFromTheInternet(downloadUrl, pathToDestinationFileOnDisk) {
@@ -43,8 +44,8 @@ function DownloadFileFromTheInternet(downloadUrl, pathToDestinationFileOnDisk) {
             switch (httpResponse.statusCode) {
                 case 200:
                     httpResponse.pipe(destinationFileOnDisk);
-                    destinationFileOnDisk.on("finish", () => { destinationFileOnDisk.close(() => { resolve(pathToDestinationFileOnDisk); }); });
-                    destinationFileOnDisk.on("error", error => { fs.unlink(destinationFileOnDisk, () => { reject(error.message); }); });
+                    destinationFileOnDisk.on("finish", () => destinationFileOnDisk.close(() => resolve(pathToDestinationFileOnDisk)));
+                    destinationFileOnDisk.on("error", error => fs.unlink(destinationFileOnDisk, () => reject(error.message)));
                     break;
                 case 302:
                     const redirectedDownloadUrl = httpResponse.headers.location;
@@ -53,26 +54,27 @@ function DownloadFileFromTheInternet(downloadUrl, pathToDestinationFileOnDisk) {
                 default:
                     reject(`Status code was: ${httpResponse.statusCode}`);
             }
-        }).on("error", error => { fs.unlink(destinationFileOnDisk, () => { reject(error.message); }); })
-        .setTimeout(60000, () => {
+        }).on("error", error => {
+            fs.unlink(destinationFileOnDisk, () => reject(error.message));
+        }).setTimeout(60000, () => {
             request.abort();
-            reject("Timeout!");
+            reject("ElectronJs pre-built binary download took too long!");
         });
     });
-};
+}
 
 function Unzip(pathToLatestElectronJsBinaryZipFile, pathToDestinationFolder) {
     EnsureRecreated(pathToDestinationFolder);
-    yauzl.open(pathToLatestElectronJsBinaryZipFile, { lazyEntries: true }, (error, zipfile) => {
+    yauzl.open(pathToLatestElectronJsBinaryZipFile, {lazyEntries: true}, (error, latestElectronJsBinaryZipFile) => {
         if (error) throw error;
-        zipfile.readEntry();
-        zipfile.on("entry", entry => {
-            zipfile.openReadStream(entry, (error, readStream) => {
+        latestElectronJsBinaryZipFile.readEntry();
+        latestElectronJsBinaryZipFile.on("entry", entry => {
+            latestElectronJsBinaryZipFile.openReadStream(entry, (error, readStream) => {
                 if (error) throw error;
                 const pathToUnzippedDestinationFile = `${pathToDestinationFolder.replace(/\/+$/, "/")}/${entry.fileName}`;
                 EnsureParentDirectoryExistence(pathToUnzippedDestinationFile);
                 readStream.pipe(fs.createWriteStream(pathToUnzippedDestinationFile));
-                readStream.on("end", () => { zipfile.readEntry(); });
+                readStream.on("end", () => latestElectronJsBinaryZipFile.readEntry());
             });
         });
     });
