@@ -1,4 +1,4 @@
-﻿const { app, BrowserWindow } = require("electron");
+﻿const { app, BrowserWindow, ipcMain } = require("electron");
 
 app.on("ready", () => {
     const mainWindow = new BrowserWindow({
@@ -11,7 +11,7 @@ app.on("ready", () => {
         resizable: false,
         frame: false
     });
-    mainWindow.setMenuBarVisibility(false);
-    mainWindow.loadURL(`file://${__dirname}/www/index.html`);
+    mainWindow.loadURL(`file://${__dirname}/index.html`);
     mainWindow.webContents.on("did-finish-load", () => { mainWindow.show(); });
 });
+ipcMain.on("btn-close-clicked", () => { app.quit(); });

@@ -7,18 +7,30 @@ using Helix.Crawler;
 using Helix.Crawler.Abstractions;
 using Helix.IPC;
 using Newtonsoft.Json;
+using System.Runtime.InteropServices;
 
 namespace Helix.Gui
 {
     public static class GuiController
     {
+        [DllImport("kernel32.dll")]
+        static extern IntPtr GetConsoleWindow();
+
+        [DllImport("user32.dll")]
+        static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
         static readonly List<Task> BackgroundTasks = new List<Task>();
         static readonly IpcSocket IpcSocket = new IpcSocket("127.0.0.1", 18880);
         static readonly ManualResetEvent ManualResetEvent = new ManualResetEvent(false);
         static readonly Stopwatch Stopwatch = new Stopwatch();
+        static readonly Process GuiProcess = new Process { StartInfo = { FileName = "gui/electron.exe" } };
 
         static void Main()
         {
+            /* Hide the console windows.
+             * TODO: Will be removed and replaced with built-in .Net Core 3.0 feature. */
+            ShowWindow(GetConsoleWindow(), 0);
+
             IpcSocket.On("btn-start-clicked", configurationJsonString =>
             {
                 if (CrawlerBot.Memory.CrawlerState != CrawlerState.Ready) return;
@@ -53,10 +65,11 @@ namespace Helix.Gui
                 CrawlerBot.Dispose();
                 ManualResetEvent.Set();
             });
+            GuiProcess.Start();
 
             ManualResetEvent.WaitOne();
-            IpcSocket.Send(new IpcMessage { Text = "shutdown" });
             IpcSocket.Dispose();
+            GuiProcess.Close();
         }
 
         static void RedrawGui(string statusText = null)
