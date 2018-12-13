@@ -11,7 +11,7 @@ const asar = require("asar");
 
 (async () => {
     const commandLineArguments = process.argv.slice(2);
-    const pathToUnzippedElectronJsBinaryDirectory = `${commandLineArguments[commandLineArguments.indexOf("-o") + 1]}/gui`;
+    const pathToUnzippedElectronJsBinaryDirectory = `${commandLineArguments[commandLineArguments.indexOf("-o") + 1]}/ui`;
     if (!fs.existsSync(pathToUnzippedElectronJsBinaryDirectory)) {
         const pathToTemporaryDownloadedZipFile = "temp.zip";
         console.log("Fetching latest ElectronJs release metadata ...");

@@ -1,29 +1,26 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Helix.Crawler;
 using Helix.Crawler.Abstractions;
 using Helix.IPC;
 using Newtonsoft.Json;
-using System.Runtime.InteropServices;
 
 namespace Helix.Gui
 {
     public static class GuiController
     {
-        [DllImport("kernel32.dll")]
-        static extern IntPtr GetConsoleWindow();
-
-        [DllImport("user32.dll")]
-        static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
         static readonly List<Task> BackgroundTasks = new List<Task>();
+        static readonly Process GuiProcess = new Process { StartInfo = { FileName = "ui/electron.exe" } };
         static readonly IpcSocket IpcSocket = new IpcSocket("127.0.0.1", 18880);
         static readonly ManualResetEvent ManualResetEvent = new ManualResetEvent(false);
         static readonly Stopwatch Stopwatch = new Stopwatch();
-        static readonly Process GuiProcess = new Process { StartInfo = { FileName = "gui/electron.exe" } };
+
+        [DllImport("kernel32.dll")]
+        static extern IntPtr GetConsoleWindow();
 
         static void Main()
         {
@@ -101,5 +98,8 @@ namespace Helix.Gui
                 }
             }, CrawlerBot.Memory.CancellationToken));
         }
+
+        [DllImport("user32.dll")]
+        static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
     }
 }

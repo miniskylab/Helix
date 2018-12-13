@@ -23,7 +23,7 @@
     </ItemGroup>
 
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-        <Exec Command="node build.js -o $(OutDir)" />
+        <Exec Command="node deployment\build.js -o $(OutDir)" />
     </Target>
     
 </Project>
