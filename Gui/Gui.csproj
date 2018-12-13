@@ -4,6 +4,7 @@
         <TargetFramework>netcoreapp2.1</TargetFramework>
         <LangVersion>latest</LangVersion>
         <OutputType>Exe</OutputType>
+        <AssemblyName>Helix</AssemblyName>
     </PropertyGroup>
 
     <ItemGroup>
@@ -15,8 +16,14 @@
         <ProjectReference Include="..\IPC\IPC.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <Compile Remove="node_modules\**" />
+        <EmbeddedResource Remove="node_modules\**" />
+        <None Remove="node_modules\**" />
+    </ItemGroup>
+
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-      <Exec Command="node build.js -o $(OutDir)" />
+        <Exec Command="node build.js -o $(OutDir)" />
     </Target>
     
 </Project>
