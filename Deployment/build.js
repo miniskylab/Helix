@@ -13,12 +13,12 @@ const asar = require("asar");
     const commandLineArguments = process.argv.slice(2);
     const pathToUnzippedElectronJsBinaryDirectory = `${commandLineArguments[commandLineArguments.indexOf("-o") + 1]}/ui`;
     if (!fs.existsSync(pathToUnzippedElectronJsBinaryDirectory)) {
-        const pathToTemporaryDownloadedZipFile = "temp.zip";
         console.log("Fetching latest ElectronJs release metadata ...");
         const latestElectronJsReleaseJson = await SendGETRequestOverHttps("https://api.github.com/repos/electron/electron/releases/latest");
         const latestElectronJsBinaryDownloadUrl = ExtractLatestElectronJsBinaryDownloadUrl(latestElectronJsReleaseJson);
 
         console.log("Downloading latest ElectronJs binary from the Internet ...");
+        const pathToTemporaryDownloadedZipFile = "temp.zip";
         await DownloadFileFromTheInternet(latestElectronJsBinaryDownloadUrl, pathToTemporaryDownloadedZipFile);
 
         console.log("Unzipping downloaded ElectronJs binary ...");
@@ -27,9 +27,10 @@ const asar = require("asar");
     }
 
     console.log("Deploying GUI code ...");
+    const pathToGuiSourceCode = "../Gui/app";
     const pathToDeploymentArchiveFile = `${pathToUnzippedElectronJsBinaryDirectory}/resources/app.asar`;
     if (fs.existsSync(pathToDeploymentArchiveFile)) fs.unlinkSync(pathToDeploymentArchiveFile);
-    await new Promise(resolve => asar.createPackage("app", pathToDeploymentArchiveFile, resolve));
+    await new Promise(resolve => asar.createPackage(pathToGuiSourceCode, pathToDeploymentArchiveFile, resolve));
 
     console.log("Done!");
 })();
