@@ -16,14 +16,8 @@
         <ProjectReference Include="..\IPC\IPC.csproj" />
     </ItemGroup>
 
-    <ItemGroup>
-        <Compile Remove="node_modules\**" />
-        <EmbeddedResource Remove="node_modules\**" />
-        <None Remove="node_modules\**" />
-    </ItemGroup>
-
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-        <Exec Command="node deployment\build.js -o $(OutDir)" />
+        <Exec Command="pushd ..\deployment&#xD;&#xA;node build.js -o $(TargetDir)&#xD;&#xA;popd ..\deployment" />
     </Target>
     
 </Project>
