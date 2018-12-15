@@ -16,16 +16,27 @@ namespace Helix.Crawler.Abstractions
 
         public int WebBrowserCount { get; }
 
+        public Configurations(string domainName = "", bool reportBrokenLinksOnly = false, int requestTimeoutDuration = 0,
+            bool showWebBrowsers = false, string startUrl = "", int webBrowserCount = 0)
+        {
+            DomainName = domainName;
+            ReportBrokenLinksOnly = reportBrokenLinksOnly;
+            RequestTimeoutDuration = requestTimeoutDuration;
+            ShowWebBrowsers = showWebBrowsers;
+            StartUrl = startUrl;
+            WebBrowserCount = webBrowserCount;
+        }
+
         public Configurations(string configurationJsonString)
         {
             var tokens = JObject.Parse(configurationJsonString);
-            ShowWebBrowsers = (bool) tokens.SelectToken(nameof(ShowWebBrowsers));
-            WebBrowserCount = (int) tokens.SelectToken(nameof(WebBrowserCount));
-            ReportBrokenLinksOnly = (bool) tokens.SelectToken(nameof(ReportBrokenLinksOnly));
-            RequestTimeoutDuration = (int) tokens.SelectToken(nameof(RequestTimeoutDuration));
-            StartUrl = ((string) tokens.SelectToken(nameof(StartUrl))).ToLower();
+            ShowWebBrowsers = (bool) (tokens.SelectToken(nameof(ShowWebBrowsers)) ?? false);
+            WebBrowserCount = (int) (tokens.SelectToken(nameof(WebBrowserCount)) ?? 0);
+            ReportBrokenLinksOnly = (bool) (tokens.SelectToken(nameof(ReportBrokenLinksOnly)) ?? false);
+            RequestTimeoutDuration = (int) (tokens.SelectToken(nameof(RequestTimeoutDuration)) ?? 0);
+            StartUrl = ((string) tokens.SelectToken(nameof(StartUrl)) ?? string.Empty).ToLower();
 
-            DomainName = (string) tokens.SelectToken(nameof(DomainName));
+            DomainName = ((string) tokens.SelectToken(nameof(DomainName)) ?? string.Empty).ToLower();
             if (string.IsNullOrWhiteSpace(DomainName)) DomainName = "_";
         }
     }

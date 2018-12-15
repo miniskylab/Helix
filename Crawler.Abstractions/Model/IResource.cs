@@ -6,8 +6,8 @@ namespace Helix.Crawler.Abstractions
     {
         bool Localized { get; set; }
 
-        Uri ParentUri { get; }
+        Uri ParentUri { get; set; }
 
-        Uri Uri { get; }
+        Uri Uri { get; set; }
     }
 }
