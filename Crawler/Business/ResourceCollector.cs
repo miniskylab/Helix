@@ -8,7 +8,6 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Helix.Crawler.Abstractions;
-using JetBrains.Annotations;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using Titanium.Web.Proxy;
@@ -17,8 +16,7 @@ using Titanium.Web.Proxy.Models;
 
 namespace Helix.Crawler
 {
-    [UsedImplicitly]
-    sealed class ResourceCollector : IResourceCollector
+    public sealed class ResourceCollector : IResourceCollector
     {
         const int HttpProxyPort = 18882;
         readonly ChromeDriver _chromeDriver;

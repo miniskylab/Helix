@@ -1,11 +1,9 @@
 ﻿using System;
 using Helix.Crawler.Abstractions;
-using JetBrains.Annotations;
 
 namespace Helix.Crawler
 {
-    [UsedImplicitly]
-    public class ResourceScope : IResourceScope
+    public sealed class ResourceScope : IResourceScope
     {
         readonly Configurations _configurations;
 

@@ -1,11 +1,9 @@
 ﻿using System;
 using Helix.Crawler.Abstractions;
-using JetBrains.Annotations;
 
 namespace Helix.Crawler
 {
-    [UsedImplicitly]
-    class ResourceProcessor : IResourceProcessor
+    public sealed class ResourceProcessor : IResourceProcessor
     {
         readonly IResourceScope _resourceScope;
 

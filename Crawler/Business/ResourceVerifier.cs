@@ -6,12 +6,10 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Helix.Crawler.Abstractions;
-using JetBrains.Annotations;
 
 namespace Helix.Crawler
 {
-    [UsedImplicitly]
-    sealed class ResourceVerifier : IResourceVerifier
+    public sealed class ResourceVerifier : IResourceVerifier
     {
         readonly CancellationTokenSource _cancellationTokenSource;
         bool _disposed;

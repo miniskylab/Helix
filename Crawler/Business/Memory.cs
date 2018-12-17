@@ -9,7 +9,7 @@ using JetBrains.Annotations;
 
 namespace Helix.Crawler
 {
-    class Memory : IMemory
+    public sealed class Memory : IMemory
     {
         int _activeThreadCount;
         readonly ConcurrentSet<string> _alreadyVerifiedUrls = new ConcurrentSet<string>();
