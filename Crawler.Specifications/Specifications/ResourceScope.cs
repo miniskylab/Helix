@@ -18,5 +18,16 @@ namespace Helix.Crawler.Specifications
             if (expectedException != null) Assert.Throws(expectedException, () => { resourceScope.IsInternalResource(resource); });
             else Assert.Equal(resourceScope.IsInternalResource(resource), expectedResult);
         }
+
+        [Theory]
+        [ClassData(typeof(StartUrlDefinition))]
+        void CouldIdentifyStartUrl(string url, Configurations configurations, bool expectedResult, Type expectedException)
+        {
+            if (configurations != null) ServiceLocator.AddOrReplaceServices(new ServiceDescriptor(typeof(Configurations), configurations));
+            var resourceScope = ServiceLocator.Get<IResourceScope>();
+
+            if (expectedException != null) Assert.Throws(expectedException, () => { resourceScope.IsStartUrl(url); });
+            else Assert.Equal(resourceScope.IsStartUrl(url), expectedResult);
+        }
     }
 }
