@@ -10,7 +10,7 @@ namespace Helix.Crawler.Specifications
     {
         [Theory]
         [ClassData(typeof(InternalResourceDefinition))]
-        void CouldIdentifyInternalResources(IResource resource, Configurations configurations, bool expectedResult, Type expectedException)
+        void CouldIdentifyInternalResources(Configurations configurations, IResource resource, bool expectedResult, Type expectedException)
         {
             if (configurations != null) ServiceLocator.AddOrReplaceServices(new ServiceDescriptor(typeof(Configurations), configurations));
             var resourceScope = ServiceLocator.Get<IResourceScope>();
@@ -21,13 +21,24 @@ namespace Helix.Crawler.Specifications
 
         [Theory]
         [ClassData(typeof(StartUrlDefinition))]
-        void CouldIdentifyStartUrl(string url, Configurations configurations, bool expectedResult, Type expectedException)
+        void CouldIdentifyStartUrl(Configurations configurations, string url, bool expectedResult, Type expectedException)
         {
             if (configurations != null) ServiceLocator.AddOrReplaceServices(new ServiceDescriptor(typeof(Configurations), configurations));
             var resourceScope = ServiceLocator.Get<IResourceScope>();
 
             if (expectedException != null) Assert.Throws(expectedException, () => { resourceScope.IsStartUrl(url); });
             else Assert.Equal(expectedResult, resourceScope.IsStartUrl(url));
+        }
+
+        [Theory]
+        [ClassData(typeof(UriLocalizationDefinition))]
+        void CouldLocalizeUri(Configurations configurations, Uri originalUri, Uri expectedLocalizedUri, Type expectedException)
+        {
+            if (configurations != null) ServiceLocator.AddOrReplaceServices(new ServiceDescriptor(typeof(Configurations), configurations));
+            var resourceScope = ServiceLocator.Get<IResourceScope>();
+
+            if (expectedException != null) Assert.Throws(expectedException, () => { resourceScope.Localize(originalUri); });
+            else Assert.Equal(expectedLocalizedUri, resourceScope.Localize(originalUri));
         }
     }
 }
