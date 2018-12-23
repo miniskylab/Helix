@@ -113,7 +113,11 @@ namespace Helix.Crawler
 
         async Task EnsureInternal(object _, SessionEventArgs networkTraffic)
         {
-            await Task.Run(() => { _resourceScope.EnsureInternal(networkTraffic.WebSession.Request.RequestUri); });
+            await Task.Run(() =>
+            {
+                networkTraffic.WebSession.Request.RequestUri = _resourceScope.Localize(networkTraffic.WebSession.Request.RequestUri);
+                networkTraffic.WebSession.Request.Host = networkTraffic.WebSession.Request.RequestUri.Host;
+            });
         }
 
         void ReleaseUnmanagedResources()

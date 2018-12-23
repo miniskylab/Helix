@@ -16,7 +16,7 @@ namespace Helix.Crawler.Specifications
             var resourceScope = ServiceLocator.Get<IResourceScope>();
 
             if (expectedException != null) Assert.Throws(expectedException, () => { resourceScope.IsInternalResource(resource); });
-            else Assert.Equal(resourceScope.IsInternalResource(resource), expectedResult);
+            else Assert.Equal(expectedResult, resourceScope.IsInternalResource(resource));
         }
 
         [Theory]
@@ -27,7 +27,7 @@ namespace Helix.Crawler.Specifications
             var resourceScope = ServiceLocator.Get<IResourceScope>();
 
             if (expectedException != null) Assert.Throws(expectedException, () => { resourceScope.IsStartUrl(url); });
-            else Assert.Equal(resourceScope.IsStartUrl(url), expectedResult);
+            else Assert.Equal(expectedResult, resourceScope.IsStartUrl(url));
         }
     }
 }

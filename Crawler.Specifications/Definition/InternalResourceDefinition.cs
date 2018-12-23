@@ -8,7 +8,7 @@ using Newtonsoft.Json;
 
 namespace Helix.Crawler.Specifications
 {
-    class InternalResourceDefinition : TheoryData<IResource, Configurations, bool, Type>
+    internal class InternalResourceDefinition : TheoryData<IResource, Configurations, bool, Type>
     {
         public InternalResourceDefinition()
         {

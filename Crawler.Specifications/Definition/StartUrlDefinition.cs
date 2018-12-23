@@ -7,7 +7,7 @@ using Newtonsoft.Json;
 
 namespace Helix.Crawler.Specifications
 {
-    class StartUrlDefinition : TheoryData<string, Configurations, bool, Type>
+    internal class StartUrlDefinition : TheoryData<string, Configurations, bool, Type>
     {
         public StartUrlDefinition()
         {

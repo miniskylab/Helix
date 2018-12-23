@@ -4,7 +4,7 @@ namespace Helix.Crawler.Abstractions
 {
     public interface IResourceScope
     {
-        void EnsureInternal(Uri uri);
+        Uri Localize(Uri uri);
 
         bool IsInternalResource(IResource resource);
 

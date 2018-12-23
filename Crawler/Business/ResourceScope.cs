@@ -9,9 +9,10 @@ namespace Helix.Crawler
 
         public ResourceScope(Configurations configurations) { _configurations = configurations; }
 
-        public void EnsureInternal(Uri uri)
+        public Uri Localize(Uri uri)
         {
             /*TODO:*/
+            return uri;
         }
 
         public bool IsInternalResource(IResource resource)
