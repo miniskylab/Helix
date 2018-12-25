@@ -8,7 +8,7 @@ using Newtonsoft.Json;
 
 namespace Helix.Crawler.Specifications
 {
-    internal class InternalResourceDefinition : TheoryData<Configurations, IResource, bool, Type>
+    internal class InternalResourceDefinition : TheoryDescription<Configurations, IResource, bool, Type>
     {
         public InternalResourceDefinition()
         {
@@ -29,7 +29,7 @@ namespace Helix.Crawler.Specifications
             var resource = ServiceLocator.Get<IResource>();
             resource.Uri = new Uri("http://www.helix.com/anything");
             resource.ParentUri = new Uri("http://192.168.1.2:8080");
-            Add(p2: resource, p3: false);
+            AddTheoryDescription(p2: resource, p3: false);
         }
 
         void IsStartUrlUsingDomainName()
@@ -41,7 +41,7 @@ namespace Helix.Crawler.Specifications
             {
                 { nameof(Configurations.StartUrl), "http://www.helix.com" }
             }));
-            Add(configurations, resource, true);
+            AddTheoryDescription(configurations, resource, true);
         }
 
         void IsStartUrlUsingIpAddress()
@@ -54,7 +54,7 @@ namespace Helix.Crawler.Specifications
                 { nameof(Configurations.StartUrl), "http://192.168.1.2:8080" },
                 { nameof(Configurations.DomainName), "www.helix.com" }
             }));
-            Add(configurations, resource, true);
+            AddTheoryDescription(configurations, resource, true);
         }
 
         void MatchConfiguredDomainName()
@@ -66,7 +66,7 @@ namespace Helix.Crawler.Specifications
             {
                 { nameof(Configurations.DomainName), "www.helix.com" }
             }));
-            Add(configurations, resource, true);
+            AddTheoryDescription(configurations, resource, true);
         }
 
         void ShareHostNameWithParent()
@@ -74,7 +74,7 @@ namespace Helix.Crawler.Specifications
             var resource = ServiceLocator.Get<IResource>();
             resource.ParentUri = new Uri("http://www.helix.com");
             resource.Uri = new Uri("http://www.helix.com/anything");
-            Add(p2: resource, p3: true);
+            AddTheoryDescription(p2: resource, p3: true);
         }
 
         void ThrowExceptionIfArgumentIsNotValid()
@@ -82,15 +82,15 @@ namespace Helix.Crawler.Specifications
             var resource = ServiceLocator.Get<IResource>();
             resource.Uri = new Uri("http://www.helix.com");
             resource.ParentUri = null;
-            Add(p2: resource, p4: typeof(ArgumentException));
+            AddTheoryDescription(p2: resource, p4: typeof(ArgumentException));
         }
 
         void ThrowExceptionIfArgumentNull()
         {
             var resource = ServiceLocator.Get<IResource>();
             resource.Uri = null;
-            Add(p2: resource, p4: typeof(ArgumentNullException));
-            Add(p2: null, p4: typeof(ArgumentNullException));
+            AddTheoryDescription(p2: resource, p4: typeof(ArgumentNullException));
+            AddTheoryDescription(p2: null, p4: typeof(ArgumentNullException));
         }
     }
 }

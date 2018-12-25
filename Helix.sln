@@ -9,13 +9,19 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gui", "Gui\Gui.csproj", "{9
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Crawler.Abstractions", "Crawler.Abstractions\Crawler.Abstractions.csproj", "{4BE3E84C-8721-4566-BF09-F4BF78BBF9A2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IPC", "IPC\IPC.csproj", "{C9ABBA75-6398-43EF-9697-8B3EA841D689}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IPC", "IPC\IPC.csproj", "{C9ABBA75-6398-43EF-9697-8B3EA841D689}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IPC.Abstractions", "IPC.Abstractions\IPC.Abstractions.csproj", "{02DF229B-9382-4C00-A610-A8409F0A5CC0}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IPC.Abstractions", "IPC.Abstractions\IPC.Abstractions.csproj", "{02DF229B-9382-4C00-A610-A8409F0A5CC0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Crawler.Specifications", "Crawler.Specifications\Crawler.Specifications.csproj", "{C4B21D76-24E0-42CF-A9D8-9BCC8D043126}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Crawler.Specifications", "Crawler.Specifications\Crawler.Specifications.csproj", "{C4B21D76-24E0-42CF-A9D8-9BCC8D043126}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Specifications", "Specifications\Specifications.csproj", "{9EE24964-6BDA-4F86-ACB4-792E1E616472}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Specifications", "Specifications\Specifications.csproj", "{9EE24964-6BDA-4F86-ACB4-792E1E616472}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Requirements", "Requirements", "{EB9D75C2-3126-4A75-B61C-3A9955068896}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Crawler", "Crawler", "{4739E787-D36A-4E24-A6FB-29E724C2F3A4}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "IPC", "IPC", "{3C6C454C-D7C0-4C31-8CAD-3D7F84A10978}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -54,6 +60,14 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{4BE3E84C-8721-4566-BF09-F4BF78BBF9A2} = {4739E787-D36A-4E24-A6FB-29E724C2F3A4}
+		{02DF229B-9382-4C00-A610-A8409F0A5CC0} = {3C6C454C-D7C0-4C31-8CAD-3D7F84A10978}
+		{C4B21D76-24E0-42CF-A9D8-9BCC8D043126} = {4739E787-D36A-4E24-A6FB-29E724C2F3A4}
+		{9EE24964-6BDA-4F86-ACB4-792E1E616472} = {EB9D75C2-3126-4A75-B61C-3A9955068896}
+		{4739E787-D36A-4E24-A6FB-29E724C2F3A4} = {EB9D75C2-3126-4A75-B61C-3A9955068896}
+		{3C6C454C-D7C0-4C31-8CAD-3D7F84A10978} = {EB9D75C2-3126-4A75-B61C-3A9955068896}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {E332318D-6E43-4DF6-9A6B-C7D853198F99}

@@ -2,8 +2,8 @@ namespace Helix.Crawler.Abstractions
 {
     public interface IRawResource : INetworkResource
     {
-        string ParentUrl { get; }
+        string ParentUrl { get; set; }
 
-        string Url { get; }
+        string Url { get; set; }
     }
 }

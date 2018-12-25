@@ -9,17 +9,19 @@ namespace Helix.Crawler.Specifications
     {
         [Theory]
         [ClassData(typeof(RawResourceProcessingDefinition))]
-        void CouldProcessRawResourcesIntoResources(IRawResource rawResource, IResource expectedResource, bool expectedProcessingResult,
-            Type expectedException)
+        void CouldProcessRawResourcesIntoResources(IRawResource rawResource, IResource expectedOutputResource,
+            bool expectedProcessingResult, Type expectedExceptionType)
         {
             var resourceProcessor = ServiceLocator.Get<IResourceProcessor>();
-            if (expectedException != null)
-                Assert.Throws(expectedException, () => { resourceProcessor.TryProcessRawResource(rawResource, out _); });
+            if (expectedExceptionType != null)
+                Assert.Throws(expectedExceptionType, () => { resourceProcessor.TryProcessRawResource(rawResource, out _); });
             else
             {
                 var processingResult = resourceProcessor.TryProcessRawResource(rawResource, out var resource);
                 Assert.Equal(expectedProcessingResult, processingResult);
-                Assert.StrictEqual(expectedResource, resource);
+                Assert.Equal(expectedOutputResource.Localized, resource.Localized);
+                Assert.Equal(expectedOutputResource.ParentUri, resource.ParentUri);
+                Assert.Equal(expectedOutputResource.Uri, resource.Uri);
             }
         }
     }
