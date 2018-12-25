@@ -11,6 +11,8 @@ namespace Helix.Crawler
 
         public bool TryProcessRawResource(IRawResource rawResource, out IResource resource)
         {
+            if (rawResource == null) throw new ArgumentNullException();
+
             resource = null;
             var urlIsNotStartUrl = !_resourceScope.IsStartUrl(rawResource.Url);
             var parentUrlIsNotValid = !Uri.TryCreate(rawResource.ParentUrl, UriKind.Absolute, out var parentUri);

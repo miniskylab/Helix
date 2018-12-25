@@ -9,14 +9,9 @@ namespace Helix.Crawler
 
         public ResourceScope(Configurations configurations) { _configurations = configurations; }
 
-        public Uri Localize(Uri uri)
-        {
-            /*TODO:*/
-            return uri;
-        }
-
         public bool IsInternalResource(IResource resource)
         {
+            if (resource == null || resource.Uri == null) throw new ArgumentNullException();
             return IsStartUrl(resource.Uri.AbsoluteUri) ||
                    resource.Uri.Authority.ToLower().Equals(resource.ParentUri.Authority.ToLower()) ||
                    resource.Uri.Authority.ToLower().EndsWith(_configurations.DomainName.ToLower());
@@ -24,7 +19,14 @@ namespace Helix.Crawler
 
         public bool IsStartUrl(string url)
         {
+            if (url == null) throw new ArgumentNullException();
             return url.ToLower().EnsureEndsWith('/').Equals(_configurations.StartUrl.EnsureEndsWith('/'));
+        }
+
+        public Uri Localize(Uri uri)
+        {
+            /*TODO:*/
+            return uri;
         }
     }
 }
