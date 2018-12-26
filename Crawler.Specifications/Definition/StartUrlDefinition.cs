@@ -11,8 +11,10 @@ namespace Helix.Crawler.Specifications
     {
         public StartUrlDefinition()
         {
-            MatchConfiguredStartUrl();
+            MatchConfiguredStartUrlUsingDomainName();
+            MatchConfiguredStartUrlUsingIpAddress();
             ThrowExceptionIfArgumentNull();
+            ThrowExceptionIfArgumentIsNotValid();
             IsNotStartUrlInAllOtherCases();
         }
 
@@ -28,7 +30,7 @@ namespace Helix.Crawler.Specifications
             AddTheoryDescription(p2: "http://www.helix.com/anything", p3: false);
         }
 
-        void MatchConfiguredStartUrl()
+        void MatchConfiguredStartUrlUsingDomainName()
         {
             var configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
             {
@@ -36,6 +38,18 @@ namespace Helix.Crawler.Specifications
             }));
             AddTheoryDescription(configurations, "http://www.helix.com", true);
         }
+
+        void MatchConfiguredStartUrlUsingIpAddress()
+        {
+            var configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
+            {
+                { nameof(Configurations.StartUrl), "http://192.168.1.2" },
+                { nameof(Configurations.DomainName), "www.helix.com" }
+            }));
+            AddTheoryDescription(configurations, "http://www.helix.com", true);
+        }
+
+        void ThrowExceptionIfArgumentIsNotValid() { AddTheoryDescription(p2: "ThisIsAnInvalidUrl", p4: typeof(UriFormatException)); }
 
         void ThrowExceptionIfArgumentNull() { AddTheoryDescription(null, p4: typeof(ArgumentNullException)); }
     }

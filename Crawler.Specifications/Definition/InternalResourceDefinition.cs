@@ -51,7 +51,7 @@ namespace Helix.Crawler.Specifications
             resource.Uri = new Uri("http://www.helix.com");
             var configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
             {
-                { nameof(Configurations.StartUrl), "http://192.168.1.2:8080" },
+                { nameof(Configurations.StartUrl), "http://192.168.1.2" },
                 { nameof(Configurations.DomainName), "www.helix.com" }
             }));
             AddTheoryDescription(configurations, resource, true);
