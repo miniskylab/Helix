@@ -11,7 +11,17 @@ namespace Helix.Crawler.Specifications
         public UriLocalizationDefinition()
         {
             ReplaceDomainNameMatchingConfiguredWithStartUrlAuthority();
+            DoesNothingToUriWhoseAuthorityIsDifferentFromTheConfiguredDomainName();
             ThrowExceptionIfArgumentNull();
+        }
+
+        void DoesNothingToUriWhoseAuthorityIsDifferentFromTheConfiguredDomainName()
+        {
+            var configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
+            {
+                { nameof(Configurations.DomainName), "www.helix.com" }
+            }));
+            AddTheoryDescription(configurations, new Uri("http://www.sanity.com/anything"), new Uri("http://www.sanity.com/anything"));
         }
 
         void ReplaceDomainNameMatchingConfiguredWithStartUrlAuthority()

@@ -12,24 +12,27 @@ namespace Helix.Crawler
         public bool IsInternalResource(IResource resource)
         {
             if (resource == null || resource.Uri == null) throw new ArgumentNullException();
-            if (IsStartUrl(resource.Uri.AbsoluteUri)) return true;
+            if (IsStartUrl(Localize(resource.Uri).AbsoluteUri)) return true;
 
             if (resource.ParentUri == null) throw new ArgumentException();
-            return resource.Uri.Authority.ToLower().Equals(resource.ParentUri.Authority.ToLower()) ||
-                   resource.Uri.Authority.ToLower().EndsWith(_configurations.DomainName.ToLower());
+            return Localize(resource.Uri).Authority.Equals(resource.ParentUri.Authority, StringComparison.OrdinalIgnoreCase) ||
+                   resource.Uri.Authority.EndsWith(_configurations.DomainName, StringComparison.OrdinalIgnoreCase);
         }
 
         public bool IsStartUrl(string url)
         {
             if (url == null) throw new ArgumentNullException();
-            var localizedUrl = new Uri(url).AbsoluteUri;
-            return localizedUrl.ToLower().EnsureEndsWith('/').Equals(_configurations.StartUrl.EnsureEndsWith('/'));
+            return new Uri(url).AbsoluteUri.Equals(_configurations.StartUrl.EnsureEndsWith('/'), StringComparison.OrdinalIgnoreCase);
         }
 
         public Uri Localize(Uri uri)
         {
-            /*TODO:*/
-            return uri;
+            if (uri == null) throw new ArgumentNullException();
+            if (!uri.Authority.Equals(_configurations.DomainName, StringComparison.OrdinalIgnoreCase)) return uri;
+
+            var startUri = new Uri(_configurations.StartUrl);
+            var uriBuilder = new UriBuilder(uri) { Host = startUri.Host, Port = startUri.Port };
+            return uriBuilder.Uri;
         }
     }
 }

@@ -28,7 +28,7 @@ namespace Helix.Crawler.Specifications
         {
             var resource = ServiceLocator.Get<IResource>();
             resource.Uri = new Uri("http://www.helix.com/anything");
-            resource.ParentUri = new Uri("http://192.168.1.2:8080");
+            resource.ParentUri = new Uri("http://192.168.1.2");
             AddTheoryDescription(p2: resource, p3: false);
         }
 
@@ -60,7 +60,7 @@ namespace Helix.Crawler.Specifications
         void MatchConfiguredDomainName()
         {
             var resource = ServiceLocator.Get<IResource>();
-            resource.ParentUri = new Uri("http://192.168.1.2:8080");
+            resource.ParentUri = new Uri("http://192.168.1.2");
             resource.Uri = new Uri("http://www.helix.com/anything");
             var configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
             {
