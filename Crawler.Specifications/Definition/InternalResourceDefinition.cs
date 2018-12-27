@@ -27,8 +27,8 @@ namespace Helix.Crawler.Specifications
         void IsNotInternalResourceInAllOtherCases()
         {
             var resource = ServiceLocator.Get<IResource>();
-            resource.Uri = new Uri("http://www.helix.com/anything");
-            resource.ParentUri = new Uri("http://192.168.1.2");
+            resource.ParentUri = new Uri("http://www.helix.com");
+            resource.Uri = new Uri("http://www.sanity.com/anything");
             AddTheoryDescription(p2: resource, p3: false);
         }
 
@@ -57,16 +57,26 @@ namespace Helix.Crawler.Specifications
             AddTheoryDescription(configurations, resource, true);
         }
 
+        [SuppressMessage("ReSharper", "RedundantArgumentDefaultValue")]
         void MatchConfiguredDomainName()
         {
             var resource = ServiceLocator.Get<IResource>();
-            resource.ParentUri = new Uri("http://192.168.1.2");
-            resource.Uri = new Uri("http://www.helix.com/anything");
+            resource.ParentUri = new Uri("http://192.168.1.2/parent");
+            resource.Uri = new Uri("http://www.helix.com/child");
             var configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
             {
                 { nameof(Configurations.DomainName), "www.helix.com" }
             }));
             AddTheoryDescription(configurations, resource, true);
+
+            resource = ServiceLocator.Get<IResource>();
+            resource.ParentUri = new Uri("http://192.168.1.2");
+            resource.Uri = new Uri("http://www.helix.com/anything");
+            configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
+            {
+                { nameof(Configurations.DomainName), "helix.com" }
+            }));
+            AddTheoryDescription(configurations, resource, false);
         }
 
         void ShareHostNameWithParent()

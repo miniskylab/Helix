@@ -12,11 +12,11 @@ namespace Helix.Crawler
         public bool IsInternalResource(IResource resource)
         {
             if (resource == null || resource.Uri == null) throw new ArgumentNullException();
-            if (IsStartUrl(Localize(resource.Uri).AbsoluteUri)) return true;
+            if (IsStartUrl(resource.Uri.AbsoluteUri)) return true;
+            if (resource.Uri.Authority.Equals(_configurations.DomainName, StringComparison.OrdinalIgnoreCase)) return true;
 
             if (resource.ParentUri == null) throw new ArgumentException();
-            return Localize(resource.Uri).Authority.Equals(resource.ParentUri.Authority, StringComparison.OrdinalIgnoreCase) ||
-                   resource.Uri.Authority.EndsWith(_configurations.DomainName, StringComparison.OrdinalIgnoreCase);
+            return resource.Uri.Authority.Equals(resource.ParentUri.Authority, StringComparison.OrdinalIgnoreCase);
         }
 
         public bool IsStartUrl(string url)
