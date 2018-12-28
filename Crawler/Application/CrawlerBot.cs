@@ -123,13 +123,20 @@ namespace Helix.Crawler
                 if (Memory.CancellationToken.IsCancellationRequested) throw new OperationCanceledException(Memory.CancellationToken);
                 var resourceCollector = ServiceLocator.Get<IResourceCollector>();
                 resourceCollector.OnRawResourceCollected += rawResource => Task.Run(() => { Memory.Memorize(rawResource); });
-                resourceCollector.OnBrowserExceptionOccurred += (exception, resource) =>
+                resourceCollector.OnBrowserExceptionOccurred += (exception, errorResource) =>
                 {
-                    /* TODO: How and Where do we log this information? */
+                    HandleException(exception);
+                    File.AppendAllText(
+                        Memory.ErrorFilePath,
+                        $"\nError Resource:\nParent URL: {errorResource.ParentUri}\nURL: {errorResource.Uri}\n"
+                    );
                 };
                 resourceCollector.OnAllAttemptsToCollectNewRawResourcesFailed += parentResource =>
                 {
-                    /* TODO: How and Where do we log this information? */
+                    File.AppendAllText(
+                        Memory.ErrorFilePath,
+                        $"\nAll attempts to collect new raw resources failed for this URL: {parentResource.Uri}\n"
+                    );
                 };
                 resourceCollector.OnIdle += () => ResourceCollectorPool.Add(resourceCollector);
                 ResourceCollectorPool.Add(resourceCollector);
