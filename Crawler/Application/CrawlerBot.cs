@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Globalization;
-using System.IO;
 using System.Linq;
 using System.Net;
 using System.Threading;
@@ -13,6 +12,7 @@ namespace Helix.Crawler
     public static class CrawlerBot
     {
         public static IMemory Memory = ServiceLocator.Get<IMemory>();
+        static FilePersistence _filePersistence;
         static Task _mainWorkingTask;
         static readonly BlockingCollection<IResourceCollector> ResourceCollectorPool = new BlockingCollection<IResourceCollector>();
         static readonly BlockingCollection<IResourceVerifier> ResourceVerifierPool = new BlockingCollection<IResourceVerifier>();
@@ -62,6 +62,7 @@ namespace Helix.Crawler
             }
             ReportWriter.Instance.Dispose();
             ServiceLocator.Dispose();
+            _filePersistence.Dispose();
             Memory.TryTransitTo(CrawlerState.Ready);
             OnStopped?.Invoke(Memory.EverythingIsDone);
         }
@@ -91,11 +92,11 @@ namespace Helix.Crawler
 
         static void EnsureErrorLogFileIsRecreated()
         {
-            if (File.Exists(Memory.ErrorFilePath)) File.Delete(Memory.ErrorFilePath);
-            File.AppendAllText(Memory.ErrorFilePath, DateTime.Now.ToString(CultureInfo.InvariantCulture));
+            _filePersistence = new FilePersistence(Memory.ErrorFilePath);
+            _filePersistence.WriteLineAsync(DateTime.Now.ToString(CultureInfo.InvariantCulture));
         }
 
-        static void HandleException(Exception exception)
+        static void HandleException(Exception exception, string additionalTextMessage = "")
         {
             switch (exception)
             {
@@ -111,7 +112,7 @@ namespace Helix.Crawler
                     if (thereIsNoUnhandledInnerException) return;
                     break;
             }
-            File.AppendAllText(Memory.ErrorFilePath, exception.ToString());
+            _filePersistence.WriteLineAsync($"{exception}{additionalTextMessage}");
             OnExceptionOccurred?.Invoke(exception);
         }
 
@@ -125,18 +126,13 @@ namespace Helix.Crawler
                 resourceCollector.OnRawResourceCollected += rawResource => Task.Run(() => { Memory.Memorize(rawResource); });
                 resourceCollector.OnBrowserExceptionOccurred += (exception, errorResource) =>
                 {
-                    HandleException(exception);
-                    File.AppendAllText(
-                        Memory.ErrorFilePath,
-                        $"\nError Resource:\nParent URL: {errorResource.ParentUri}\nURL: {errorResource.Uri}\n"
-                    );
+                    if (Memory.CrawlerState == CrawlerState.Stopping || Memory.CrawlerState == CrawlerState.Ready) return;
+                    HandleException(exception, $"\nError Resource:\nParent URL: {errorResource.ParentUri}\nURL: {errorResource.Uri}");
                 };
                 resourceCollector.OnAllAttemptsToCollectNewRawResourcesFailed += parentResource =>
                 {
-                    File.AppendAllText(
-                        Memory.ErrorFilePath,
-                        $"\nAll attempts to collect new raw resources failed for this URL: {parentResource.Uri}\n"
-                    );
+                    if (Memory.CrawlerState == CrawlerState.Stopping || Memory.CrawlerState == CrawlerState.Ready) return;
+                    _filePersistence.WriteLineAsync($"\nAll attempts to collect new raw resources failed for URL: {parentResource.Uri}");
                 };
                 resourceCollector.OnIdle += () => ResourceCollectorPool.Add(resourceCollector);
                 ResourceCollectorPool.Add(resourceCollector);
