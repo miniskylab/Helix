@@ -1,8 +1,8 @@
-﻿const child_process = require('child_process');
-child_process.execSync("npm install yauzl@latest rimraf@latest asar@latest --silent", {stdio: [0, 1, 2]});
+﻿const fs = require("fs");
+const child_process = require("child_process");
+RestoreNpmPackages();
 
 const path = require("path");
-const fs = require("fs");
 const https = require("https");
 const url = require("url");
 const yauzl = require("yauzl");
@@ -34,6 +34,13 @@ const asar = require("asar");
 
     console.log("Done!");
 })();
+
+function RestoreNpmPackages() {
+    if (!fs.existsSync("node_modules")) {
+        console.log("Restoring NPM pacakges ...");
+        child_process.execSync("npm install yauzl@latest rimraf@latest asar@latest --silent", {stdio: [0, 1, 2]});
+    }
+}
 
 function SendGETRequestOverHttps(destinationUrl) {
     return new Promise((resolve, reject) => {

@@ -5,7 +5,7 @@ using Helix.Specifications.Core;
 
 namespace Helix.Crawler.Specifications
 {
-    internal class RawResourceProcessingDefinition : TheoryDescription<IRawResource, IResource, bool, Type>
+    class RawResourceProcessingDefinition : TheoryDescription<IRawResource, IResource, bool, Type>
     {
         public RawResourceProcessingDefinition()
         {
