@@ -37,7 +37,7 @@ const asar = require("asar");
 
 function RestoreNpmPackages() {
     if (!fs.existsSync("node_modules")) {
-        console.log("Restoring NPM pacakges ...");
+        console.log("Restoring NPM packages ...");
         child_process.execSync("npm install yauzl@latest rimraf@latest asar@latest --silent", {stdio: [0, 1, 2]});
     }
 }
