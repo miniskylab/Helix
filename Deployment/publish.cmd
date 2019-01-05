@@ -10,8 +10,9 @@ SET mode=[%1]
 IF %mode%==[] SET mode=Release
 CALL dotnet publish %entryDirectoryPath% -c %mode% -r win10-x64 -o %publishDirectoryPath%
 
-CALL robocopy %entryDirectoryPath%\bin\%mode%\netcoreapp2.1\win10-x64 %publishDirectoryPath% chromedriver.exe /NFL /NDL /NJH /NJS /nc /ns /np
 CALL robocopy %entryDirectoryPath%\bin\%mode%\netcoreapp2.1\win10-x64\ui %publishDirectoryPath%\ui /E /NFL /NDL /NJH /NJS /nc /ns /np
+CALL robocopy %entryDirectoryPath%\bin\%mode%\netcoreapp2.1\win10-x64 %publishDirectoryPath% chromedriver.exe /NFL /NDL /NJH /NJS /nc /ns /np
+CALL robocopy %entryDirectoryPath%\bin\%mode%\netcoreapp2.1\win10-x64\chromium %publishDirectoryPath%\chromium /E /NFL /NDL /NJH /NJS /nc /ns /np
 CALL robocopy . %publishDirectoryPath%\.. Helix.exe.lnk FixPortExhaustion.reg /NFL /NDL /NJH /NJS /nc /ns /np
 CALL rcedit-x64.exe %publishDirectoryPath%\helix.exe --set-icon icon.ico
 

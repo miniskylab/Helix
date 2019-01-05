@@ -41,6 +41,7 @@ namespace Helix.Crawler
 
             var chromeOptions = new ChromeOptions();
             if (!configurations.ShowWebBrowsers) chromeOptions.AddArguments("--headless", "--incognito");
+            chromeOptions.BinaryLocation = Path.Combine(workingDirectory, "chromium/chrome.exe");
             chromeOptions.Proxy = new Proxy
             {
                 HttpProxy = $"http://localhost:{HttpProxyPort}",
