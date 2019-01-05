@@ -31,9 +31,10 @@ namespace Helix.Crawler
 
             _textWriter?.Flush();
             _textWriter?.Dispose();
+            _textWriter = null;
         }
 
-        public void WriteLineAsync(string text) { _textWriter.WriteLineAsync(text); }
+        public void WriteLineAsync(string text) { _textWriter?.WriteLineAsync(text); }
 
         void EnsureFileIsRecreated()
         {

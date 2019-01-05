@@ -32,8 +32,8 @@ async function DeployChromiumWebBrowser(pathToUnzippedChromiumWebBrowserDirector
 
     console.log(`Downloading Chromium Web Browser v${version} from the Internet ...`);
     const pathToTemporaryDownloadedZipFile = "temp_chromium.zip";
-    const latestChromiumWebBrowserDownloadUrl = `https://github.com/henrypp/chromium/releases/download/v${version}-win64/chromium-sync.zip`;
-    await DownloadFileFromTheInternet(latestChromiumWebBrowserDownloadUrl, pathToTemporaryDownloadedZipFile);
+    const chromiumWebBrowserDownloadUrl = `https://github.com/henrypp/chromium/releases/download/v${version}-win64/chromium-sync.zip`;
+    await DownloadFileFromTheInternet(chromiumWebBrowserDownloadUrl, pathToTemporaryDownloadedZipFile);
 
     console.log(`Unzipping downloaded Chromium Web Browser v${version} ...`);
     await Unzip(pathToTemporaryDownloadedZipFile, pathToUnzippedChromiumWebBrowserDirectory);
@@ -46,8 +46,8 @@ async function DeployChromeWebDriver(pathToUnzippedChromeWebDriverDirectory, ver
 
     console.log(`Downloading Chrome Web Driver v${version} from the Internet ...`);
     const pathToTemporaryDownloadedZipFile = "temp_chromedriver.zip";
-    const latestChromeWebDriverDownloadUrl = `https://chromedriver.storage.googleapis.com/${version}/chromedriver_win32.zip`;
-    await DownloadFileFromTheInternet(latestChromeWebDriverDownloadUrl, pathToTemporaryDownloadedZipFile);
+    const chromeWebDriverDownloadUrl = `https://chromedriver.storage.googleapis.com/${version}/chromedriver_win32.zip`;
+    await DownloadFileFromTheInternet(chromeWebDriverDownloadUrl, pathToTemporaryDownloadedZipFile);
 
     console.log(`Unzipping downloaded Chrome Web Driver v${version} ...`);
     await Unzip(pathToTemporaryDownloadedZipFile, pathToUnzippedChromeWebDriverDirectory);
