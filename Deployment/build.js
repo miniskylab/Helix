@@ -119,7 +119,7 @@ function DownloadFileFromTheInternet(downloadUrl, pathToDestinationFileOnDisk) {
             fs.unlink(destinationFileOnDisk, () => reject(error.message));
         }).setTimeout(60000, () => {
             request.abort();
-            reject("ElectronJs pre-built binary download took too long!");
+            reject(`Download from Url: "${downloadUrl}" timed out.`);
         });
     });
 }
