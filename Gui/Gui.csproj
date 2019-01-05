@@ -8,10 +8,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Selenium.WebDriver.ChromeDriver" Version="2.43.0" />
-    </ItemGroup>
-
-    <ItemGroup>
         <ProjectReference Include="..\Crawler\Crawler.csproj" />
         <ProjectReference Include="..\IPC\IPC.csproj" />
     </ItemGroup>
