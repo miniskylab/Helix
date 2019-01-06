@@ -39,7 +39,7 @@ namespace Helix.Crawler
                 FtpProxy = $"http://localhost:{HttpProxyPort}"
             };
 
-            _chromeDriver = new ChromeDriver(chromeDriverService, chromeOptions, TimeSpan.FromMinutes(5));
+            _chromeDriver = new ChromeDriver(chromeDriverService, chromeOptions);
         }
 
         public void Dispose()
