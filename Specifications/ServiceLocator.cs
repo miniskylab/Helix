@@ -36,6 +36,7 @@ namespace Helix.Specifications
             _serviceCollection = new ServiceCollection();
             _serviceProvider = _serviceCollection.Add(new[]
             {
+                new ServiceDescriptor(typeof(IHtmlParser), typeof(HtmlAgilityPackParser), ServiceLifetime.Transient),
                 new ServiceDescriptor(typeof(IResourceCollector), typeof(ResourceCollector), ServiceLifetime.Transient),
                 new ServiceDescriptor(typeof(IResourceVerifier), typeof(ResourceVerifier), ServiceLifetime.Transient),
                 new ServiceDescriptor(typeof(IResourceProcessor), typeof(ResourceProcessor), ServiceLifetime.Transient),
