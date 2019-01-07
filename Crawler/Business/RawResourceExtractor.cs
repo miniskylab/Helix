@@ -1,28 +1,29 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Helix.Crawler.Abstractions;
-using HtmlAgilityPack;
+using HtmlAgilityPackDocument = HtmlAgilityPack.HtmlDocument;
 
 namespace Helix.Crawler
 {
-    public class HtmlAgilityPackParser : IHtmlParser
+    public class RawResourceExtractor : IRawResourceExtractor
     {
         readonly Func<string, bool> _urlSchemeIsSupported = url => url.StartsWith("http", StringComparison.OrdinalIgnoreCase) ||
                                                                    url.StartsWith("https", StringComparison.OrdinalIgnoreCase) ||
                                                                    url.StartsWith("/", StringComparison.OrdinalIgnoreCase);
-        public event UrlCollectedEvent OnUrlCollected;
+        public event RawResourceExtractedEvent OnRawResourceExtracted;
 
-        public void ExtractUrlsFrom(string html)
+        public void ExtractRawResourcesFrom(HtmlDocument htmlDocument)
         {
-            var htmlDocument = new HtmlDocument();
-            htmlDocument.LoadHtml(html);
+            if (htmlDocument == null) throw new ArgumentNullException();
+            var htmlAgilityPackDocument = new HtmlAgilityPackDocument();
+            htmlAgilityPackDocument.LoadHtml(htmlDocument.Text);
 
-            var anchorTags = htmlDocument.DocumentNode.SelectNodes("//a[@href]");
+            var anchorTags = htmlAgilityPackDocument.DocumentNode.SelectNodes("//a[@href]");
             if (anchorTags == null) return;
             Parallel.ForEach(anchorTags, anchorTag =>
             {
                 var url = anchorTag.Attributes["href"].Value;
-                if (_urlSchemeIsSupported(url)) OnUrlCollected?.Invoke(url);
+                if (_urlSchemeIsSupported(url)) OnRawResourceExtracted?.Invoke(new RawResource { ParentUrl = htmlDocument.Url, Url = url });
             });
         }
     }

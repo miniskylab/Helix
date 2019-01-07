@@ -7,12 +7,12 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="xunit.runner.visualstudio" Version="2.4.1"/>
+        <PackageReference Include="xunit.runner.visualstudio" Version="2.4.1" />
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Crawler.Abstractions\Crawler.Abstractions.csproj"/>
-        <ProjectReference Include="..\Specifications\Specifications.csproj"/>
+        <ProjectReference Include="..\Crawler.Abstractions\Crawler.Abstractions.csproj" />
+        <ProjectReference Include="..\Specifications\Specifications.csproj" />
     </ItemGroup>
 
 </Project>
