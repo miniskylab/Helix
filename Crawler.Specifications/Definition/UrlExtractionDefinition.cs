@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Helix.Specifications.Core;
+using Helix.Specifications;
 
 namespace Helix.Crawler.Specifications
 {
@@ -9,6 +9,7 @@ namespace Helix.Crawler.Specifications
         public UrlExtractionDefinition()
         {
             ExtractUrlsFromHtmlString();
+            OnlySupportHttpAndHttpsSchemes();
             ThrowExceptionIfArgumentNull();
         }
 
@@ -29,6 +30,21 @@ namespace Helix.Crawler.Specifications
                     "http://www.sanity.com/",
                     "http://192.168.1.2"
                 }
+            );
+        }
+
+        void OnlySupportHttpAndHttpsSchemes()
+        {
+            AddTheoryDescription(@"
+                <html>
+                    <body>
+                        <a href=""ftp://www.helix.com""></a>
+                        <a href=""mailto://www.helix.com""></a>
+                        <a href=""telnet://www.helix.com""></a>
+                        <a href=""file://www.helix.com""></a>
+                    </body>
+                </html>",
+                new List<string>()
             );
         }
 

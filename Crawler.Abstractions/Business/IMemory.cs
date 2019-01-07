@@ -22,13 +22,13 @@ namespace Helix.Crawler.Abstractions
 
         void IncrementActiveThreadCount();
 
-        void Memorize(IRawResource toBeVerifiedRawResource);
+        void Memorize(RawResource toBeVerifiedRawResource);
 
-        void Memorize(IResource toBeCrawledResource);
+        void Memorize(Resource toBeCrawledResource);
 
-        bool TryTakeToBeCrawledResource(out IResource toBeCrawledResource);
+        bool TryTakeToBeCrawledResource(out Resource toBeCrawledResource);
 
-        bool TryTakeToBeVerifiedRawResource(out IRawResource toBeVerifiedRawResource);
+        bool TryTakeToBeVerifiedRawResource(out RawResource toBeVerifiedRawResource);
 
         bool TryTransitTo(CrawlerState crawlerState);
     }

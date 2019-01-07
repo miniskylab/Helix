@@ -1,12 +1,9 @@
 using System;
-using Helix.Crawler.Abstractions;
 
-namespace Helix.Crawler
+namespace Helix.Crawler.Abstractions
 {
-    public class Resource : IResource
+    public class Resource : NetworkResource
     {
-        public int HttpStatusCode { get; set; }
-
         public bool Localized { get; set; }
 
         public Uri ParentUri { get; set; }

@@ -3,9 +3,9 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 
-namespace Helix.Crawler
+namespace Helix.Core
 {
-    class ConcurrentSet<T> : ICollection<T>
+    public class ConcurrentSet<T> : ICollection<T>
     {
         readonly ConcurrentDictionary<T, bool> _concurrentDictionary;
 

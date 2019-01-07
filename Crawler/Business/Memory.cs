@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
+using Helix.Core;
 using Helix.Crawler.Abstractions;
 using JetBrains.Annotations;
 
@@ -14,8 +15,8 @@ namespace Helix.Crawler
         int _activeThreadCount;
         readonly ConcurrentSet<string> _alreadyVerifiedUrls = new ConcurrentSet<string>();
         readonly CancellationTokenSource _cancellationTokenSource;
-        readonly BlockingCollection<IResource> _toBeCrawledResources = new BlockingCollection<IResource>();
-        readonly BlockingCollection<IRawResource> _toBeVerifiedRawResources = new BlockingCollection<IRawResource>();
+        readonly BlockingCollection<Resource> _toBeCrawledResources = new BlockingCollection<Resource>();
+        readonly BlockingCollection<RawResource> _toBeVerifiedRawResources = new BlockingCollection<RawResource>();
         readonly string _workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
         static readonly object StaticLock = new object();
 
@@ -55,7 +56,7 @@ namespace Helix.Crawler
 
         public void IncrementActiveThreadCount() { Interlocked.Increment(ref _activeThreadCount); }
 
-        public void Memorize(IRawResource toBeVerifiedRawResource)
+        public void Memorize(RawResource toBeVerifiedRawResource)
         {
             if (CancellationToken.IsCancellationRequested) return;
             lock (StaticLock)
@@ -66,18 +67,18 @@ namespace Helix.Crawler
             _toBeVerifiedRawResources.Add(toBeVerifiedRawResource, CancellationToken);
         }
 
-        public void Memorize(IResource toBeCrawledResource)
+        public void Memorize(Resource toBeCrawledResource)
         {
             if (CancellationToken.IsCancellationRequested) return;
             _toBeCrawledResources.Add(toBeCrawledResource, CancellationToken);
         }
 
-        public bool TryTakeToBeCrawledResource(out IResource toBeCrawledResource)
+        public bool TryTakeToBeCrawledResource(out Resource toBeCrawledResource)
         {
             return _toBeCrawledResources.TryTake(out toBeCrawledResource);
         }
 
-        public bool TryTakeToBeVerifiedRawResource(out IRawResource toBeVerifiedRawResource)
+        public bool TryTakeToBeVerifiedRawResource(out RawResource toBeVerifiedRawResource)
         {
             return _toBeVerifiedRawResources.TryTake(out toBeVerifiedRawResource);
         }

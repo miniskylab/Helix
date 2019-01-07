@@ -3,12 +3,11 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using Helix.Crawler.Abstractions;
 using Helix.Specifications;
-using Helix.Specifications.Core;
 using Newtonsoft.Json;
 
 namespace Helix.Crawler.Specifications
 {
-    class InternalResourceDefinition : TheoryDescription<Configurations, IResource, bool, Type>
+    class InternalResourceDefinition : TheoryDescription<Configurations, Resource, bool, Type>
     {
         public InternalResourceDefinition()
         {
@@ -26,17 +25,13 @@ namespace Helix.Crawler.Specifications
         [SuppressMessage("ReSharper", "RedundantArgumentDefaultValue")]
         void IsNotInternalResourceInAllOtherCases()
         {
-            var resource = ServiceLocator.Get<IResource>();
-            resource.ParentUri = new Uri("http://www.helix.com");
-            resource.Uri = new Uri("http://www.sanity.com/anything");
+            var resource = new Resource { ParentUri = new Uri("http://www.helix.com"), Uri = new Uri("http://www.sanity.com/anything") };
             AddTheoryDescription(p2: resource, p3: false);
         }
 
         void IsStartUrlUsingDomainName()
         {
-            var resource = ServiceLocator.Get<IResource>();
-            resource.ParentUri = null;
-            resource.Uri = new Uri("http://www.helix.com");
+            var resource = new Resource { ParentUri = null, Uri = new Uri("http://www.helix.com") };
             var configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
             {
                 { nameof(Configurations.StartUrl), "http://www.helix.com" }
@@ -46,9 +41,7 @@ namespace Helix.Crawler.Specifications
 
         void IsStartUrlUsingIpAddress()
         {
-            var resource = ServiceLocator.Get<IResource>();
-            resource.ParentUri = null;
-            resource.Uri = new Uri("http://www.helix.com");
+            var resource = new Resource { ParentUri = null, Uri = new Uri("http://www.helix.com") };
             var configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
             {
                 { nameof(Configurations.StartUrl), "http://192.168.1.2" },
@@ -60,18 +53,14 @@ namespace Helix.Crawler.Specifications
         [SuppressMessage("ReSharper", "RedundantArgumentDefaultValue")]
         void MatchConfiguredDomainName()
         {
-            var resource = ServiceLocator.Get<IResource>();
-            resource.ParentUri = new Uri("http://192.168.1.2/parent");
-            resource.Uri = new Uri("http://www.helix.com/child");
+            var resource = new Resource { ParentUri = new Uri("http://192.168.1.2/parent"), Uri = new Uri("http://www.helix.com/child") };
             var configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
             {
                 { nameof(Configurations.DomainName), "www.helix.com" }
             }));
             AddTheoryDescription(configurations, resource, true);
 
-            resource = ServiceLocator.Get<IResource>();
-            resource.ParentUri = new Uri("http://192.168.1.2");
-            resource.Uri = new Uri("http://www.helix.com/anything");
+            resource = new Resource { ParentUri = new Uri("http://192.168.1.2"), Uri = new Uri("http://www.helix.com/anything") };
             configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
             {
                 { nameof(Configurations.DomainName), "helix.com" }
@@ -81,24 +70,19 @@ namespace Helix.Crawler.Specifications
 
         void ShareHostNameWithParent()
         {
-            var resource = ServiceLocator.Get<IResource>();
-            resource.ParentUri = new Uri("http://www.helix.com");
-            resource.Uri = new Uri("http://www.helix.com/anything");
+            var resource = new Resource { ParentUri = new Uri("http://www.helix.com"), Uri = new Uri("http://www.helix.com/anything") };
             AddTheoryDescription(p2: resource, p3: true);
         }
 
         void ThrowExceptionIfArgumentIsNotValid()
         {
-            var resource = ServiceLocator.Get<IResource>();
-            resource.Uri = new Uri("http://www.helix.com");
-            resource.ParentUri = null;
+            var resource = new Resource { Uri = new Uri("http://www.helix.com"), ParentUri = null };
             AddTheoryDescription(p2: resource, p4: typeof(ArgumentException));
         }
 
         void ThrowExceptionIfArgumentNull()
         {
-            var resource = ServiceLocator.Get<IResource>();
-            resource.Uri = null;
+            var resource = new Resource { Uri = null };
             AddTheoryDescription(p2: resource, p4: typeof(ArgumentNullException));
             AddTheoryDescription(p2: null, p4: typeof(ArgumentNullException));
         }

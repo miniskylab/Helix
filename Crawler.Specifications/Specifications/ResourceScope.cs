@@ -10,7 +10,7 @@ namespace Helix.Crawler.Specifications
     {
         [Theory]
         [ClassData(typeof(InternalResourceDefinition))]
-        void CouldIdentifyInternalResources(Configurations configurations, IResource resource, bool expectedIdentificationResult,
+        void CouldIdentifyInternalResources(Configurations configurations, Resource resource, bool expectedIdentificationResult,
             Type expectedExceptionType)
         {
             if (configurations != null) ServiceLocator.AddOrReplaceServices(new ServiceDescriptor(typeof(Configurations), configurations));

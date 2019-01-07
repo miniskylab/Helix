@@ -6,6 +6,6 @@ namespace Helix.Crawler.Abstractions
     {
         event IdleEvent OnIdle;
 
-        IVerificationResult Verify(IRawResource rawResource);
+        VerificationResult Verify(RawResource rawResource);
     }
 }

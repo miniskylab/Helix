@@ -9,6 +9,6 @@ namespace Helix.Crawler.Abstractions
         event IdleEvent OnIdle;
         event RawResourceCollectedEvent OnRawResourceCollected;
 
-        void CollectNewRawResourcesFrom(IResource parentResource);
+        void CollectNewRawResourcesFrom(Resource parentResource);
     }
 }

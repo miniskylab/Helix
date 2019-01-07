@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 
-namespace Helix.Specifications.Core
+namespace Helix.Specifications
 {
     public class TheoryDescription<T1> : IEnumerable<object[]>
     {

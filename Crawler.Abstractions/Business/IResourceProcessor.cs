@@ -2,6 +2,6 @@
 {
     public interface IResourceProcessor
     {
-        bool TryProcessRawResource(IRawResource rawResource, out IResource resource);
+        bool TryProcessRawResource(RawResource rawResource, out Resource resource);
     }
 }

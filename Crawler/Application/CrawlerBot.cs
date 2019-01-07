@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using Helix.Core;
 using Helix.Crawler.Abstractions;
 
 namespace Helix.Crawler
@@ -187,7 +188,7 @@ namespace Helix.Crawler
         }
 
         public delegate void ExceptionOccurredEvent(Exception exception);
-        public delegate Task ResourceVerifiedEvent(IVerificationResult verificationResult);
+        public delegate Task ResourceVerifiedEvent(VerificationResult verificationResult);
         public delegate void StoppedEvent(bool isAllWorkDone = false);
         public delegate void WebBrowserClosedEvent(int closedWebBrowserCount);
         public delegate void WebBrowserOpenedEvent(int openedWebBrowserCount);

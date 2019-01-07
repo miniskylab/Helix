@@ -9,7 +9,7 @@ namespace Helix.Crawler
 
         public ResourceScope(Configurations configurations) { _configurations = configurations; }
 
-        public bool IsInternalResource(IResource resource)
+        public bool IsInternalResource(Resource resource)
         {
             if (resource == null || resource.Uri == null) throw new ArgumentNullException();
             if (IsStartUrl(resource.Uri.AbsoluteUri)) return true;

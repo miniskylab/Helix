@@ -9,7 +9,7 @@ namespace Helix.Crawler.Specifications
     {
         [Theory]
         [ClassData(typeof(RawResourceProcessingDefinition))]
-        void CouldProcessRawResourcesIntoResources(IRawResource rawResource, IResource expectedOutputResource,
+        void CouldProcessRawResourcesIntoResources(RawResource rawResource, Resource expectedOutputResource,
             bool expectedProcessingResult, Type expectedExceptionType)
         {
             var resourceProcessor = ServiceLocator.Get<IResourceProcessor>();

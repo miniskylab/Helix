@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Reflection;
+using Helix.Core;
 using Helix.Crawler.Abstractions;
 
 namespace Helix.Crawler
@@ -17,7 +18,7 @@ namespace Helix.Crawler
             WriteLineAsync("HTTP Status Code,Parent Url,Verified Url");
         }
 
-        public void WriteReport(IVerificationResult verificationResult, bool writeBrokenLinksOnly = false)
+        public void WriteReport(VerificationResult verificationResult, bool writeBrokenLinksOnly = false)
         {
             if (writeBrokenLinksOnly && !verificationResult.IsBrokenResource) return;
             var parentUrl = verificationResult.Resource?.ParentUri?.OriginalString ?? verificationResult.RawResource.ParentUrl;

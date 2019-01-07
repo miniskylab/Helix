@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using Helix.Crawler.Abstractions;
-using Helix.Specifications.Core;
+using Helix.Specifications;
 using Newtonsoft.Json;
 
 namespace Helix.Crawler.Specifications

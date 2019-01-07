@@ -9,7 +9,7 @@ namespace Helix.Crawler
 
         public ResourceProcessor(IResourceScope resourceScope) { _resourceScope = resourceScope; }
 
-        public bool TryProcessRawResource(IRawResource rawResource, out IResource resource)
+        public bool TryProcessRawResource(RawResource rawResource, out Resource resource)
         {
             if (rawResource == null) throw new ArgumentNullException();
 

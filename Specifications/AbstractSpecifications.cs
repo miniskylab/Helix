@@ -4,8 +4,14 @@ namespace Helix.Specifications
 {
     public abstract class AbstractSpecifications : IDisposable
     {
-        protected AbstractSpecifications() { ServiceLocator.Reset(); }
+        protected ServiceLocator ServiceLocator;
 
-        public void Dispose() { ServiceLocator.Dispose(); }
+        protected AbstractSpecifications() { ServiceLocator = ServiceLocator.CreateNewInstance(); }
+
+        public void Dispose()
+        {
+            ServiceLocator?.Dispose();
+            ServiceLocator = null;
+        }
     }
 }

@@ -1,11 +1,10 @@
 ﻿using System;
 using Helix.Crawler.Abstractions;
 using Helix.Specifications;
-using Helix.Specifications.Core;
 
 namespace Helix.Crawler.Specifications
 {
-    class RawResourceProcessingDefinition : TheoryDescription<IRawResource, IResource, bool, Type>
+    class RawResourceProcessingDefinition : TheoryDescription<RawResource, Resource, bool, Type>
     {
         public RawResourceProcessingDefinition()
         {
@@ -15,14 +14,8 @@ namespace Helix.Crawler.Specifications
 
         void CreateResourceFromRawResource()
         {
-            var rawResource = ServiceLocator.Get<IRawResource>();
-            rawResource.ParentUrl = "http://www.helix.com";
-            rawResource.Url = "http://www.helix.com/anything";
-
-            var expectedOutputResource = ServiceLocator.Get<IResource>();
-            expectedOutputResource.ParentUri = new Uri(rawResource.ParentUrl);
-            expectedOutputResource.Uri = new Uri(rawResource.Url);
-
+            var rawResource = new RawResource { ParentUrl = "http://www.helix.com", Url = "http://www.helix.com/anything" };
+            var expectedOutputResource = new Resource { ParentUri = new Uri(rawResource.ParentUrl), Uri = new Uri(rawResource.Url) };
             AddTheoryDescription(rawResource, expectedOutputResource, true);
         }
 

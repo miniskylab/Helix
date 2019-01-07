@@ -55,7 +55,7 @@ namespace Helix.Crawler
             _httpClient?.Dispose();
         }
 
-        public IVerificationResult Verify(IRawResource rawResource)
+        public VerificationResult Verify(RawResource rawResource)
         {
             var verificationResult = new VerificationResult { RawResource = rawResource };
             if (!_resourceProcessor.TryProcessRawResource(rawResource, out var resource))

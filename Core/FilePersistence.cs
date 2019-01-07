@@ -4,9 +4,9 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Helix.Crawler
+namespace Helix.Core
 {
-    class FilePersistence : IDisposable
+    public class FilePersistence : IDisposable
     {
         readonly List<Task> _backgroundTasks;
         readonly CancellationTokenSource _cancellationTokenSource;

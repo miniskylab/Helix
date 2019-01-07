@@ -52,7 +52,7 @@ namespace Helix.Crawler
             _chromeDriver = new ChromeDriver(chromeDriverService, chromeOptions);
         }
 
-        public void CollectNewRawResourcesFrom(IResource parentResource)
+        public void CollectNewRawResourcesFrom(Resource parentResource)
         {
             try
             {
