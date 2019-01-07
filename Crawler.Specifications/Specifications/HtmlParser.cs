@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Helix.Crawler.Abstractions;
 using Helix.Specifications;
 using Xunit;
@@ -17,7 +18,7 @@ namespace Helix.Crawler.Specifications
             htmlParser.OnUrlCollected += url =>
             {
                 Assert.Contains(url, expectedExtractedUrls ?? new List<string>());
-                urlCollectedEventRaiseCount++;
+                Interlocked.Increment(ref urlCollectedEventRaiseCount);
             };
 
             if (expectedExceptionType != null)

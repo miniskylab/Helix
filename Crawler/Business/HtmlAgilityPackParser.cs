@@ -1,4 +1,6 @@
-﻿using Helix.Crawler.Abstractions;
+﻿using System.Threading.Tasks;
+using Helix.Crawler.Abstractions;
+using HtmlAgilityPack;
 
 namespace Helix.Crawler
 {
@@ -8,8 +10,12 @@ namespace Helix.Crawler
 
         public void ExtractUrlsFrom(string html)
         {
-            OnUrlCollected?.Invoke("");
-            throw new System.NotImplementedException();
+            var htmlDocument = new HtmlDocument();
+            htmlDocument.LoadHtml(html);
+
+            var anchorTags = htmlDocument.DocumentNode.SelectNodes("//a[@href]");
+            if (anchorTags == null) return;
+            Parallel.ForEach(anchorTags, anchorTag => { OnUrlCollected?.Invoke(anchorTag.Attributes["href"].Value); });
         }
     }
 }
