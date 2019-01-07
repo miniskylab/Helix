@@ -16,6 +16,7 @@ namespace Helix.Crawler
         readonly ConcurrentSet<string> _alreadyVerifiedUrls = new ConcurrentSet<string>();
         readonly CancellationTokenSource _cancellationTokenSource;
         readonly BlockingCollection<Resource> _toBeCrawledResources = new BlockingCollection<Resource>();
+        readonly BlockingCollection<string> _toBeParsedHtmlDocuments = new BlockingCollection<string>();
         readonly BlockingCollection<RawResource> _toBeVerifiedRawResources = new BlockingCollection<RawResource>();
         readonly string _workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
         static readonly object StaticLock = new object();
@@ -73,9 +74,20 @@ namespace Helix.Crawler
             _toBeCrawledResources.Add(toBeCrawledResource, CancellationToken);
         }
 
+        public void Memorize(string toBeParsedHtmlDocument)
+        {
+            if (CancellationToken.IsCancellationRequested) return;
+            _toBeParsedHtmlDocuments.Add(toBeParsedHtmlDocument, CancellationToken);
+        }
+
         public bool TryTakeToBeCrawledResource(out Resource toBeCrawledResource)
         {
             return _toBeCrawledResources.TryTake(out toBeCrawledResource);
+        }
+
+        public bool TryTakeToBeParsedHtmlDocument(out string toBeParsedHtmlDocument)
+        {
+            return _toBeParsedHtmlDocuments.TryTake(out toBeParsedHtmlDocument);
         }
 
         public bool TryTakeToBeVerifiedRawResource(out RawResource toBeVerifiedRawResource)

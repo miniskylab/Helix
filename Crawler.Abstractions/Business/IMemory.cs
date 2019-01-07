@@ -26,7 +26,11 @@ namespace Helix.Crawler.Abstractions
 
         void Memorize(Resource toBeCrawledResource);
 
+        void Memorize(string toBeParsedHtmlDocument);
+
         bool TryTakeToBeCrawledResource(out Resource toBeCrawledResource);
+
+        bool TryTakeToBeParsedHtmlDocument(out string toBeParsedHtmlDocument);
 
         bool TryTakeToBeVerifiedRawResource(out RawResource toBeVerifiedRawResource);
 
