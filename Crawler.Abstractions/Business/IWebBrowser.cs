@@ -4,6 +4,8 @@ namespace Helix.Crawler.Abstractions
 {
     public interface IWebBrowser : IDisposable
     {
-        string GetPageSource(Uri uri);
+        event IdleEvent OnIdle;
+
+        string Render(Uri uri);
     }
 }

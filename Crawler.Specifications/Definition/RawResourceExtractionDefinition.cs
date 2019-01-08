@@ -19,7 +19,7 @@ namespace Helix.Crawler.Specifications
             AddTheoryDescription(
                 new HtmlDocument
                 {
-                    Url = "http://www.helix.com",
+                    Uri = new Uri("http://www.helix.com"),
                     Text = @"
                         <html>
                             <body>
@@ -40,7 +40,7 @@ namespace Helix.Crawler.Specifications
         {
             AddTheoryDescription(new HtmlDocument
                 {
-                    Url = "http://www.helix.com",
+                    Uri = new Uri("http://www.helix.com"),
                     Text = @"
                         <html>
                             <body>

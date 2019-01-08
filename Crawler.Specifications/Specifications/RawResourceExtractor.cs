@@ -11,31 +11,33 @@ namespace Helix.Crawler.Specifications
     {
         [Theory]
         [ClassData(typeof(RawResourceExtractionDefinition))]
-        void CouldExtractRawResourcesFromHtmlDocument(HtmlDocument htmlDocument, IList<RawResource> expectedRawResources,
+        void CouldExtractRawResourcesFromHtmlDocument(HtmlDocument htmlDocument, IList<RawResource> expectedOutputRawResources,
             Type expectedExceptionType)
         {
             var rawResourceExtractedEventRaiseCount = 0;
             var rawResourceExtractor = ServiceLocator.Get<IRawResourceExtractor>();
-            rawResourceExtractor.OnRawResourceExtracted += extractedRawResource =>
+            void OnRawResourceExtracted(RawResource extractedRawResource)
             {
                 Assert.Single(
-                    expectedRawResources ?? new List<RawResource>(),
-                    expectedRawResource =>
-                        expectedRawResource.Url == extractedRawResource.Url &&
-                        expectedRawResource.ParentUrl == extractedRawResource.ParentUrl
+                    expectedOutputRawResources ?? new List<RawResource>(),
+                    expectedOutputRawResource => expectedOutputRawResource.Url == extractedRawResource.Url &&
+                                                 expectedOutputRawResource.ParentUrl == extractedRawResource.ParentUrl
                 );
                 Interlocked.Increment(ref rawResourceExtractedEventRaiseCount);
-            };
+            }
 
             if (expectedExceptionType != null)
             {
                 Assert.True(rawResourceExtractedEventRaiseCount == 0);
-                Assert.Throws(expectedExceptionType, () => { rawResourceExtractor.ExtractRawResourcesFrom(htmlDocument); });
+                Assert.Throws(
+                    expectedExceptionType,
+                    () => { rawResourceExtractor.ExtractRawResourcesFrom(htmlDocument, OnRawResourceExtracted); }
+                );
             }
             else
             {
-                rawResourceExtractor.ExtractRawResourcesFrom(htmlDocument);
-                Assert.Equal(expectedRawResources.Count, rawResourceExtractedEventRaiseCount);
+                rawResourceExtractor.ExtractRawResourcesFrom(htmlDocument, OnRawResourceExtracted);
+                Assert.Equal(expectedOutputRawResources.Count, rawResourceExtractedEventRaiseCount);
             }
         }
     }

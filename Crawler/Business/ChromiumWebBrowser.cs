@@ -20,6 +20,7 @@ namespace Helix.Crawler
 
         public event AsyncEventHandler<SessionEventArgs> BeforeRequest;
         public event AsyncEventHandler<SessionEventArgs> BeforeResponse;
+        public event IdleEvent OnIdle;
 
         public ChromiumWebBrowser(Configurations configurations)
         {
@@ -48,9 +49,10 @@ namespace Helix.Crawler
             GC.SuppressFinalize(this);
         }
 
-        public string GetPageSource(Uri uri)
+        public string Render(Uri uri)
         {
             _chromeDriver.Navigate().GoToUrl(uri);
+            OnIdle?.Invoke();
             return _chromeDriver.PageSource;
         }
 

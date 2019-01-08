@@ -15,8 +15,8 @@ namespace Helix.Crawler
         int _activeThreadCount;
         readonly ConcurrentSet<string> _alreadyVerifiedUrls = new ConcurrentSet<string>();
         readonly CancellationTokenSource _cancellationTokenSource;
-        readonly BlockingCollection<Resource> _toBeCrawledResources = new BlockingCollection<Resource>();
-        readonly BlockingCollection<string> _toBeParsedHtmlDocuments = new BlockingCollection<string>();
+        readonly BlockingCollection<HtmlDocument> _toBeExtractedHtmlDocuments = new BlockingCollection<HtmlDocument>();
+        readonly BlockingCollection<Uri> _toBeRenderedUris = new BlockingCollection<Uri>();
         readonly BlockingCollection<RawResource> _toBeVerifiedRawResources = new BlockingCollection<RawResource>();
         readonly string _workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
         static readonly object StaticLock = new object();
@@ -29,7 +29,7 @@ namespace Helix.Crawler
 
         public CancellationToken CancellationToken => _cancellationTokenSource.Token;
 
-        public bool EverythingIsDone => !_toBeVerifiedRawResources.Any() && !_toBeCrawledResources.Any() && _activeThreadCount == 0;
+        public bool EverythingIsDone => !_toBeVerifiedRawResources.Any() && !_toBeRenderedUris.Any() && _activeThreadCount == 0;
 
         public int RemainingUrlCount => _activeThreadCount + _toBeVerifiedRawResources.Count;
 
@@ -65,35 +65,37 @@ namespace Helix.Crawler
                 if (_alreadyVerifiedUrls.Contains(toBeVerifiedRawResource.Url.StripFragment())) return;
                 _alreadyVerifiedUrls.Add(toBeVerifiedRawResource.Url.StripFragment());
             }
-            _toBeVerifiedRawResources.Add(toBeVerifiedRawResource, CancellationToken);
+
+            try { _toBeVerifiedRawResources.Add(toBeVerifiedRawResource, CancellationToken); }
+            catch (OperationCanceledException operationCanceledException)
+            {
+                if (operationCanceledException.CancellationToken != CancellationToken) throw;
+            }
         }
 
-        public void Memorize(Resource toBeCrawledResource)
+        public void Memorize(Uri toBeRenderedUri)
         {
-            if (CancellationToken.IsCancellationRequested) return;
-            _toBeCrawledResources.Add(toBeCrawledResource, CancellationToken);
+            try { _toBeRenderedUris.Add(toBeRenderedUri, CancellationToken); }
+            catch (OperationCanceledException operationCanceledException)
+            {
+                if (operationCanceledException.CancellationToken != CancellationToken) throw;
+            }
         }
 
-        public void Memorize(string toBeParsedHtmlDocument)
+        public void Memorize(HtmlDocument toBeExtractedHtmlDocument)
         {
-            if (CancellationToken.IsCancellationRequested) return;
-            _toBeParsedHtmlDocuments.Add(toBeParsedHtmlDocument, CancellationToken);
+            try { _toBeExtractedHtmlDocuments.Add(toBeExtractedHtmlDocument, CancellationToken); }
+            catch (OperationCanceledException operationCanceledException)
+            {
+                if (operationCanceledException.CancellationToken != CancellationToken) throw;
+            }
         }
 
-        public bool TryTakeToBeCrawledResource(out Resource toBeCrawledResource)
-        {
-            return _toBeCrawledResources.TryTake(out toBeCrawledResource);
-        }
+        public HtmlDocument TakeToBeExtractedHtmlDocument() { return _toBeExtractedHtmlDocuments.Take(CancellationToken); }
 
-        public bool TryTakeToBeParsedHtmlDocument(out string toBeParsedHtmlDocument)
-        {
-            return _toBeParsedHtmlDocuments.TryTake(out toBeParsedHtmlDocument);
-        }
+        public Uri TakeToBeRenderedUri() { return _toBeRenderedUris.Take(CancellationToken); }
 
-        public bool TryTakeToBeVerifiedRawResource(out RawResource toBeVerifiedRawResource)
-        {
-            return _toBeVerifiedRawResources.TryTake(out toBeVerifiedRawResource);
-        }
+        public RawResource TakeToBeVerifiedRawResource() { return _toBeVerifiedRawResources.Take(); }
 
         public bool TryTransitTo(CrawlerState crawlerState)
         {

@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 
 namespace Helix.Crawler.Abstractions
@@ -24,15 +25,15 @@ namespace Helix.Crawler.Abstractions
 
         void Memorize(RawResource toBeVerifiedRawResource);
 
-        void Memorize(Resource toBeCrawledResource);
+        void Memorize(Uri toBeRenderedUri);
 
-        void Memorize(string toBeParsedHtmlDocument);
+        void Memorize(HtmlDocument toBeExtractedHtmlDocument);
 
-        bool TryTakeToBeCrawledResource(out Resource toBeCrawledResource);
+        HtmlDocument TakeToBeExtractedHtmlDocument();
 
-        bool TryTakeToBeParsedHtmlDocument(out string toBeParsedHtmlDocument);
+        Uri TakeToBeRenderedUri();
 
-        bool TryTakeToBeVerifiedRawResource(out RawResource toBeVerifiedRawResource);
+        RawResource TakeToBeVerifiedRawResource();
 
         bool TryTransitTo(CrawlerState crawlerState);
     }

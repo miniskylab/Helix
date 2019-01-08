@@ -6,6 +6,7 @@ using Helix.Crawler.Abstractions;
 
 namespace Helix.Crawler
 {
+    // TODO: Singleton via Dependency Injection
     sealed class ReportWriter : FilePersistence
     {
         static ReportWriter _instance;

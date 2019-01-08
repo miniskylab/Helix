@@ -8,5 +8,4 @@ namespace Helix.Crawler.Abstractions
     public delegate void BrowserExceptionOccurredEvent(Exception webDriverException, Resource resourceThatTriggeredThisException);
     public delegate void IdleEvent();
     public delegate Task RawResourceCollectedEvent(RawResource rawResource);
-    public delegate void RawResourceExtractedEvent(RawResource rawResource);
 }
