@@ -6,6 +6,8 @@ namespace Helix.Crawler.Abstractions
     {
         public string DomainName { get; }
 
+        public int HttpProxyPort { get; set; }
+
         public bool ReportBrokenLinksOnly { get; }
 
         public int RequestTimeoutDuration { get; }
@@ -35,6 +37,7 @@ namespace Helix.Crawler.Abstractions
             ReportBrokenLinksOnly = (bool) (tokens.SelectToken(nameof(ReportBrokenLinksOnly)) ?? false);
             RequestTimeoutDuration = (int) (tokens.SelectToken(nameof(RequestTimeoutDuration)) ?? 0);
             StartUrl = ((string) tokens.SelectToken(nameof(StartUrl)) ?? string.Empty).ToLower();
+            HttpProxyPort = 18882;
 
             DomainName = ((string) tokens.SelectToken(nameof(DomainName)) ?? string.Empty).ToLower();
             if (string.IsNullOrWhiteSpace(DomainName)) DomainName = "_";

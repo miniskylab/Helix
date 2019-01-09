@@ -16,27 +16,27 @@ namespace Helix.Crawler.Specifications
         {
             var rawResourceExtractedEventRaiseCount = 0;
             var rawResourceExtractor = ServiceLocator.Get<IRawResourceExtractor>();
-            void OnRawResourceExtracted(RawResource extractedRawResource)
+            rawResourceExtractor.OnRawResourceExtracted += extractedRawResource =>
             {
                 Assert.Single(
                     expectedOutputRawResources ?? new List<RawResource>(),
-                    expectedOutputRawResource => expectedOutputRawResource.Url == extractedRawResource.Url &&
-                                                 expectedOutputRawResource.ParentUrl == extractedRawResource.ParentUrl
+                    expectedOutputRawResource => expectedOutputRawResource.Url.Equals(extractedRawResource.Url) &&
+                                                 expectedOutputRawResource.ParentUri.Equals(extractedRawResource.ParentUri)
                 );
                 Interlocked.Increment(ref rawResourceExtractedEventRaiseCount);
-            }
+            };
 
             if (expectedExceptionType != null)
             {
                 Assert.True(rawResourceExtractedEventRaiseCount == 0);
                 Assert.Throws(
                     expectedExceptionType,
-                    () => { rawResourceExtractor.ExtractRawResourcesFrom(htmlDocument, OnRawResourceExtracted); }
+                    () => rawResourceExtractor.ExtractRawResourcesFrom(htmlDocument)
                 );
             }
             else
             {
-                rawResourceExtractor.ExtractRawResourcesFrom(htmlDocument, OnRawResourceExtracted);
+                rawResourceExtractor.ExtractRawResourcesFrom(htmlDocument);
                 Assert.Equal(expectedOutputRawResources.Count, rawResourceExtractedEventRaiseCount);
             }
         }

@@ -30,8 +30,8 @@ namespace Helix.Crawler.Specifications
                 },
                 new List<RawResource>
                 {
-                    new RawResource { ParentUrl = "http://www.helix.com", Url = "http://www.sanity.com/" },
-                    new RawResource { ParentUrl = "http://www.helix.com", Url = "http://192.168.1.2" },
+                    new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://www.sanity.com/" },
+                    new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://192.168.1.2" },
                 }
             );
         }

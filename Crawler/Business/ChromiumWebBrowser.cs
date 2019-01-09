@@ -5,40 +5,30 @@ using System.Reflection;
 using Helix.Crawler.Abstractions;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
-using Titanium.Web.Proxy;
-using Titanium.Web.Proxy.EventArguments;
-using Titanium.Web.Proxy.Models;
 
 namespace Helix.Crawler
 {
     public class ChromiumWebBrowser : IWebBrowser
     {
-        const int HttpProxyPort = 18882;
         ChromeDriver _chromeDriver;
-        static ProxyServer _httpProxyServer;
-        static readonly object StaticLock = new object();
 
-        public event AsyncEventHandler<SessionEventArgs> BeforeRequest;
-        public event AsyncEventHandler<SessionEventArgs> BeforeResponse;
         public event IdleEvent OnIdle;
 
         public ChromiumWebBrowser(Configurations configurations)
         {
-            SetupHttpProxyServer();
-
             var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
             var chromeDriverService = ChromeDriverService.CreateDefaultService(workingDirectory);
             chromeDriverService.HideCommandPromptWindow = true;
 
-            var chromeOptions = new ChromeOptions();
+            var chromeOptions = new ChromeOptions { BinaryLocation = Path.Combine(workingDirectory, "chromium/chrome.exe") };
             if (!configurations.ShowWebBrowsers) chromeOptions.AddArguments("--headless", "--incognito");
-            chromeOptions.BinaryLocation = Path.Combine(workingDirectory, "chromium/chrome.exe");
-            chromeOptions.Proxy = new Proxy
-            {
-                HttpProxy = $"http://localhost:{HttpProxyPort}",
-                SslProxy = $"http://localhost:{HttpProxyPort}",
-                FtpProxy = $"http://localhost:{HttpProxyPort}"
-            };
+            if (configurations.HttpProxyPort > 0)
+                chromeOptions.Proxy = new Proxy
+                {
+                    HttpProxy = $"http://{IPAddress.Loopback}:{configurations.HttpProxyPort}",
+                    FtpProxy = $"http://{IPAddress.Loopback}:{configurations.HttpProxyPort}",
+                    SslProxy = $"http://{IPAddress.Loopback}:{configurations.HttpProxyPort}"
+                };
 
             _chromeDriver = new ChromeDriver(chromeDriverService, chromeOptions);
         }
@@ -58,28 +48,8 @@ namespace Helix.Crawler
 
         void ReleaseUnmanagedResources()
         {
-            lock (StaticLock)
-            {
-                _chromeDriver?.Quit();
-                _httpProxyServer?.Stop();
-                _httpProxyServer?.Dispose();
-
-                _chromeDriver = null;
-                _httpProxyServer = null;
-            }
-        }
-
-        void SetupHttpProxyServer()
-        {
-            lock (StaticLock)
-            {
-                if (_httpProxyServer != null) return;
-                _httpProxyServer = new ProxyServer();
-                _httpProxyServer.AddEndPoint(new ExplicitProxyEndPoint(IPAddress.Any, HttpProxyPort));
-                _httpProxyServer.Start();
-                _httpProxyServer.BeforeRequest += BeforeRequest;
-                _httpProxyServer.BeforeResponse += BeforeResponse;
-            }
+            _chromeDriver?.Quit();
+            _chromeDriver = null;
         }
 
         ~ChromiumWebBrowser() { ReleaseUnmanagedResources(); }

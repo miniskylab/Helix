@@ -27,7 +27,8 @@ namespace Helix.Crawler
             if (_serviceProvider?.GetService<Configurations>() != null) return;
             _serviceProvider?.Dispose();
             _serviceProvider = new ServiceCollection()
-                .AddTransient<IResourceCollector, ResourceCollector>()
+                .AddTransient<IWebBrowser, ChromiumWebBrowser>()
+                .AddTransient<IRawResourceExtractor, RawResourceExtractor>()
                 .AddTransient<IResourceVerifier, ResourceVerifier>()
                 .AddTransient<IResourceProcessor, ResourceProcessor>()
                 .AddTransient<IResourceScope, ResourceScope>()

@@ -44,7 +44,7 @@ namespace Helix.Crawler
             {
                 _alreadyVerifiedUrls.Clear();
                 _alreadyVerifiedUrls.Add(Configurations.StartUrl);
-                _toBeVerifiedRawResources.Add(new RawResource { Url = Configurations.StartUrl, ParentUrl = null }, CancellationToken);
+                _toBeVerifiedRawResources.Add(new RawResource { Url = Configurations.StartUrl, ParentUri = null }, CancellationToken);
             }
         }
 

@@ -16,7 +16,7 @@ using Titanium.Web.Proxy.Models;
 
 namespace Helix.Crawler
 {
-    public sealed class ResourceCollector : IResourceCollector
+    public sealed class LegacyResourceCollector
     {
         const int HttpProxyPort = 18882;
         readonly ChromeDriver _chromeDriver;
@@ -30,7 +30,7 @@ namespace Helix.Crawler
         public event IdleEvent OnIdle;
         public event RawResourceCollectedEvent OnRawResourceCollected;
 
-        public ResourceCollector(Configurations configurations, IResourceScope resourceScope)
+        public LegacyResourceCollector(Configurations configurations, IResourceScope resourceScope)
         {
             _resourceScope = resourceScope;
             SetupHttpProxyServer();
@@ -62,7 +62,7 @@ namespace Helix.Crawler
                                                                            href.StartsWith("/", StringComparison.OrdinalIgnoreCase));
                 var newRawResources = TryGetUrls("a", "href")
                     .Where(hrefSchemeIsSupported)
-                    .Select(href => new RawResource { Url = href, ParentUrl = parentResource.Uri.AbsoluteUri });
+                    .Select(href => new RawResource { ParentUri = parentResource.Uri, Url = href });
                 Parallel.ForEach(newRawResources, newRawResource => { OnRawResourceCollected?.Invoke(newRawResource); });
             }
             catch (WebDriverException webDriverException)
@@ -104,8 +104,8 @@ namespace Helix.Crawler
                 if (isNotGETRequest || isNotCss && isNotFont && isNotJavaScript && isNotImage && isNotAudio && isNotVideo) return;
                 var newRawResource = new RawResource
                 {
+                    ParentUri = new Uri(request.OriginalUrl),
                     Url = request.Url,
-                    ParentUrl = request.OriginalUrl,
                     HttpStatusCode = response.StatusCode
                 };
                 OnRawResourceCollected?.Invoke(newRawResource);
@@ -169,6 +169,6 @@ namespace Helix.Crawler
             throw new TaskCanceledException();
         }
 
-        ~ResourceCollector() { ReleaseUnmanagedResources(); }
+        ~LegacyResourceCollector() { ReleaseUnmanagedResources(); }
     }
 }

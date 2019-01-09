@@ -116,7 +116,7 @@ namespace Helix.Crawler
                     return;
                 }
 
-                rawResourceExtractor.ExtractRawResourcesFrom(toBeExtractedHtmlDocument, rawResource => Memory.Memorize(rawResource));
+                rawResourceExtractor.ExtractRawResourcesFrom(toBeExtractedHtmlDocument);
                 Memory.DecrementActiveThreadCount();
             }
         }
@@ -149,6 +149,7 @@ namespace Helix.Crawler
                 if (Memory.CancellationToken.IsCancellationRequested) throw new OperationCanceledException(Memory.CancellationToken);
                 var rawResourceExtractor = ServiceLocator.Get<IRawResourceExtractor>();
                 rawResourceExtractor.OnIdle += () => RawResourceExtractorPool.Add(rawResourceExtractor);
+                rawResourceExtractor.OnRawResourceExtracted += rawResource => Memory.Memorize(rawResource);
                 RawResourceExtractorPool.Add(rawResourceExtractor);
             }
         }

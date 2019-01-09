@@ -22,9 +22,9 @@ namespace Helix.Crawler
         public void WriteReport(VerificationResult verificationResult, bool writeBrokenLinksOnly = false)
         {
             if (writeBrokenLinksOnly && !verificationResult.IsBrokenResource) return;
-            var parentUrl = verificationResult.Resource?.ParentUri?.OriginalString ?? verificationResult.RawResource.ParentUrl;
+            var parentUri = verificationResult.Resource?.ParentUri;
             var verifiedUrl = verificationResult.Resource?.Uri.OriginalString ?? verificationResult.RawResource.Url;
-            WriteLineAsync($"{verificationResult.HttpStatusCode},{parentUrl},{verifiedUrl}");
+            WriteLineAsync($"{verificationResult.HttpStatusCode},{parentUri?.OriginalString},{verifiedUrl}");
         }
     }
 }

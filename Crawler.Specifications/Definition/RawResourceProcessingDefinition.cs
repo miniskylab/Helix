@@ -14,8 +14,8 @@ namespace Helix.Crawler.Specifications
 
         void CreateResourceFromRawResource()
         {
-            var rawResource = new RawResource { ParentUrl = "http://www.helix.com", Url = "http://www.helix.com/anything" };
-            var expectedOutputResource = new Resource { ParentUri = new Uri(rawResource.ParentUrl), Uri = new Uri(rawResource.Url) };
+            var rawResource = new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://www.helix.com/anything" };
+            var expectedOutputResource = new Resource { ParentUri = rawResource.ParentUri, Uri = new Uri(rawResource.Url) };
             AddTheoryDescription(rawResource, expectedOutputResource, true);
         }
 

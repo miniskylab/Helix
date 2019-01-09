@@ -14,15 +14,13 @@ namespace Helix.Crawler
             if (rawResource == null) throw new ArgumentNullException();
 
             resource = null;
-            var urlIsNotStartUrl = !_resourceScope.IsStartUrl(rawResource.Url);
-            var parentUrlIsNotValid = !Uri.TryCreate(rawResource.ParentUrl, UriKind.Absolute, out var parentUri);
-            if (urlIsNotStartUrl && parentUrlIsNotValid) return false;
+            if (!_resourceScope.IsStartUrl(rawResource.Url) && rawResource.ParentUri == null) return false;
 
-            var absoluteUrl = EnsureAbsolute(rawResource.Url, parentUri);
+            var absoluteUrl = EnsureAbsolute(rawResource.Url, rawResource.ParentUri);
             if (!Uri.TryCreate(absoluteUrl, UriKind.Absolute, out var uri)) return false;
             StripFragmentFrom(ref uri);
 
-            resource = new Resource { Uri = uri, ParentUri = parentUri, HttpStatusCode = rawResource.HttpStatusCode };
+            resource = new Resource { ParentUri = rawResource.ParentUri, Uri = uri, HttpStatusCode = rawResource.HttpStatusCode };
             return true;
         }
 
