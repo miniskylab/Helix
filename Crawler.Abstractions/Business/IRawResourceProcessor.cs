@@ -1,6 +1,6 @@
 ﻿namespace Helix.Crawler.Abstractions
 {
-    public interface IResourceProcessor
+    public interface IRawResourceProcessor
     {
         bool TryProcessRawResource(RawResource rawResource, out Resource resource);
     }

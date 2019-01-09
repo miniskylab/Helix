@@ -30,7 +30,7 @@ namespace Helix.Crawler
                 .AddTransient<IWebBrowser, ChromiumWebBrowser>()
                 .AddTransient<IRawResourceExtractor, RawResourceExtractor>()
                 .AddTransient<IResourceVerifier, ResourceVerifier>()
-                .AddTransient<IResourceProcessor, ResourceProcessor>()
+                .AddTransient<IRawResourceProcessor, RawResourceProcessor>()
                 .AddTransient<IResourceScope, ResourceScope>()
                 .AddSingleton(configurations)
                 .AddSingleton<IMemory, Memory>()

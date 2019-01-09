@@ -14,15 +14,15 @@ namespace Helix.Crawler
         readonly CancellationTokenSource _cancellationTokenSource;
         bool _disposed;
         readonly HttpClient _httpClient;
-        readonly IResourceProcessor _resourceProcessor;
+        readonly IRawResourceProcessor _rawResourceProcessor;
         readonly IResourceScope _resourceScope;
         Task<HttpResponseMessage> _sendingGETRequestTask;
 
         public event IdleEvent OnIdle;
 
-        public ResourceVerifier(Configurations configurations, IResourceProcessor resourceProcessor, IResourceScope resourceScope)
+        public ResourceVerifier(Configurations configurations, IRawResourceProcessor rawResourceProcessor, IResourceScope resourceScope)
         {
-            _resourceProcessor = resourceProcessor;
+            _rawResourceProcessor = rawResourceProcessor;
             _resourceScope = resourceScope;
             _cancellationTokenSource = new CancellationTokenSource();
 
@@ -58,7 +58,7 @@ namespace Helix.Crawler
         public VerificationResult Verify(RawResource rawResource)
         {
             var verificationResult = new VerificationResult { RawResource = rawResource };
-            if (!_resourceProcessor.TryProcessRawResource(rawResource, out var resource))
+            if (!_rawResourceProcessor.TryProcessRawResource(rawResource, out var resource))
             {
                 verificationResult.Resource = null;
                 verificationResult.HttpStatusCode = (int) HttpStatusCode.ExpectationFailed;

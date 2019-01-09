@@ -5,19 +5,19 @@ using Xunit;
 
 namespace Helix.Crawler.Specifications
 {
-    public class ResourceProcessor : AbstractSpecifications
+    public class RawResourceProcessor : AbstractSpecifications
     {
         [Theory]
         [ClassData(typeof(RawResourceProcessingDefinition))]
         void CouldProcessRawResourcesIntoResources(RawResource rawResource, Resource expectedOutputResource,
             bool expectedProcessingResult, Type expectedExceptionType)
         {
-            var resourceProcessor = ServiceLocator.Get<IResourceProcessor>();
+            var rawResourceProcessor = ServiceLocator.Get<IRawResourceProcessor>();
             if (expectedExceptionType != null)
-                Assert.Throws(expectedExceptionType, () => { resourceProcessor.TryProcessRawResource(rawResource, out _); });
+                Assert.Throws(expectedExceptionType, () => { rawResourceProcessor.TryProcessRawResource(rawResource, out _); });
             else
             {
-                var processingResult = resourceProcessor.TryProcessRawResource(rawResource, out var resource);
+                var processingResult = rawResourceProcessor.TryProcessRawResource(rawResource, out var resource);
                 Assert.Equal(expectedProcessingResult, processingResult);
                 Assert.Equal(expectedOutputResource.Localized, resource.Localized);
                 Assert.Equal(expectedOutputResource.ParentUri, resource.ParentUri);

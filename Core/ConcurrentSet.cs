@@ -17,19 +17,28 @@ namespace Helix.Core
 
         public void Add(T item)
         {
+            if (item == null) throw new ArgumentNullException();
             if (!_concurrentDictionary.TryAdd(item, false))
                 throw new InvalidOperationException("Cannot add the same item twice.");
         }
 
         public void Clear() { _concurrentDictionary.Clear(); }
 
-        public bool Contains(T item) { return _concurrentDictionary.ContainsKey(item); }
+        public bool Contains(T item)
+        {
+            if (item == null) throw new ArgumentNullException();
+            return _concurrentDictionary.ContainsKey(item);
+        }
 
         public void CopyTo(T[] array, int arrayIndex) { _concurrentDictionary.Keys.CopyTo(array, arrayIndex); }
 
         public IEnumerator<T> GetEnumerator() { return _concurrentDictionary.Keys.GetEnumerator(); }
 
-        public bool Remove(T item) { return _concurrentDictionary.TryRemove(item, out _); }
+        public bool Remove(T item)
+        {
+            if (item == null) throw new ArgumentNullException();
+            return _concurrentDictionary.TryRemove(item, out _);
+        }
 
         IEnumerator IEnumerable.GetEnumerator() { return GetEnumerator(); }
     }
