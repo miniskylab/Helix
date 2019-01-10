@@ -116,6 +116,7 @@ namespace Helix.Crawler
                     return;
                 }
 
+                // TODO: Put in a Task.Run()
                 rawResourceExtractor.ExtractRawResourcesFrom(toBeExtractedHtmlDocument);
                 Memory.DecrementActiveThreadCount();
             }
@@ -174,6 +175,11 @@ namespace Helix.Crawler
                 if (Memory.CancellationToken.IsCancellationRequested) throw new OperationCanceledException(Memory.CancellationToken);
                 var webBrowser = ServiceLocator.Get<IWebBrowser>();
                 webBrowser.OnIdle += () => WebBrowserPool.Add(webBrowser);
+                webBrowser.OnExceptionOccurred += exception =>
+                {
+                    HandleException(exception);
+                    WebBrowserPool.Add(webBrowser);
+                };
                 WebBrowserPool.Add(webBrowser);
                 OnWebBrowserOpened?.Invoke(Interlocked.Increment(ref openedWebBrowserCount));
             });
@@ -200,6 +206,7 @@ namespace Helix.Crawler
                     return;
                 }
 
+                // TODO: Put in a Task.Run()
                 Memory.Memorize(new HtmlDocument
                 {
                     Uri = toBeRenderedUri,
@@ -230,6 +237,7 @@ namespace Helix.Crawler
                     return;
                 }
 
+                // TODO: Put in a Task.Run()
                 var verificationResult = resourceVerifier.Verify(toBeVerifiedRawResource);
                 if (verificationResult.HttpStatusCode != (int) HttpStatusCode.ExpectationFailed)
                 {
