@@ -13,8 +13,8 @@ namespace Helix.Crawler.Specifications
         {
             ShareHostNameWithParent();
             MatchConfiguredDomainName();
-            IsStartUrlUsingDomainName();
-            IsStartUrlUsingIpAddress();
+            IsStartUriUsingDomainName();
+            IsStartUriUsingIpAddress();
 
             ThrowExceptionIfArgumentNull();
             ThrowExceptionIfArgumentIsNotValid();
@@ -29,22 +29,22 @@ namespace Helix.Crawler.Specifications
             AddTheoryDescription(p2: resource, p3: false);
         }
 
-        void IsStartUrlUsingDomainName()
+        void IsStartUriUsingDomainName()
         {
             var resource = new Resource { ParentUri = null, Uri = new Uri("http://www.helix.com") };
             var configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
             {
-                { nameof(Configurations.StartUrl), "http://www.helix.com" }
+                { nameof(Configurations.StartUri), "http://www.helix.com" }
             }));
             AddTheoryDescription(configurations, resource, true);
         }
 
-        void IsStartUrlUsingIpAddress()
+        void IsStartUriUsingIpAddress()
         {
             var resource = new Resource { ParentUri = null, Uri = new Uri("http://www.helix.com") };
             var configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
             {
-                { nameof(Configurations.StartUrl), "http://192.168.1.2" },
+                { nameof(Configurations.StartUri), "http://192.168.1.2" },
                 { nameof(Configurations.DomainName), "www.helix.com" }
             }));
             AddTheoryDescription(configurations, resource, true);
@@ -56,13 +56,15 @@ namespace Helix.Crawler.Specifications
             var resource = new Resource { ParentUri = new Uri("http://192.168.1.2/parent"), Uri = new Uri("http://www.helix.com/child") };
             var configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
             {
+                { nameof(Configurations.StartUri), "http://192.168.1.2" },
                 { nameof(Configurations.DomainName), "www.helix.com" }
             }));
             AddTheoryDescription(configurations, resource, true);
 
-            resource = new Resource { ParentUri = new Uri("http://192.168.1.2"), Uri = new Uri("http://www.helix.com/anything") };
+            resource = new Resource { ParentUri = new Uri("http://192.168.1.2/parent"), Uri = new Uri("http://www.helix.com/child") };
             configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
             {
+                { nameof(Configurations.StartUri), "http://192.168.1.2" },
                 { nameof(Configurations.DomainName), "helix.com" }
             }));
             AddTheoryDescription(configurations, resource, false);
@@ -70,7 +72,7 @@ namespace Helix.Crawler.Specifications
 
         void ShareHostNameWithParent()
         {
-            var resource = new Resource { ParentUri = new Uri("http://www.helix.com"), Uri = new Uri("http://www.helix.com/anything") };
+            var resource = new Resource { ParentUri = new Uri("http://www.helix.com/parent"), Uri = new Uri("http://www.helix.com/child") };
             AddTheoryDescription(p2: resource, p3: true);
         }
 

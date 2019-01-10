@@ -3,7 +3,7 @@ const socket = new require("net").Socket();
 
 socket.connect(18880, "127.0.0.1", () => {
     const btnMain = document.getElementById("btn-main");
-    const txtStartUrl = document.getElementById("txt-start-url");
+    const txtStartUri = document.getElementById("txt-start-uri");
     const txtDomainName = document.getElementById("txt-domain-name");
     const txtWebBrowserCount = document.getElementById("txt-web-browser-count");
     const txtRequestTimeoutDuration = document.getElementById("txt-request-timeout-duration");
@@ -14,7 +14,7 @@ socket.connect(18880, "127.0.0.1", () => {
         socket.write(JSON.stringify({
             text: "btn-start-clicked",
             payload: JSON.stringify({
-                StartUrl: txtStartUrl.value,
+                StartUri: txtStartUri.value,
                 DomainName: txtDomainName.value,
                 WebBrowserCount: txtWebBrowserCount.value,
                 RequestTimeoutDuration: txtRequestTimeoutDuration.value,

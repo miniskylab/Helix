@@ -12,17 +12,17 @@ namespace Helix.Crawler
         public bool IsInternalResource(Resource resource)
         {
             if (resource == null || resource.Uri == null) throw new ArgumentNullException();
-            if (IsStartUrl(resource.Uri.AbsoluteUri)) return true;
+            if (IsStartUri(resource.Uri.AbsoluteUri)) return true;
             if (resource.Uri.Authority.Equals(_configurations.DomainName, StringComparison.OrdinalIgnoreCase)) return true;
 
             if (resource.ParentUri == null) throw new ArgumentException();
             return resource.Uri.Authority.Equals(resource.ParentUri.Authority, StringComparison.OrdinalIgnoreCase);
         }
 
-        public bool IsStartUrl(string url)
+        public bool IsStartUri(string url)
         {
             if (url == null) throw new ArgumentNullException();
-            return new Uri(url).AbsoluteUri.Equals(_configurations.StartUrl.EnsureEndsWith('/'), StringComparison.OrdinalIgnoreCase);
+            return new Uri(url).Equals(_configurations.StartUri);
         }
 
         public Uri Localize(Uri uri)
@@ -30,8 +30,7 @@ namespace Helix.Crawler
             if (uri == null) throw new ArgumentNullException();
             if (!uri.Authority.Equals(_configurations.DomainName, StringComparison.OrdinalIgnoreCase)) return uri;
 
-            var startUri = new Uri(_configurations.StartUrl);
-            var uriBuilder = new UriBuilder(uri) { Host = startUri.Host, Port = startUri.Port };
+            var uriBuilder = new UriBuilder(uri) { Host = _configurations.StartUri.Host, Port = _configurations.StartUri.Port };
             return uriBuilder.Uri;
         }
     }

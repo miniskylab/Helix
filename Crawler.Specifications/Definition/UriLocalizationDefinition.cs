@@ -10,7 +10,7 @@ namespace Helix.Crawler.Specifications
     {
         public UriLocalizationDefinition()
         {
-            ReplaceDomainNameMatchingConfiguredWithStartUrlAuthority();
+            ReplaceDomainNameMatchingConfiguredWithStartUriAuthority();
             DoesNothingToUriWhoseAuthorityIsDifferentFromTheConfiguredDomainName();
             ThrowExceptionIfArgumentNull();
         }
@@ -19,16 +19,17 @@ namespace Helix.Crawler.Specifications
         {
             var configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
             {
+                { nameof(Configurations.StartUri), "http://www.helix.com" },
                 { nameof(Configurations.DomainName), "www.helix.com" }
             }));
             AddTheoryDescription(configurations, new Uri("http://www.sanity.com/anything"), new Uri("http://www.sanity.com/anything"));
         }
 
-        void ReplaceDomainNameMatchingConfiguredWithStartUrlAuthority()
+        void ReplaceDomainNameMatchingConfiguredWithStartUriAuthority()
         {
             var configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
             {
-                { nameof(Configurations.StartUrl), "http://192.168.1.2" },
+                { nameof(Configurations.StartUri), "http://192.168.1.2" },
                 { nameof(Configurations.DomainName), "www.helix.com" }
             }));
             AddTheoryDescription(configurations, new Uri("http://www.helix.com/anything"), new Uri("http://192.168.1.2/anything"));

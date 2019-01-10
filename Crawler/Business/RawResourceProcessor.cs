@@ -14,24 +14,13 @@ namespace Helix.Crawler
             if (rawResource == null) throw new ArgumentNullException();
 
             resource = null;
-            var absoluteUrl = EnsureAbsolute(rawResource.Url, rawResource.ParentUri);
-            if (!_resourceScope.IsStartUrl(absoluteUrl) && rawResource.ParentUri == null) return false;
+            if (!_resourceScope.IsStartUri(rawResource.Url) && rawResource.ParentUri == null) return false;
 
-            if (!Uri.TryCreate(absoluteUrl, UriKind.Absolute, out var uri)) return false;
+            if (!Uri.TryCreate(rawResource.Url, UriKind.Absolute, out var uri)) return false;
             StripFragmentFrom(ref uri);
 
             resource = new Resource { ParentUri = rawResource.ParentUri, Uri = uri, HttpStatusCode = rawResource.HttpStatusCode };
             return true;
-        }
-
-        static string EnsureAbsolute(string possiblyRelativeUrl, Uri parentUri)
-        {
-            if (!possiblyRelativeUrl.StartsWith("/")) return possiblyRelativeUrl;
-            if (parentUri == null) throw new ArgumentException();
-            var baseString = possiblyRelativeUrl.StartsWith("//")
-                ? $"{parentUri.Scheme}:"
-                : $"{parentUri.Scheme}://{parentUri.Host}:{parentUri.Port}";
-            return $"{baseString}{possiblyRelativeUrl}";
         }
 
         static void StripFragmentFrom(ref Uri uri)

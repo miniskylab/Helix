@@ -10,8 +10,45 @@ namespace Helix.Crawler.Specifications
         public RawResourceExtractionDefinition()
         {
             ExtractRawResourcesFromHtmlDocument();
+            ConvertRelativeUrlToAbsoluteUrl();
             OnlySupportHttpAndHttpsSchemes();
             ThrowExceptionIfArgumentNull();
+        }
+
+        void ConvertRelativeUrlToAbsoluteUrl()
+        {
+            const string htmlDocumentText = @"
+                <html>
+                    <body>
+                        <a href=""/anything""></a>
+                        <a href=""//www.sanity.com""></a>
+                    </body>
+                </html>";
+
+            AddTheoryDescription(
+                new HtmlDocument
+                {
+                    Uri = new Uri("http://www.helix.com"),
+                    Text = htmlDocumentText
+                },
+                new List<RawResource>
+                {
+                    new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://www.helix.com/anything" },
+                    new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://www.sanity.com" },
+                }
+            );
+            AddTheoryDescription(
+                new HtmlDocument
+                {
+                    Uri = new Uri("https://www.helix.com"),
+                    Text = htmlDocumentText
+                },
+                new List<RawResource>
+                {
+                    new RawResource { ParentUri = new Uri("https://www.helix.com"), Url = "https://www.helix.com/anything" },
+                    new RawResource { ParentUri = new Uri("https://www.helix.com"), Url = "https://www.sanity.com" },
+                }
+            );
         }
 
         void ExtractRawResourcesFromHtmlDocument()

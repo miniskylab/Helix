@@ -7,39 +7,45 @@ using Newtonsoft.Json;
 
 namespace Helix.Crawler.Specifications
 {
-    class StartUrlDefinition : TheoryDescription<Configurations, string, bool, Type>
+    class StartUriDefinition : TheoryDescription<Configurations, string, bool, Type>
     {
-        public StartUrlDefinition()
+        public StartUriDefinition()
         {
-            MatchConfiguredStartUrl();
+            MatchConfiguredStartUri();
             ThrowExceptionIfArgumentNull();
             ThrowExceptionIfArgumentIsNotValid();
-            IsNotStartUrlInAllOtherCases();
+            IsNotStartUriInAllOtherCases();
         }
 
         [SuppressMessage("ReSharper", "RedundantArgumentDefaultValue")]
-        void IsNotStartUrlInAllOtherCases()
+        void IsNotStartUriInAllOtherCases()
         {
             var configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
             {
-                { nameof(Configurations.StartUrl), "http://192.168.1.2" },
+                { nameof(Configurations.StartUri), "http://192.168.1.2" },
                 { nameof(Configurations.DomainName), "www.helix.com" }
             }));
             AddTheoryDescription(configurations, "http://www.helix.com", false);
             AddTheoryDescription(p2: "http://www.helix.com/anything", p3: false);
         }
 
-        void MatchConfiguredStartUrl()
+        void MatchConfiguredStartUri()
         {
             var configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
             {
-                { nameof(Configurations.StartUrl), "http://192.168.1.2" }
+                { nameof(Configurations.StartUri), "http://192.168.1.2" }
             }));
             AddTheoryDescription(configurations, "http://192.168.1.2", true);
             AddTheoryDescription(configurations, "http://192.168.1.2:80", true);
+
+            configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
+            {
+                { nameof(Configurations.StartUri), "http://www.helix.com/anything" }
+            }));
+            AddTheoryDescription(configurations, "http://www.helix.com/anything", true);
         }
 
-        void ThrowExceptionIfArgumentIsNotValid() { AddTheoryDescription(p2: "ThisIsAnInvalidUrl", p4: typeof(UriFormatException)); }
+        void ThrowExceptionIfArgumentIsNotValid() { AddTheoryDescription(p2: "ThisIsAnInvalidUri", p4: typeof(UriFormatException)); }
 
         void ThrowExceptionIfArgumentNull() { AddTheoryDescription(null, p4: typeof(ArgumentNullException)); }
     }

@@ -6,7 +6,7 @@ namespace Helix.Crawler.Abstractions
     {
         bool IsInternalResource(Resource resource);
 
-        bool IsStartUrl(string url);
+        bool IsStartUri(string url);
 
         Uri Localize(Uri uri);
     }

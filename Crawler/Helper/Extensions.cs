@@ -4,8 +4,6 @@ namespace Helix.Crawler
 {
     static class Extensions
     {
-        public static string EnsureEndsWith(this string url, char character) { return $"{url.TrimEnd(character)}{character}"; }
-
         public static string StripFragment(this string url)
         {
             var hashCharacterIndex = url.IndexOf("#", StringComparison.Ordinal);

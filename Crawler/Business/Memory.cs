@@ -15,9 +15,9 @@ namespace Helix.Crawler
         int _activeThreadCount;
         readonly ConcurrentSet<string> _alreadyVerifiedUrls = new ConcurrentSet<string>();
         readonly CancellationTokenSource _cancellationTokenSource;
-        readonly BlockingCollection<HtmlDocument> _toBeExtractedHtmlDocuments = new BlockingCollection<HtmlDocument>();
-        readonly BlockingCollection<Uri> _toBeRenderedUris = new BlockingCollection<Uri>();
-        readonly BlockingCollection<RawResource> _toBeVerifiedRawResources = new BlockingCollection<RawResource>();
+        readonly BlockingCollection<HtmlDocument> _toBeExtractedHtmlDocuments = new BlockingCollection<HtmlDocument>(1000);
+        readonly BlockingCollection<Uri> _toBeRenderedUris = new BlockingCollection<Uri>(1000);
+        readonly BlockingCollection<RawResource> _toBeVerifiedRawResources = new BlockingCollection<RawResource>(1000);
         readonly string _workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
         static readonly object StaticLock = new object();
 
@@ -43,8 +43,15 @@ namespace Helix.Crawler
             lock (StaticLock)
             {
                 _alreadyVerifiedUrls.Clear();
-                _alreadyVerifiedUrls.Add(Configurations.StartUrl);
-                _toBeVerifiedRawResources.Add(new RawResource { Url = Configurations.StartUrl, ParentUri = null }, CancellationToken);
+                _alreadyVerifiedUrls.Add(Configurations.StartUri.AbsoluteUri);
+                _toBeVerifiedRawResources.Add(
+                    new RawResource
+                    {
+                        ParentUri = null,
+                        Url = Configurations.StartUri.AbsoluteUri
+                    },
+                    CancellationToken
+                );
             }
         }
 

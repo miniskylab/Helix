@@ -50,10 +50,25 @@ namespace Helix.Crawler
                     OnRawResourceExtracted?.Invoke(new RawResource
                     {
                         ParentUri = htmlDocument.Uri,
-                        Url = url
+                        Url = EnsureAbsolute(url, htmlDocument.Uri)
                     });
             });
             OnIdle?.Invoke();
+        }
+
+        static string EnsureAbsolute(string possiblyRelativeUrl, Uri parentUri)
+        {
+            if (!possiblyRelativeUrl.StartsWith("/")) return possiblyRelativeUrl;
+            if (parentUri == null) throw new ArgumentException();
+
+            string baseString;
+            if (possiblyRelativeUrl.StartsWith("//")) baseString = $"{parentUri.Scheme}:";
+            else
+            {
+                baseString = $"{parentUri.Scheme}://{parentUri.Host}";
+                if (!parentUri.IsDefaultPort) baseString += $":{parentUri.Port}";
+            }
+            return $"{baseString}{possiblyRelativeUrl}";
         }
 
         static void ReleaseUnmanagedResources()

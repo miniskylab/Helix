@@ -21,14 +21,14 @@ namespace Helix.Crawler.Specifications
         }
 
         [Theory]
-        [ClassData(typeof(StartUrlDefinition))]
-        void CouldIdentifyStartUrl(Configurations configurations, string url, bool expectedIdentificationResult, Type expectedExceptionType)
+        [ClassData(typeof(StartUriDefinition))]
+        void CouldIdentifyStartUri(Configurations configurations, string url, bool expectedIdentificationResult, Type expectedExceptionType)
         {
             if (configurations != null) ServiceLocator.AddOrReplaceServices(new ServiceDescriptor(typeof(Configurations), configurations));
             var resourceScope = ServiceLocator.Get<IResourceScope>();
 
-            if (expectedExceptionType != null) Assert.Throws(expectedExceptionType, () => { resourceScope.IsStartUrl(url); });
-            else Assert.Equal(expectedIdentificationResult, resourceScope.IsStartUrl(url));
+            if (expectedExceptionType != null) Assert.Throws(expectedExceptionType, () => { resourceScope.IsStartUri(url); });
+            else Assert.Equal(expectedIdentificationResult, resourceScope.IsStartUri(url));
         }
 
         [Theory]
