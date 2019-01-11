@@ -12,17 +12,17 @@ namespace Helix.Crawler
         public bool IsInternalResource(Resource resource)
         {
             if (resource == null || resource.Uri == null) throw new ArgumentNullException();
-            if (IsStartUri(resource.Uri.AbsoluteUri)) return true;
+            if (IsStartUri(resource.Uri)) return true;
             if (resource.Uri.Authority.Equals(_configurations.DomainName, StringComparison.OrdinalIgnoreCase)) return true;
 
             if (resource.ParentUri == null) throw new ArgumentException();
             return resource.Uri.Authority.Equals(resource.ParentUri.Authority, StringComparison.OrdinalIgnoreCase);
         }
 
-        public bool IsStartUri(string url)
+        public bool IsStartUri(Uri uri)
         {
-            if (url == null) throw new ArgumentNullException();
-            return new Uri(url).Equals(_configurations.StartUri);
+            if (uri == null) throw new ArgumentNullException();
+            return uri.Equals(_configurations.StartUri);
         }
 
         public Uri Localize(Uri uri)

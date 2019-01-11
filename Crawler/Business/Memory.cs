@@ -102,7 +102,7 @@ namespace Helix.Crawler
 
         public Uri TakeToBeRenderedUri() { return _toBeRenderedUris.Take(CancellationToken); }
 
-        public RawResource TakeToBeVerifiedRawResource() { return _toBeVerifiedRawResources.Take(); }
+        public RawResource TakeToBeVerifiedRawResource() { return _toBeVerifiedRawResources.Take(CancellationToken); }
 
         public bool TryTransitTo(CrawlerState crawlerState)
         {

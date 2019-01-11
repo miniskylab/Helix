@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Helix.Core;
@@ -116,9 +115,11 @@ namespace Helix.Crawler
                     return;
                 }
 
-                // TODO: Put in a Task.Run()
-                rawResourceExtractor.ExtractRawResourcesFrom(toBeExtractedHtmlDocument);
-                Memory.DecrementActiveThreadCount();
+                Task.Run(() =>
+                {
+                    rawResourceExtractor.ExtractRawResourcesFrom(toBeExtractedHtmlDocument);
+                    Memory.DecrementActiveThreadCount();
+                });
             }
         }
 
@@ -206,18 +207,21 @@ namespace Helix.Crawler
                     return;
                 }
 
-                // TODO: Put in a Task.Run()
-                Memory.Memorize(new HtmlDocument
+                Task.Run(() =>
                 {
-                    Uri = toBeRenderedUri,
-                    Text = webBrowser.Render(toBeRenderedUri)
+                    Memory.Memorize(new HtmlDocument
+                    {
+                        Uri = toBeRenderedUri,
+                        Text = webBrowser.Render(toBeRenderedUri)
+                    });
+                    Memory.DecrementActiveThreadCount();
                 });
-                Memory.DecrementActiveThreadCount();
             }
         }
 
         static void Verify()
         {
+            var resourceScope = ServiceLocator.Get<IResourceScope>();
             while (!Memory.EverythingIsDone)
             {
                 if (Memory.CancellationToken.IsCancellationRequested) return;
@@ -237,18 +241,23 @@ namespace Helix.Crawler
                     return;
                 }
 
-                // TODO: Put in a Task.Run()
-                var verificationResult = resourceVerifier.Verify(toBeVerifiedRawResource);
-                if (verificationResult.HttpStatusCode != (int) HttpStatusCode.ExpectationFailed)
+                Task.Run(() =>
                 {
-                    ReportWriter.Instance.WriteReport(verificationResult, Memory.Configurations.ReportBrokenLinksOnly);
-                    OnResourceVerified?.Invoke(verificationResult);
-                }
+                    var verificationResult = resourceVerifier.Verify(toBeVerifiedRawResource);
+                    var isStartUrl = verificationResult.Resource != null && resourceScope.IsStartUri(verificationResult.Resource.Uri);
+                    var isOrphanedUrl = verificationResult.RawResource.ParentUri == null;
+                    if (isStartUrl || !isOrphanedUrl)
+                    {
+                        // TODO: Investigate where those orphaned Uri-s came from.
+                        ReportWriter.Instance.WriteReport(verificationResult, Memory.Configurations.ReportBrokenLinksOnly);
+                        OnResourceVerified?.Invoke(verificationResult);
+                    }
 
-                var resourceIsRenderable = toBeVerifiedRawResource.HttpStatusCode == 0;
-                if (!verificationResult.IsBrokenResource && verificationResult.IsInternalResource && resourceIsRenderable)
-                    Memory.Memorize(verificationResult.Resource.Uri);
-                Memory.DecrementActiveThreadCount();
+                    var resourceIsRenderable = verificationResult.Resource != null && toBeVerifiedRawResource.HttpStatusCode == 0;
+                    if (resourceIsRenderable && !verificationResult.IsBrokenResource && verificationResult.IsInternalResource)
+                        Memory.Memorize(verificationResult.Resource.Uri);
+                    Memory.DecrementActiveThreadCount();
+                });
             }
         }
 

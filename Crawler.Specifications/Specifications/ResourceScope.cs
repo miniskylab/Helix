@@ -22,13 +22,13 @@ namespace Helix.Crawler.Specifications
 
         [Theory]
         [ClassData(typeof(StartUriDefinition))]
-        void CouldIdentifyStartUri(Configurations configurations, string url, bool expectedIdentificationResult, Type expectedExceptionType)
+        void CouldIdentifyStartUri(Configurations configurations, Uri uri, bool expectedIdentificationResult, Type expectedExceptionType)
         {
             if (configurations != null) ServiceLocator.AddOrReplaceServices(new ServiceDescriptor(typeof(Configurations), configurations));
             var resourceScope = ServiceLocator.Get<IResourceScope>();
 
-            if (expectedExceptionType != null) Assert.Throws(expectedExceptionType, () => { resourceScope.IsStartUri(url); });
-            else Assert.Equal(expectedIdentificationResult, resourceScope.IsStartUri(url));
+            if (expectedExceptionType != null) Assert.Throws(expectedExceptionType, () => { resourceScope.IsStartUri(uri); });
+            else Assert.Equal(expectedIdentificationResult, resourceScope.IsStartUri(uri));
         }
 
         [Theory]
@@ -39,7 +39,7 @@ namespace Helix.Crawler.Specifications
             var resourceScope = ServiceLocator.Get<IResourceScope>();
 
             if (expectedExceptionType != null) Assert.Throws(expectedExceptionType, () => { resourceScope.Localize(originalUri); });
-            else Assert.Equal(expectedLocalizedUri, resourceScope.Localize(originalUri));
+            else Assert.StrictEqual(expectedLocalizedUri, resourceScope.Localize(originalUri));
         }
     }
 }

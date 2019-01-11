@@ -41,7 +41,7 @@ namespace Helix.Crawler.Abstractions
             RequestTimeoutDuration = (int) (tokens.SelectToken(nameof(RequestTimeoutDuration)) ?? 0);
             StartUri = ValidateStartUri((string) tokens.SelectToken(nameof(StartUri)) ?? string.Empty);
             HttpProxyPort = 18882;
-            UseIncognitoWebBrowser = true;
+            UseIncognitoWebBrowser = false;
 
             DomainName = ((string) tokens.SelectToken(nameof(DomainName)) ?? string.Empty).ToLower();
             if (string.IsNullOrWhiteSpace(DomainName)) DomainName = "_";

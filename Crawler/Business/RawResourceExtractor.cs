@@ -113,7 +113,7 @@ namespace Helix.Crawler
                     if (isNotGETRequest || isNotCss && isNotFont && isNotJavaScript && isNotImage && isNotAudio && isNotVideo) return;
                     var newRawResource = new RawResource
                     {
-                        ParentUri = request.RequestUri,
+                        ParentUri = null, // TODO: Write a Chrome extension
                         Url = request.Url,
                         HttpStatusCode = response.StatusCode
                     };

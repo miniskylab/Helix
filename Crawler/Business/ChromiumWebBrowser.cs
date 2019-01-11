@@ -36,7 +36,7 @@ namespace Helix.Crawler
         public string Render(Uri uri)
         {
             var timedOut = true;
-            for (var attemptCount = 0; attemptCount < 3; attemptCount++)
+            for (var attemptCount = 0; attemptCount < 5; attemptCount++)
             {
                 try
                 {
@@ -53,8 +53,9 @@ namespace Helix.Crawler
 
             if (timedOut)
             {
-                if (OnExceptionOccurred != null) OnExceptionOccurred.Invoke(new TimeoutException());
-                else throw new TimeoutException($"Chromium web browser failed to render the URI: {uri}");
+                var timeOutErrorMessage = $"Chromium web browser failed to render the URI: {uri}";
+                if (OnExceptionOccurred != null) OnExceptionOccurred.Invoke(new TimeoutException(timeOutErrorMessage));
+                else throw new TimeoutException(timeOutErrorMessage);
             }
 
             OnIdle?.Invoke();

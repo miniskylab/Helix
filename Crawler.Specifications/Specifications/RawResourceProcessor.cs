@@ -19,9 +19,10 @@ namespace Helix.Crawler.Specifications
             {
                 var processingResult = rawResourceProcessor.TryProcessRawResource(rawResource, out var resource);
                 Assert.Equal(expectedProcessingResult, processingResult);
-                Assert.Equal(expectedOutputResource.Localized, resource.Localized);
-                Assert.Equal(expectedOutputResource.ParentUri, resource.ParentUri);
-                Assert.Equal(expectedOutputResource.Uri, resource.Uri);
+                Assert.Equal(expectedOutputResource?.Localized, resource?.Localized);
+                Assert.StrictEqual(expectedOutputResource?.ParentUri, resource?.ParentUri);
+                Assert.StrictEqual(expectedOutputResource?.Uri, resource?.Uri);
+                Assert.Equal(expectedOutputResource?.Uri.Fragment, resource?.Uri.Fragment);
             }
         }
     }
