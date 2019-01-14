@@ -17,4 +17,11 @@
         <ProjectReference Include="..\Crawler.Abstractions\Crawler.Abstractions.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <ContentWithTargetPath Include="..\Chromium Extensions\initiator.crx">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+            <TargetPath>initiator.crx</TargetPath>
+        </ContentWithTargetPath>
+    </ItemGroup>
+
 </Project>
