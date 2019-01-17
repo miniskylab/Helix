@@ -101,7 +101,6 @@ namespace Helix.Crawler
                     FtpProxy = $"http://{IPAddress.Loopback}:{_configurations.HttpProxyPort}",
                     SslProxy = $"http://{IPAddress.Loopback}:{_configurations.HttpProxyPort}"
                 };
-            chromeOptions.AddExtension(Path.Combine(workingDirectory, "initiator.crx"));
 
             _chromeDriver = new ChromeDriver(chromeDriverService, chromeOptions);
             _processIds.Add(chromeDriverService.ProcessId);
