@@ -145,7 +145,7 @@ namespace Helix.Crawler
 
         static void InitializeRawResourceExtractorPool()
         {
-            var rawResourceExtractorCount = 30 * Memory.Configurations.WebBrowserCount;
+            var rawResourceExtractorCount = 50 * Memory.Configurations.WebBrowserCount;
             for (var rawResourceExtractorId = 0; rawResourceExtractorId < rawResourceExtractorCount; rawResourceExtractorId++)
             {
                 if (Memory.CancellationToken.IsCancellationRequested) throw new OperationCanceledException(Memory.CancellationToken);
@@ -158,7 +158,7 @@ namespace Helix.Crawler
 
         static void InitializeResourceVerifierPool()
         {
-            var resourceVerifierCount = 30 * Memory.Configurations.WebBrowserCount;
+            var resourceVerifierCount = 50 * Memory.Configurations.WebBrowserCount;
             for (var resourceVerifierId = 0; resourceVerifierId < resourceVerifierCount; resourceVerifierId++)
             {
                 if (Memory.CancellationToken.IsCancellationRequested) throw new OperationCanceledException(Memory.CancellationToken);
@@ -181,6 +181,7 @@ namespace Helix.Crawler
                     HandleException(exception);
                     WebBrowserPool.Add(webBrowser);
                 };
+                webBrowser.OnRawResourceCaptured += rawResource => Memory.Memorize(rawResource);
                 WebBrowserPool.Add(webBrowser);
                 OnWebBrowserOpened?.Invoke(Interlocked.Increment(ref openedWebBrowserCount));
             });
@@ -209,11 +210,12 @@ namespace Helix.Crawler
 
                 Task.Run(() =>
                 {
-                    Memory.Memorize(new HtmlDocument
-                    {
-                        Uri = toBeRenderedUri,
-                        Text = webBrowser.Render(toBeRenderedUri)
-                    });
+                    if (webBrowser.TryRender(toBeRenderedUri, out var htmlText))
+                        Memory.Memorize(new HtmlDocument
+                        {
+                            Uri = toBeRenderedUri,
+                            Text = htmlText
+                        });
                     Memory.DecrementActiveThreadCount();
                 });
             }

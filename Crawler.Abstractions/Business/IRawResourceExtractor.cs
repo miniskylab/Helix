@@ -2,7 +2,7 @@
 
 namespace Helix.Crawler.Abstractions
 {
-    public interface IRawResourceExtractor : IDisposable
+    public interface IRawResourceExtractor
     {
         event IdleEvent OnIdle;
         event Action<RawResource> OnRawResourceExtracted;

@@ -19,7 +19,8 @@ namespace Helix.Crawler
         readonly BlockingCollection<Uri> _toBeRenderedUris = new BlockingCollection<Uri>(1000);
         readonly BlockingCollection<RawResource> _toBeVerifiedRawResources = new BlockingCollection<RawResource>(1000);
         readonly string _workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
-        static readonly object StaticLock = new object();
+        static readonly object ActiveThreadCountIncrementSync = new object();
+        static readonly object SyncRoot = new object();
 
         public Configurations Configurations { get; }
 
@@ -39,20 +40,16 @@ namespace Helix.Crawler
             ErrorFilePath = Path.Combine(_workingDirectory, "errors.txt");
             _cancellationTokenSource = new CancellationTokenSource();
             Interlocked.Exchange(ref _activeThreadCount, 0);
-            while (_toBeVerifiedRawResources.Any()) _toBeVerifiedRawResources.Take();
-            lock (StaticLock)
-            {
-                _alreadyVerifiedUrls.Clear();
-                _alreadyVerifiedUrls.Add(Configurations.StartUri.AbsoluteUri);
-                _toBeVerifiedRawResources.Add(
-                    new RawResource
-                    {
-                        ParentUri = null,
-                        Url = Configurations.StartUri.AbsoluteUri
-                    },
-                    CancellationToken
-                );
-            }
+            _alreadyVerifiedUrls.Clear();
+            _alreadyVerifiedUrls.Add(Configurations.StartUri.AbsoluteUri);
+            _toBeVerifiedRawResources.Add(
+                new RawResource
+                {
+                    ParentUri = null,
+                    Url = Configurations.StartUri.AbsoluteUri
+                },
+                CancellationToken
+            );
         }
 
         [UsedImplicitly]
@@ -62,12 +59,19 @@ namespace Helix.Crawler
 
         public void DecrementActiveThreadCount() { Interlocked.Decrement(ref _activeThreadCount); }
 
-        public void IncrementActiveThreadCount() { Interlocked.Increment(ref _activeThreadCount); }
+        public void IncrementActiveThreadCount()
+        {
+            lock (ActiveThreadCountIncrementSync)
+            {
+                while (Interlocked.CompareExchange(ref _activeThreadCount, 0, 0) >= 1000) Thread.Sleep(TimeSpan.FromSeconds(3));
+                Interlocked.Increment(ref _activeThreadCount);
+            }
+        }
 
         public void Memorize(RawResource toBeVerifiedRawResource)
         {
             if (CancellationToken.IsCancellationRequested) return;
-            lock (StaticLock)
+            lock (SyncRoot)
             {
                 if (_alreadyVerifiedUrls.Contains(toBeVerifiedRawResource.Url.StripFragment())) return;
                 _alreadyVerifiedUrls.Add(toBeVerifiedRawResource.Url.StripFragment());
@@ -110,28 +114,28 @@ namespace Helix.Crawler
             switch (crawlerState)
             {
                 case CrawlerState.Ready:
-                    lock (StaticLock)
+                    lock (SyncRoot)
                     {
                         if (CrawlerState != CrawlerState.Stopping) return false;
                         CrawlerState = CrawlerState.Ready;
                         return true;
                     }
                 case CrawlerState.Working:
-                    lock (StaticLock)
+                    lock (SyncRoot)
                     {
                         if (CrawlerState != CrawlerState.Ready && CrawlerState != CrawlerState.Paused) return false;
                         CrawlerState = CrawlerState.Working;
                         return true;
                     }
                 case CrawlerState.Stopping:
-                    lock (StaticLock)
+                    lock (SyncRoot)
                     {
                         if (CrawlerState != CrawlerState.Working && CrawlerState != CrawlerState.Paused) return false;
                         CrawlerState = CrawlerState.Stopping;
                         return true;
                     }
                 case CrawlerState.Paused:
-                    lock (StaticLock)
+                    lock (SyncRoot)
                     {
                         if (CrawlerState != CrawlerState.Working) return false;
                         CrawlerState = CrawlerState.Paused;

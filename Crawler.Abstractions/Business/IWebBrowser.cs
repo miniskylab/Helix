@@ -6,7 +6,8 @@ namespace Helix.Crawler.Abstractions
     {
         event Action<Exception> OnExceptionOccurred;
         event IdleEvent OnIdle;
+        event Action<RawResource> OnRawResourceCaptured;
 
-        string Render(Uri uri);
+        bool TryRender(Uri uri, out string html);
     }
 }
