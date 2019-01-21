@@ -17,8 +17,13 @@ namespace Helix.Crawler
         readonly BlockingCollection<HtmlDocument> _toBeExtractedHtmlDocuments = new BlockingCollection<HtmlDocument>(1000);
         readonly BlockingCollection<Uri> _toBeRenderedUris = new BlockingCollection<Uri>(1000);
         readonly BlockingCollection<RawResource> _toBeVerifiedRawResources = new BlockingCollection<RawResource>(1000);
-        readonly string _workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
         static readonly object SyncRoot = new object();
+
+        public int ActiveExtractionThreadCount { get; set; }
+
+        public int ActiveRenderingThreadCount { get; set; }
+
+        public int ActiveVerificationThreadCount { get; set; }
 
         public Configurations Configurations { get; }
 
@@ -30,12 +35,12 @@ namespace Helix.Crawler
 
         public bool NothingLeftToDo => !_toBeVerifiedRawResources.Any() && !_toBeRenderedUris.Any() && !_toBeExtractedHtmlDocuments.Any();
 
-        public int RemainingUrlCount => _toBeVerifiedRawResources.Count;
+        public int RemainingUrlCount => ActiveVerificationThreadCount + _toBeVerifiedRawResources.Count;
 
         public Memory(Configurations configurations)
         {
             Configurations = configurations;
-            ErrorFilePath = Path.Combine(_workingDirectory, "errors.txt");
+            ErrorFilePath = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "errors.txt");
             _cancellationTokenSource = new CancellationTokenSource();
             _alreadyVerifiedUrls.Clear();
             _alreadyVerifiedUrls.Add(Configurations.StartUri.AbsoluteUri);

@@ -17,6 +17,8 @@ namespace Helix.Crawler.Abstractions
 
         public bool UseIncognitoWebBrowser { get; }
 
+        public bool VerifyExternalUrls { get; } // TODO: Put into use
+
         public int WebBrowserCount { get; }
 
         public Configurations(string domainName = "", bool reportBrokenLinksOnly = false, int requestTimeoutDuration = 0,
@@ -39,6 +41,7 @@ namespace Helix.Crawler.Abstractions
             RequestTimeoutDuration = (int) (tokens.SelectToken(nameof(RequestTimeoutDuration)) ?? 0);
             StartUri = ValidateStartUri((string) tokens.SelectToken(nameof(StartUri)) ?? string.Empty);
             UseIncognitoWebBrowser = false;
+            VerifyExternalUrls = true;
 
             DomainName = ((string) tokens.SelectToken(nameof(DomainName)) ?? string.Empty).ToLower();
             if (string.IsNullOrWhiteSpace(DomainName)) DomainName = "_";

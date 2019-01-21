@@ -5,6 +5,12 @@ namespace Helix.Crawler.Abstractions
 {
     public interface IMemory
     {
+        int ActiveExtractionThreadCount { get; set; }
+
+        int ActiveRenderingThreadCount { get; set; }
+
+        int ActiveVerificationThreadCount { get; set; }
+
         CancellationToken CancellationToken { get; }
 
         Configurations Configurations { get; }

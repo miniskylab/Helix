@@ -13,18 +13,31 @@ namespace Helix.Crawler
     public static class CrawlerBot
     {
         public static IMemory Memory = ServiceLocator.Get<IMemory>();
-        static int _activeExtractionThreadCount;
-        static int _activeRenderingThreadCount;
-        static int _activeVerificationThreadCount;
         static FilePersistence _filePersistence;
         static readonly List<Task> BackgroundTasks;
+        static readonly object ExtractionSyncRoot = new object();
         static readonly BlockingCollection<IRawResourceExtractor> RawResourceExtractorPool;
+        static readonly object RenderingSyncRoot = new object();
         static readonly BlockingCollection<IResourceVerifier> ResourceVerifierPool;
+        static readonly object VerificationSyncRoot = new object();
         static readonly BlockingCollection<IWebBrowser> WebBrowserPool;
 
-        // TODO: Write my own lock :v
-        static bool EverythingIsDone => Memory.NothingLeftToDo &&
-                                        _activeExtractionThreadCount + _activeRenderingThreadCount + _activeVerificationThreadCount == 0;
+        static bool EverythingIsDone
+        {
+            get
+            {
+                lock (ExtractionSyncRoot)
+                lock (RenderingSyncRoot)
+                lock (VerificationSyncRoot)
+                {
+                    var activeExtractionThreadCount = Memory.ActiveExtractionThreadCount;
+                    var activeRenderingThreadCount = Memory.ActiveRenderingThreadCount;
+                    var activeVerificationThreadCount = Memory.ActiveVerificationThreadCount;
+                    var totalActiveThreadCount = activeExtractionThreadCount + activeRenderingThreadCount + activeVerificationThreadCount;
+                    return Memory.NothingLeftToDo && totalActiveThreadCount == 0;
+                }
+            }
+        }
 
         public static event ExceptionOccurredEvent OnExceptionOccurred;
         public static event ResourceVerifiedEvent OnResourceVerified;
@@ -91,6 +104,10 @@ namespace Helix.Crawler
             ReportWriter.Instance.Dispose();
             ServiceLocator.Dispose();
             _filePersistence.Dispose();
+
+            lock (ExtractionSyncRoot) Memory.ActiveExtractionThreadCount = 0;
+            lock (RenderingSyncRoot) Memory.ActiveRenderingThreadCount = 0;
+            lock (VerificationSyncRoot) Memory.ActiveVerificationThreadCount = 0;
             Memory.TryTransitTo(CrawlerState.Ready);
             OnStopped?.Invoke(EverythingIsDone);
         }
@@ -106,7 +123,7 @@ namespace Helix.Crawler
             while (!EverythingIsDone)
             {
                 if (Memory.CancellationToken.IsCancellationRequested) return;
-                Interlocked.Increment(ref _activeExtractionThreadCount);
+                lock (ExtractionSyncRoot) Memory.ActiveExtractionThreadCount++;
 
                 HtmlDocument toBeExtractedHtmlDocument;
                 IRawResourceExtractor rawResourceExtractor;
@@ -117,7 +134,7 @@ namespace Helix.Crawler
                 }
                 catch (OperationCanceledException operationCanceledException)
                 {
-                    Interlocked.Decrement(ref _activeExtractionThreadCount);
+                    lock (ExtractionSyncRoot) Memory.ActiveExtractionThreadCount--;
                     if (operationCanceledException.CancellationToken != Memory.CancellationToken) throw;
                     return;
                 }
@@ -125,7 +142,7 @@ namespace Helix.Crawler
                 Task.Run(() =>
                 {
                     rawResourceExtractor.ExtractRawResourcesFrom(toBeExtractedHtmlDocument);
-                    Interlocked.Decrement(ref _activeExtractionThreadCount);
+                    lock (ExtractionSyncRoot) Memory.ActiveExtractionThreadCount--;
                 }, Memory.CancellationToken);
             }
         }
@@ -152,7 +169,7 @@ namespace Helix.Crawler
 
         static void InitializeRawResourceExtractorPool()
         {
-            var rawResourceExtractorCount = 50 * Memory.Configurations.WebBrowserCount;
+            const int rawResourceExtractorCount = 300;
             for (var rawResourceExtractorId = 0; rawResourceExtractorId < rawResourceExtractorCount; rawResourceExtractorId++)
             {
                 if (Memory.CancellationToken.IsCancellationRequested) throw new OperationCanceledException(Memory.CancellationToken);
@@ -194,7 +211,7 @@ namespace Helix.Crawler
             while (!EverythingIsDone)
             {
                 if (Memory.CancellationToken.IsCancellationRequested) return;
-                Interlocked.Increment(ref _activeRenderingThreadCount);
+                lock (RenderingSyncRoot) Memory.ActiveRenderingThreadCount++;
 
                 Uri toBeRenderedUri;
                 IWebBrowser webBrowser;
@@ -205,7 +222,7 @@ namespace Helix.Crawler
                 }
                 catch (OperationCanceledException operationCanceledException)
                 {
-                    Interlocked.Decrement(ref _activeRenderingThreadCount);
+                    lock (RenderingSyncRoot) Memory.ActiveRenderingThreadCount--;
                     if (operationCanceledException.CancellationToken != Memory.CancellationToken) throw;
                     return;
                 }
@@ -218,7 +235,7 @@ namespace Helix.Crawler
                             Uri = toBeRenderedUri,
                             Text = htmlText
                         });
-                    Interlocked.Decrement(ref _activeRenderingThreadCount);
+                    lock (RenderingSyncRoot) Memory.ActiveRenderingThreadCount--;
                 }, Memory.CancellationToken);
             }
         }
@@ -229,7 +246,7 @@ namespace Helix.Crawler
             while (!EverythingIsDone)
             {
                 if (Memory.CancellationToken.IsCancellationRequested) return;
-                Interlocked.Increment(ref _activeVerificationThreadCount);
+                lock (VerificationSyncRoot) Memory.ActiveVerificationThreadCount++;
 
                 RawResource toBeVerifiedRawResource;
                 IResourceVerifier resourceVerifier;
@@ -240,7 +257,7 @@ namespace Helix.Crawler
                 }
                 catch (OperationCanceledException operationCanceledException)
                 {
-                    Interlocked.Decrement(ref _activeVerificationThreadCount);
+                    lock (VerificationSyncRoot) Memory.ActiveVerificationThreadCount--;
                     if (operationCanceledException.CancellationToken != Memory.CancellationToken) throw;
                     return;
                 }
@@ -260,7 +277,7 @@ namespace Helix.Crawler
                     var resourceIsRenderable = verificationResult.Resource != null && toBeVerifiedRawResource.HttpStatusCode == 0;
                     if (resourceIsRenderable && !verificationResult.IsBrokenResource && verificationResult.IsInternalResource)
                         Memory.Memorize(verificationResult.Resource.Uri);
-                    Interlocked.Decrement(ref _activeVerificationThreadCount);
+                    lock (VerificationSyncRoot) Memory.ActiveVerificationThreadCount--;
                 }, Memory.CancellationToken);
             }
         }
