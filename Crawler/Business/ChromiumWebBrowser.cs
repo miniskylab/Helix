@@ -24,7 +24,6 @@ namespace Helix.Crawler
         readonly List<int> _processIds;
         readonly IResourceScope _resourceScope;
 
-        public event Action<Exception> OnExceptionOccurred;
         public event IdleEvent OnIdle;
         public event Action<RawResource> OnRawResourceCaptured;
 
@@ -43,8 +42,9 @@ namespace Helix.Crawler
             GC.SuppressFinalize(this);
         }
 
-        public bool TryRender(Uri uri, out string html)
+        public bool TryRender(Uri uri, Action<Exception> onFailed, out string html)
         {
+            html = null;
             _currentUri = uri;
             var timedOut = true;
             for (var attemptCount = 0; attemptCount < 5; attemptCount++)
@@ -53,24 +53,21 @@ namespace Helix.Crawler
                 {
                     GoToUri(uri);
                     timedOut = false;
+                    html = _chromeDriver.PageSource;
                     break;
                 }
                 catch (WebDriverException webDriverException)
                 {
                     if (webDriverException.InnerException.GetType() != typeof(WebException)) throw;
-                    Restart();
+                    if (timedOut) Restart();
+                    else onFailed.Invoke(new MemberAccessException($"Chromium web browser failed to obtain page source of the URI: {uri}"));
                 }
             }
 
             if (timedOut)
-            {
-                var timeOutErrorMessage = $"Chromium web browser failed to render the URI: {uri}";
-                if (OnExceptionOccurred != null) OnExceptionOccurred.Invoke(new TimeoutException(timeOutErrorMessage));
-                else throw new TimeoutException(timeOutErrorMessage);
-            }
+                onFailed.Invoke(new TimeoutException($"Chromium web browser failed to render the URI: {uri}"));
 
             OnIdle?.Invoke();
-            html = timedOut ? null : _chromeDriver.PageSource;
             return !timedOut;
         }
 
@@ -140,7 +137,7 @@ namespace Helix.Crawler
             if (!_configurations.ShowWebBrowsers) chromeOptions.AddArguments("--headless");
             chromeOptions.AddArguments("--window-size=1920,1080");
 
-            _chromeDriver = new ChromeDriver(chromeDriverService, chromeOptions)
+            _chromeDriver = new ChromeDriver(chromeDriverService, chromeOptions, TimeSpan.FromMinutes(2))
             {
                 NetworkConditions = new ChromeNetworkConditions
                 {

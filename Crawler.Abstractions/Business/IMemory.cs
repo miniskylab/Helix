@@ -13,15 +13,11 @@ namespace Helix.Crawler.Abstractions
 
         string ErrorFilePath { get; }
 
-        bool EverythingIsDone { get; }
+        bool NothingLeftToDo { get; }
 
         int RemainingUrlCount { get; }
 
         void CancelEverything();
-
-        void DecrementActiveThreadCount();
-
-        void IncrementActiveThreadCount();
 
         void Memorize(RawResource toBeVerifiedRawResource);
 

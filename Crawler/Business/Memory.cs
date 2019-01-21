@@ -12,14 +12,12 @@ namespace Helix.Crawler
 {
     public sealed class Memory : IMemory
     {
-        int _activeThreadCount;
         readonly ConcurrentSet<string> _alreadyVerifiedUrls = new ConcurrentSet<string>();
         readonly CancellationTokenSource _cancellationTokenSource;
         readonly BlockingCollection<HtmlDocument> _toBeExtractedHtmlDocuments = new BlockingCollection<HtmlDocument>(1000);
         readonly BlockingCollection<Uri> _toBeRenderedUris = new BlockingCollection<Uri>(1000);
         readonly BlockingCollection<RawResource> _toBeVerifiedRawResources = new BlockingCollection<RawResource>(1000);
         readonly string _workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
-        static readonly object ActiveThreadCountIncrementSync = new object();
         static readonly object SyncRoot = new object();
 
         public Configurations Configurations { get; }
@@ -30,16 +28,15 @@ namespace Helix.Crawler
 
         public CancellationToken CancellationToken => _cancellationTokenSource.Token;
 
-        public bool EverythingIsDone => !_toBeVerifiedRawResources.Any() && !_toBeRenderedUris.Any() && _activeThreadCount == 0;
+        public bool NothingLeftToDo => !_toBeVerifiedRawResources.Any() && !_toBeRenderedUris.Any() && !_toBeExtractedHtmlDocuments.Any();
 
-        public int RemainingUrlCount => _activeThreadCount + _toBeVerifiedRawResources.Count;
+        public int RemainingUrlCount => _toBeVerifiedRawResources.Count;
 
         public Memory(Configurations configurations)
         {
             Configurations = configurations;
             ErrorFilePath = Path.Combine(_workingDirectory, "errors.txt");
             _cancellationTokenSource = new CancellationTokenSource();
-            Interlocked.Exchange(ref _activeThreadCount, 0);
             _alreadyVerifiedUrls.Clear();
             _alreadyVerifiedUrls.Add(Configurations.StartUri.AbsoluteUri);
             _toBeVerifiedRawResources.Add(
@@ -56,17 +53,6 @@ namespace Helix.Crawler
         public Memory() { }
 
         public void CancelEverything() { _cancellationTokenSource.Cancel(); }
-
-        public void DecrementActiveThreadCount() { Interlocked.Decrement(ref _activeThreadCount); }
-
-        public void IncrementActiveThreadCount()
-        {
-            lock (ActiveThreadCountIncrementSync)
-            {
-                while (Interlocked.CompareExchange(ref _activeThreadCount, 0, 0) >= 1000) Thread.Sleep(TimeSpan.FromSeconds(3));
-                Interlocked.Increment(ref _activeThreadCount);
-            }
-        }
 
         public void Memorize(RawResource toBeVerifiedRawResource)
         {
