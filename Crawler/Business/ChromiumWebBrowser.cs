@@ -42,54 +42,28 @@ namespace Helix.Crawler
             GC.SuppressFinalize(this);
         }
 
-        // TODO: Add cancellationToken
+        // TODO: add cancellation token
         public bool TryRender(Uri uri, Action<Exception> onFailed, out string html)
         {
             _currentUri = uri ?? throw new ArgumentNullException(nameof(uri));
             if (onFailed == null) throw new ArgumentNullException(nameof(onFailed));
 
             html = null;
-            var timedOut = true;
-            for (var attemptCount = 0; attemptCount < 3; attemptCount++)
+            if (!TryGoToUri(uri))
             {
-                try
-                {
-                    GoToUri(uri);
-                    timedOut = false;
-                    html = _chromeDriver.PageSource;
-                    break;
-                }
-                catch (WebDriverException webDriverException)
-                {
-                    if (webDriverException.InnerException.GetType() != typeof(WebException)) throw;
-                    if (timedOut) Restart();
-                    else onFailed.Invoke(new MemberAccessException($"Chromium web browser failed to obtain page source of the URI: {uri}"));
-                }
-            }
-
-            if (timedOut)
                 onFailed.Invoke(new TimeoutException($"Chromium web browser failed to render the URI: {uri}"));
+                OnIdle?.Invoke();
+                return false;
+            }
+            if (TryGetPageSource(out html)) return true;
 
+            onFailed.Invoke(new MemberAccessException($"Chromium web browser failed to obtain page source of the URI: {uri}"));
             OnIdle?.Invoke();
-            return !timedOut;
+            return false;
         }
 
-        void ForceQuit()
+        void DisableNetwork()
         {
-            _processIds.ForEach(processId => Process.GetProcessById(processId).Kill());
-            _processIds.Clear();
-        }
-
-        void GoToUri(Uri uri)
-        {
-            _chromeDriver.NetworkConditions = new ChromeNetworkConditions
-            {
-                IsOffline = false,
-                Latency = TimeSpan.FromTicks(1),
-                UploadThroughput = long.MaxValue,
-                DownloadThroughput = long.MaxValue
-            };
-            _chromeDriver.Navigate().GoToUrl(uri);
             _chromeDriver.NetworkConditions = new ChromeNetworkConditions
             {
                 IsOffline = true,
@@ -99,19 +73,45 @@ namespace Helix.Crawler
             };
         }
 
+        void EnableNetwork()
+        {
+            _chromeDriver.NetworkConditions = new ChromeNetworkConditions
+            {
+                IsOffline = false,
+                Latency = TimeSpan.FromTicks(1),
+                UploadThroughput = long.MaxValue,
+                DownloadThroughput = long.MaxValue
+            };
+        }
+
+        void ForceQuit()
+        {
+            _processIds.ForEach(processId => Process.GetProcessById(processId).Kill());
+            _processIds.Clear();
+        }
+
+        // TODO: to public
+        void Quit(bool forceQuit = false)
+        {
+            if (forceQuit) ForceQuit();
+            else
+            {
+                try { _chromeDriver?.Quit(); }
+                catch (WebDriverException webDriverException)
+                {
+                    if (webDriverException.InnerException.GetType() != typeof(WebException)) throw;
+                    ForceQuit();
+                }
+            }
+            _chromeDriver = null;
+        }
+
         void ReleaseUnmanagedResources()
         {
             _httpProxyServer?.Stop();
             _httpProxyServer?.Dispose();
             _httpProxyServer = null;
-
-            try { _chromeDriver?.Quit(); }
-            catch (WebDriverException webDriverException)
-            {
-                if (webDriverException.InnerException.GetType() != typeof(WebException)) throw;
-                ForceQuit();
-            }
-            _chromeDriver = null;
+            Quit();
         }
 
         void Restart()
@@ -204,6 +204,43 @@ namespace Helix.Crawler
                     networkTraffic.WebSession.Request.Host = networkTraffic.WebSession.Request.RequestUri.Host;
                 });
             }
+        }
+
+        static bool TimeoutExceptionOccurred(Exception exception)
+        {
+            return exception.InnerException is WebException webException && webException.Status == WebExceptionStatus.Timeout;
+        }
+
+        bool TryGetPageSource(out string html)
+        {
+            try { html = _chromeDriver.PageSource; }
+            catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
+            {
+                html = null;
+                return false;
+            }
+            return true;
+        }
+
+        bool TryGoToUri(Uri uri, int attemptCount = 3)
+        {
+            EnableNetwork();
+            for (var attemptNo = 0; attemptNo < attemptCount; attemptNo++)
+            {
+                try
+                {
+                    _chromeDriver.Navigate().GoToUrl(uri);
+                    break;
+                }
+                catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
+                {
+                    Restart();
+                    if (attemptNo < attemptCount) continue;
+                    return false;
+                }
+            }
+            DisableNetwork();
+            return true;
         }
 
         ~ChromiumWebBrowser() { ReleaseUnmanagedResources(); }
