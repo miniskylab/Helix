@@ -12,11 +12,11 @@ namespace Helix.Crawler
                                                                    url.StartsWith("/", StringComparison.OrdinalIgnoreCase);
 
         public event IdleEvent OnIdle;
-        public event Action<RawResource> OnRawResourceExtracted;
 
-        public void ExtractRawResourcesFrom(HtmlDocument htmlDocument)
+        public void ExtractRawResourcesFrom(HtmlDocument htmlDocument, Action<RawResource> onRawResourceExtracted)
         {
-            if (htmlDocument == null) throw new ArgumentNullException();
+            if (htmlDocument == null) throw new ArgumentNullException(nameof(htmlDocument));
+            if (onRawResourceExtracted == null) throw new ArgumentNullException(nameof(onRawResourceExtracted));
             var htmlAgilityPackDocument = new HtmlAgilityPackDocument();
             htmlAgilityPackDocument.LoadHtml(htmlDocument.Text);
 
@@ -26,7 +26,7 @@ namespace Helix.Crawler
             {
                 var url = anchorTag.Attributes["href"].Value;
                 if (_urlSchemeIsSupported(url))
-                    OnRawResourceExtracted?.Invoke(new RawResource
+                    onRawResourceExtracted?.Invoke(new RawResource
                     {
                         ParentUri = htmlDocument.Uri,
                         Url = EnsureAbsolute(url, htmlDocument.Uri)

@@ -123,7 +123,11 @@ namespace Helix.Crawler
             while (!EverythingIsDone)
             {
                 if (Memory.CancellationToken.IsCancellationRequested) return;
-                lock (ExtractionSyncRoot) Memory.ActiveExtractionThreadCount++;
+                lock (ExtractionSyncRoot)
+                {
+                    while (Memory.ActiveExtractionThreadCount >= 300) Thread.Sleep(TimeSpan.FromSeconds(3));
+                    Memory.ActiveExtractionThreadCount++;
+                }
 
                 HtmlDocument toBeExtractedHtmlDocument;
                 IRawResourceExtractor rawResourceExtractor;
@@ -141,7 +145,7 @@ namespace Helix.Crawler
 
                 Task.Run(() =>
                 {
-                    rawResourceExtractor.ExtractRawResourcesFrom(toBeExtractedHtmlDocument);
+                    rawResourceExtractor.ExtractRawResourcesFrom(toBeExtractedHtmlDocument, rawResource => Memory.Memorize(rawResource));
                     lock (ExtractionSyncRoot) Memory.ActiveExtractionThreadCount--;
                 }, Memory.CancellationToken);
             }
@@ -175,7 +179,6 @@ namespace Helix.Crawler
                 if (Memory.CancellationToken.IsCancellationRequested) throw new OperationCanceledException(Memory.CancellationToken);
                 var rawResourceExtractor = ServiceLocator.Get<IRawResourceExtractor>();
                 rawResourceExtractor.OnIdle += () => RawResourceExtractorPool.Add(rawResourceExtractor);
-                rawResourceExtractor.OnRawResourceExtracted += rawResource => Memory.Memorize(rawResource);
                 RawResourceExtractorPool.Add(rawResourceExtractor);
             }
         }
@@ -211,7 +214,11 @@ namespace Helix.Crawler
             while (!EverythingIsDone)
             {
                 if (Memory.CancellationToken.IsCancellationRequested) return;
-                lock (RenderingSyncRoot) Memory.ActiveRenderingThreadCount++;
+                lock (RenderingSyncRoot)
+                {
+                    while (Memory.ActiveRenderingThreadCount >= 300) Thread.Sleep(TimeSpan.FromSeconds(3));
+                    Memory.ActiveRenderingThreadCount++;
+                }
 
                 Uri toBeRenderedUri;
                 IWebBrowser webBrowser;
@@ -246,7 +253,11 @@ namespace Helix.Crawler
             while (!EverythingIsDone)
             {
                 if (Memory.CancellationToken.IsCancellationRequested) return;
-                lock (VerificationSyncRoot) Memory.ActiveVerificationThreadCount++;
+                lock (VerificationSyncRoot)
+                {
+                    while (Memory.ActiveVerificationThreadCount >= 400) Thread.Sleep(TimeSpan.FromSeconds(3));
+                    Memory.ActiveVerificationThreadCount++;
+                }
 
                 RawResource toBeVerifiedRawResource;
                 IResourceVerifier resourceVerifier;
@@ -264,19 +275,23 @@ namespace Helix.Crawler
 
                 Task.Run(() =>
                 {
-                    var verificationResult = resourceVerifier.Verify(toBeVerifiedRawResource);
-                    var isStartUrl = verificationResult.Resource != null && resourceScope.IsStartUri(verificationResult.Resource.Uri);
-                    var isOrphanedUrl = verificationResult.RawResource.ParentUri == null;
-                    if (isStartUrl || !isOrphanedUrl)
+                    if (resourceVerifier.TryVerify(toBeVerifiedRawResource, out var verificationResult))
                     {
-                        // TODO: Investigate where those orphaned Uri-s came from.
-                        ReportWriter.Instance.WriteReport(verificationResult, Memory.Configurations.ReportBrokenLinksOnly);
-                        OnResourceVerified?.Invoke(verificationResult);
-                    }
+                        var isStartUrl = verificationResult.Resource != null && resourceScope.IsStartUri(verificationResult.Resource.Uri);
+                        var isOrphanedUrl = verificationResult.RawResource.ParentUri == null;
+                        if (isStartUrl || !isOrphanedUrl)
+                        {
+                            // TODO: Investigate where those orphaned Uri-s came from.
+                            ReportWriter.Instance.WriteReport(verificationResult, Memory.Configurations.ReportBrokenLinksOnly);
+                            OnResourceVerified?.Invoke(verificationResult);
+                        }
 
-                    var resourceIsRenderable = verificationResult.Resource != null && toBeVerifiedRawResource.HttpStatusCode == 0;
-                    if (resourceIsRenderable && !verificationResult.IsBrokenResource && verificationResult.IsInternalResource)
-                        Memory.Memorize(verificationResult.Resource.Uri);
+                        var resourceExists = verificationResult.Resource != null;
+                        var isExtracted = verificationResult.IsExtractedResource;
+                        var isNotBroken = !verificationResult.IsBrokenResource;
+                        var isInternal = verificationResult.IsInternalResource;
+                        if (resourceExists && isExtracted && isNotBroken && isInternal) Memory.Memorize(verificationResult.Resource.Uri);
+                    }
                     lock (VerificationSyncRoot) Memory.ActiveVerificationThreadCount--;
                 }, Memory.CancellationToken);
             }

@@ -12,6 +12,7 @@ namespace Helix.Crawler
     public sealed class ResourceVerifier : IResourceVerifier
     {
         readonly CancellationTokenSource _cancellationTokenSource;
+        readonly Configurations _configurations;
         bool _disposed;
         readonly HttpClient _httpClient;
         readonly IRawResourceProcessor _rawResourceProcessor;
@@ -22,6 +23,7 @@ namespace Helix.Crawler
 
         public ResourceVerifier(Configurations configurations, IRawResourceProcessor rawResourceProcessor, IResourceScope resourceScope)
         {
+            _configurations = configurations;
             _rawResourceProcessor = rawResourceProcessor;
             _resourceScope = resourceScope;
             _cancellationTokenSource = new CancellationTokenSource();
@@ -55,9 +57,15 @@ namespace Helix.Crawler
             _httpClient?.Dispose();
         }
 
-        public VerificationResult Verify(RawResource rawResource)
+        public bool TryVerify(RawResource rawResource, out VerificationResult verificationResult)
         {
-            var verificationResult = new VerificationResult { RawResource = rawResource };
+            if (!_configurations.VerifyExternalUrls)
+            {
+                verificationResult = null;
+                return false;
+            }
+
+            verificationResult = new VerificationResult { RawResource = rawResource };
             if (!_rawResourceProcessor.TryProcessRawResource(rawResource, out var resource))
             {
                 verificationResult.Resource = null;
@@ -65,7 +73,7 @@ namespace Helix.Crawler
                 verificationResult.IsInternalResource = false;
 
                 OnIdle?.Invoke();
-                return verificationResult;
+                return true;
             }
 
             try
@@ -99,7 +107,7 @@ namespace Helix.Crawler
             }
 
             OnIdle?.Invoke();
-            return verificationResult;
+            return true;
         }
     }
 }

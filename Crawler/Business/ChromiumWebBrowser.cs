@@ -44,8 +44,10 @@ namespace Helix.Crawler
 
         public bool TryRender(Uri uri, Action<Exception> onFailed, out string html)
         {
+            _currentUri = uri ?? throw new ArgumentNullException(nameof(uri));
+            if (onFailed == null) throw new ArgumentNullException(nameof(onFailed));
+
             html = null;
-            _currentUri = uri;
             var timedOut = true;
             for (var attemptCount = 0; attemptCount < 5; attemptCount++)
             {

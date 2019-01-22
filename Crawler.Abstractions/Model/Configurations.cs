@@ -17,7 +17,7 @@ namespace Helix.Crawler.Abstractions
 
         public bool UseIncognitoWebBrowser { get; }
 
-        public bool VerifyExternalUrls { get; } // TODO: Put into use
+        public bool VerifyExternalUrls { get; }
 
         public int WebBrowserCount { get; }
 

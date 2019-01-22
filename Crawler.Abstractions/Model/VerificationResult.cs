@@ -11,5 +11,7 @@ namespace Helix.Crawler.Abstractions
         public Resource Resource { get; set; }
 
         public bool IsBrokenResource => HttpStatusCode < 0 || 400 <= HttpStatusCode;
+
+        public bool IsExtractedResource => Resource != null && RawResource?.HttpStatusCode == 0;
     }
 }
