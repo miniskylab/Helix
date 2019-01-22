@@ -40,7 +40,7 @@ namespace Helix.Crawler.Abstractions
             ReportBrokenLinksOnly = (bool) (tokens.SelectToken(nameof(ReportBrokenLinksOnly)) ?? false);
             RequestTimeoutDuration = (int) (tokens.SelectToken(nameof(RequestTimeoutDuration)) ?? 0);
             StartUri = ValidateStartUri((string) tokens.SelectToken(nameof(StartUri)) ?? string.Empty);
-            UseIncognitoWebBrowser = false;
+            UseIncognitoWebBrowser = true;
             VerifyExternalUrls = true;
 
             DomainName = ((string) tokens.SelectToken(nameof(DomainName)) ?? string.Empty).ToLower();

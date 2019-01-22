@@ -42,6 +42,7 @@ namespace Helix.Crawler
             GC.SuppressFinalize(this);
         }
 
+        // TODO: Add cancellationToken
         public bool TryRender(Uri uri, Action<Exception> onFailed, out string html)
         {
             _currentUri = uri ?? throw new ArgumentNullException(nameof(uri));
@@ -49,7 +50,7 @@ namespace Helix.Crawler
 
             html = null;
             var timedOut = true;
-            for (var attemptCount = 0; attemptCount < 5; attemptCount++)
+            for (var attemptCount = 0; attemptCount < 3; attemptCount++)
             {
                 try
                 {
@@ -139,7 +140,7 @@ namespace Helix.Crawler
             if (!_configurations.ShowWebBrowsers) chromeOptions.AddArguments("--headless");
             chromeOptions.AddArguments("--window-size=1920,1080");
 
-            _chromeDriver = new ChromeDriver(chromeDriverService, chromeOptions, TimeSpan.FromMinutes(2))
+            _chromeDriver = new ChromeDriver(chromeDriverService, chromeOptions)
             {
                 NetworkConditions = new ChromeNetworkConditions
                 {

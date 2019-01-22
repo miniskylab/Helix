@@ -123,10 +123,18 @@ namespace Helix.Crawler
             while (!EverythingIsDone)
             {
                 if (Memory.CancellationToken.IsCancellationRequested) return;
-                lock (ExtractionSyncRoot)
+                while (true)
                 {
-                    while (Memory.ActiveExtractionThreadCount >= 300) Thread.Sleep(TimeSpan.FromSeconds(3));
+                    Monitor.Enter(ExtractionSyncRoot);
+                    if (Memory.ActiveExtractionThreadCount >= 300)
+                    {
+                        Monitor.Exit(ExtractionSyncRoot);
+                        Thread.Sleep(TimeSpan.FromSeconds(3));
+                        continue;
+                    }
                     Memory.ActiveExtractionThreadCount++;
+                    Monitor.Exit(ExtractionSyncRoot);
+                    break;
                 }
 
                 HtmlDocument toBeExtractedHtmlDocument;
@@ -214,10 +222,18 @@ namespace Helix.Crawler
             while (!EverythingIsDone)
             {
                 if (Memory.CancellationToken.IsCancellationRequested) return;
-                lock (RenderingSyncRoot)
+                while (true)
                 {
-                    while (Memory.ActiveRenderingThreadCount >= 300) Thread.Sleep(TimeSpan.FromSeconds(3));
+                    Monitor.Enter(RenderingSyncRoot);
+                    if (Memory.ActiveRenderingThreadCount >= 300)
+                    {
+                        Monitor.Exit(RenderingSyncRoot);
+                        Thread.Sleep(TimeSpan.FromSeconds(3));
+                        continue;
+                    }
                     Memory.ActiveRenderingThreadCount++;
+                    Monitor.Exit(RenderingSyncRoot);
+                    break;
                 }
 
                 Uri toBeRenderedUri;
@@ -253,10 +269,18 @@ namespace Helix.Crawler
             while (!EverythingIsDone)
             {
                 if (Memory.CancellationToken.IsCancellationRequested) return;
-                lock (VerificationSyncRoot)
+                while (true)
                 {
-                    while (Memory.ActiveVerificationThreadCount >= 400) Thread.Sleep(TimeSpan.FromSeconds(3));
+                    Monitor.Enter(VerificationSyncRoot);
+                    if (Memory.ActiveVerificationThreadCount >= 400)
+                    {
+                        Monitor.Exit(VerificationSyncRoot);
+                        Thread.Sleep(TimeSpan.FromSeconds(3));
+                        continue;
+                    }
                     Memory.ActiveVerificationThreadCount++;
+                    Monitor.Exit(VerificationSyncRoot);
+                    break;
                 }
 
                 RawResource toBeVerifiedRawResource;
