@@ -5,6 +5,7 @@ using System.IO;
 using System.Management;
 using System.Net;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using Helix.Crawler.Abstractions;
 using OpenQA.Selenium;
@@ -23,6 +24,7 @@ namespace Helix.Crawler
         ProxyServer _httpProxyServer;
         readonly List<int> _processIds;
         readonly IResourceScope _resourceScope;
+        static readonly ManualResetEvent ManualResetEvent = new ManualResetEvent(true);
 
         public event IdleEvent OnIdle;
         public event Action<RawResource> OnRawResourceCaptured;
@@ -42,7 +44,6 @@ namespace Helix.Crawler
             GC.SuppressFinalize(this);
         }
 
-        // TODO: add cancellation token
         public bool TryRender(Uri uri, Action<Exception> onFailed, out string html)
         {
             _currentUri = uri ?? throw new ArgumentNullException(nameof(uri));
@@ -90,28 +91,22 @@ namespace Helix.Crawler
             _processIds.Clear();
         }
 
-        // TODO: to public
-        void Quit(bool forceQuit = false)
-        {
-            if (forceQuit) ForceQuit();
-            else
-            {
-                try { _chromeDriver?.Quit(); }
-                catch (WebDriverException webDriverException)
-                {
-                    if (webDriverException.InnerException.GetType() != typeof(WebException)) throw;
-                    ForceQuit();
-                }
-            }
-            _chromeDriver = null;
-        }
-
         void ReleaseUnmanagedResources()
         {
             _httpProxyServer?.Stop();
             _httpProxyServer?.Dispose();
             _httpProxyServer = null;
-            Quit();
+            
+            // TODO: static instanceCount
+            ManualResetEvent.Dispose();
+
+            try { _chromeDriver?.Quit(); }
+            catch (WebDriverException webDriverException)
+            {
+                if (webDriverException.InnerException.GetType() != typeof(WebException)) throw;
+                ForceQuit();
+            }
+            _chromeDriver = null;
         }
 
         void Restart()
@@ -140,6 +135,7 @@ namespace Helix.Crawler
             if (!_configurations.ShowWebBrowsers) chromeOptions.AddArguments("--headless");
             chromeOptions.AddArguments("--window-size=1920,1080");
 
+            ManualResetEvent.WaitOne();
             _chromeDriver = new ChromeDriver(chromeDriverService, chromeOptions)
             {
                 NetworkConditions = new ChromeNetworkConditions
