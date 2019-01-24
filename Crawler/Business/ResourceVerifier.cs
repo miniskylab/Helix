@@ -14,12 +14,14 @@ namespace Helix.Crawler
     {
         readonly CancellationTokenSource _cancellationTokenSource;
         readonly Configurations _configurations;
+        bool _disposed;
+        readonly object _disposeSync;
         readonly HttpClient _httpClient;
         readonly IRawResourceProcessor _rawResourceProcessor;
         readonly IResourceScope _resourceScope;
         Task<HttpResponseMessage> _sendingGETRequestTask;
 
-        public event IdleEvent OnIdle;
+        public event Action OnIdle;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public ResourceVerifier(Configurations configurations, IRawResourceProcessor rawResourceProcessor, IResourceScope resourceScope)
@@ -28,6 +30,8 @@ namespace Helix.Crawler
             _rawResourceProcessor = rawResourceProcessor;
             _resourceScope = resourceScope;
             _cancellationTokenSource = new CancellationTokenSource();
+            _disposed = false;
+            _disposeSync = new object();
 
             _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(configurations.RequestTimeoutDuration) };
             _httpClient.DefaultRequestHeaders.Accept.ParseAdd("*/*");
@@ -42,70 +46,76 @@ namespace Helix.Crawler
 
         public void Dispose()
         {
-            _cancellationTokenSource?.Cancel();
-            try { _sendingGETRequestTask?.Wait(); }
-            catch
+            lock (_disposeSync)
             {
-                /* At this point, all exceptions should be fully handled.
-                 * I just want to wait for the task to complete.
-                 * I don't care about the result of the task. */
-            }
+                if (_disposed) return;
+                _cancellationTokenSource?.Cancel();
+                try { _sendingGETRequestTask?.Wait(); }
+                catch
+                {
+                    /* At this point, all exceptions should be fully handled.
+                     * I just want to wait for the task to complete.
+                     * I don't care about the result of the task. */
+                }
 
-            _cancellationTokenSource?.Dispose();
-            _httpClient?.Dispose();
+                _sendingGETRequestTask?.Dispose();
+                _cancellationTokenSource?.Dispose();
+                _httpClient?.Dispose();
+                _disposed = true;
+            }
         }
 
         public bool TryVerify(RawResource rawResource, out VerificationResult verificationResult)
         {
-            if (!_configurations.VerifyExternalUrls)
-            {
-                verificationResult = null;
-                return false;
-            }
-
-            verificationResult = new VerificationResult { RawResource = rawResource };
-            if (!_rawResourceProcessor.TryProcessRawResource(rawResource, out var resource))
-            {
-                verificationResult.Resource = null;
-                verificationResult.HttpStatusCode = (int) HttpStatusCode.ExpectationFailed;
-                verificationResult.IsInternalResource = false;
-
-                OnIdle?.Invoke();
-                return true;
-            }
-
             try
             {
-                verificationResult.Resource = resource;
-                verificationResult.IsInternalResource = _resourceScope.IsInternalResource(resource);
-                verificationResult.HttpStatusCode = rawResource.HttpStatusCode;
-                if (verificationResult.HttpStatusCode == 0)
+                if (!_configurations.VerifyExternalUrls)
                 {
-                    _sendingGETRequestTask = _httpClient.GetAsync(resource.Uri, _cancellationTokenSource.Token);
-                    verificationResult.HttpStatusCode = (int) _sendingGETRequestTask.Result.StatusCode;
+                    verificationResult = null;
+                    return false;
                 }
-            }
-            catch (AggregateException aggregateException)
-            {
-                switch (aggregateException.InnerException)
-                {
-                    case TaskCanceledException _:
-                        verificationResult.HttpStatusCode = _cancellationTokenSource.Token.IsCancellationRequested
-                            ? (int) HttpStatusCode.Processing
-                            : (int) HttpStatusCode.RequestTimeout;
-                        break;
-                    case HttpRequestException _:
-                    case SocketException _:
-                        verificationResult.HttpStatusCode = (int) HttpStatusCode.BadRequest;
-                        break;
-                    default:
-                        OnIdle?.Invoke();
-                        throw;
-                }
-            }
 
-            OnIdle?.Invoke();
-            return true;
+                verificationResult = new VerificationResult { RawResource = rawResource };
+                if (!_rawResourceProcessor.TryProcessRawResource(rawResource, out var resource))
+                {
+                    verificationResult.Resource = null;
+                    verificationResult.HttpStatusCode = (int) HttpStatusCode.ExpectationFailed;
+                    verificationResult.IsInternalResource = false;
+
+                    return true;
+                }
+
+                try
+                {
+                    verificationResult.Resource = resource;
+                    verificationResult.IsInternalResource = _resourceScope.IsInternalResource(resource);
+                    verificationResult.HttpStatusCode = rawResource.HttpStatusCode;
+                    if (verificationResult.HttpStatusCode == 0)
+                    {
+                        _sendingGETRequestTask = _httpClient.GetAsync(resource.Uri, _cancellationTokenSource.Token);
+                        verificationResult.HttpStatusCode = (int) _sendingGETRequestTask.Result.StatusCode;
+                    }
+                }
+                catch (AggregateException aggregateException)
+                {
+                    switch (aggregateException.InnerException)
+                    {
+                        case TaskCanceledException _:
+                            verificationResult.HttpStatusCode = _cancellationTokenSource.Token.IsCancellationRequested
+                                ? (int) HttpStatusCode.Processing
+                                : (int) HttpStatusCode.RequestTimeout;
+                            break;
+                        case HttpRequestException _:
+                        case SocketException _:
+                            verificationResult.HttpStatusCode = (int) HttpStatusCode.BadRequest;
+                            break;
+                        default:
+                            throw;
+                    }
+                }
+                return true;
+            }
+            finally { OnIdle?.Invoke(); }
         }
     }
 }

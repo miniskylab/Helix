@@ -27,7 +27,7 @@ namespace Helix.Crawler
         readonly IResourceScope _resourceScope;
         static readonly ManualResetEvent ManualResetEvent = new ManualResetEvent(true);
 
-        public event IdleEvent OnIdle;
+        public event Action OnIdle;
         public event Action<RawResource> OnRawResourceCaptured;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
@@ -51,18 +51,20 @@ namespace Helix.Crawler
             _currentUri = uri ?? throw new ArgumentNullException(nameof(uri));
             if (onFailed == null) throw new ArgumentNullException(nameof(onFailed));
 
-            html = null;
-            if (!TryGoToUri(uri))
+            try
             {
-                onFailed.Invoke(new TimeoutException($"Chromium web browser failed to render the URI: {uri}"));
-                OnIdle?.Invoke();
+                html = null;
+                if (!TryGoToUri(uri))
+                {
+                    onFailed.Invoke(new TimeoutException($"Chromium web browser failed to render the URI: {uri}"));
+                    return false;
+                }
+
+                if (TryGetPageSource(out html)) return true;
+                onFailed.Invoke(new MemberAccessException($"Chromium web browser failed to obtain page source of the URI: {uri}"));
                 return false;
             }
-            if (TryGetPageSource(out html)) return true;
-
-            onFailed.Invoke(new MemberAccessException($"Chromium web browser failed to obtain page source of the URI: {uri}"));
-            OnIdle?.Invoke();
-            return false;
+            finally { OnIdle?.Invoke(); }
         }
 
         void DisableNetwork()
@@ -206,7 +208,8 @@ namespace Helix.Crawler
 
         static bool TimeoutExceptionOccurred(Exception exception)
         {
-            return exception.InnerException is WebException webException && webException.Status == WebExceptionStatus.Timeout;
+            return exception is WebDriverTimeoutException ||
+                   exception.InnerException is WebException webException && webException.Status == WebExceptionStatus.Timeout;
         }
 
         bool TryGetPageSource(out string html)

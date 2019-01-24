@@ -4,7 +4,7 @@ namespace Helix.Crawler.Abstractions
 {
     public interface IRawResourceExtractor
     {
-        event IdleEvent OnIdle;
+        event Action OnIdle;
 
         void ExtractRawResourcesFrom(HtmlDocument htmlDocument, Action<RawResource> onRawResourceExtracted);
     }

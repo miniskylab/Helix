@@ -13,9 +13,9 @@ namespace Helix.Crawler
     {
         readonly ConcurrentSet<string> _alreadyVerifiedUrls = new ConcurrentSet<string>();
         readonly CancellationTokenSource _cancellationTokenSource;
-        readonly BlockingCollection<HtmlDocument> _toBeExtractedHtmlDocuments = new BlockingCollection<HtmlDocument>(1000);
-        readonly BlockingCollection<Uri> _toBeRenderedUris = new BlockingCollection<Uri>(1000);
-        readonly BlockingCollection<RawResource> _toBeVerifiedRawResources = new BlockingCollection<RawResource>(1000);
+        readonly BlockingCollection<HtmlDocument> _toBeExtractedHtmlDocuments = new BlockingCollection<HtmlDocument>(100000);
+        readonly BlockingCollection<Uri> _toBeRenderedUris = new BlockingCollection<Uri>(100000);
+        readonly BlockingCollection<RawResource> _toBeVerifiedRawResources = new BlockingCollection<RawResource>(100000);
         static readonly object SyncRoot = new object();
 
         public int ActiveExtractionThreadCount { get; set; }
@@ -67,29 +67,20 @@ namespace Helix.Crawler
                 _alreadyVerifiedUrls.Add(toBeVerifiedRawResource.Url.StripFragment());
             }
 
-            try { _toBeVerifiedRawResources.Add(toBeVerifiedRawResource, CancellationToken); }
-            catch (OperationCanceledException operationCanceledException)
-            {
-                if (operationCanceledException.CancellationToken != CancellationToken) throw;
-            }
+            while (!_toBeVerifiedRawResources.TryAdd(toBeVerifiedRawResource))
+                Thread.Sleep(TimeSpan.FromSeconds(3));
         }
 
         public void Memorize(Uri toBeRenderedUri)
         {
-            try { _toBeRenderedUris.Add(toBeRenderedUri, CancellationToken); }
-            catch (OperationCanceledException operationCanceledException)
-            {
-                if (operationCanceledException.CancellationToken != CancellationToken) throw;
-            }
+            while (!_toBeRenderedUris.TryAdd(toBeRenderedUri))
+                Thread.Sleep(TimeSpan.FromSeconds(3));
         }
 
         public void Memorize(HtmlDocument toBeExtractedHtmlDocument)
         {
-            try { _toBeExtractedHtmlDocuments.Add(toBeExtractedHtmlDocument, CancellationToken); }
-            catch (OperationCanceledException operationCanceledException)
-            {
-                if (operationCanceledException.CancellationToken != CancellationToken) throw;
-            }
+            while (!_toBeExtractedHtmlDocuments.TryAdd(toBeExtractedHtmlDocument))
+                Thread.Sleep(TimeSpan.FromSeconds(3));
         }
 
         public HtmlDocument TakeToBeExtractedHtmlDocument() { return _toBeExtractedHtmlDocuments.Take(CancellationToken); }
