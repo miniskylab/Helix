@@ -25,7 +25,7 @@ namespace Helix.Crawler
         ProxyServer _httpProxyServer;
         readonly List<int> _processIds;
         readonly IResourceScope _resourceScope;
-        static readonly ManualResetEvent ManualResetEvent = new ManualResetEvent(true);
+        readonly object _syncRoot;
 
         public event Action OnIdle;
         public event Action<RawResource> OnRawResourceCaptured;
@@ -36,35 +36,49 @@ namespace Helix.Crawler
             _configurations = configurations;
             _resourceScope = resourceScope;
             _processIds = new List<int>();
+            _syncRoot = new object();
             SetupHttpProxyServer();
             Restart();
         }
 
         public void Dispose()
         {
-            ReleaseUnmanagedResources();
-            GC.SuppressFinalize(this);
+            lock (_syncRoot)
+            {
+                ReleaseUnmanagedResources();
+                GC.SuppressFinalize(this);
+            }
         }
 
-        public bool TryRender(Uri uri, Action<Exception> onFailed, out string html)
+        public bool TryRender(Uri uri, Action<Exception> onFailed, CancellationToken cancellationToken, out string html)
         {
             _currentUri = uri ?? throw new ArgumentNullException(nameof(uri));
             if (onFailed == null) throw new ArgumentNullException(nameof(onFailed));
 
-            try
+            html = null;
+            var renderingFailedErrorMessage = $"Chromium web browser failed to render the URI: {uri}";
+            lock (_syncRoot)
             {
-                html = null;
-                if (!TryGoToUri(uri))
+                try
                 {
-                    onFailed.Invoke(new TimeoutException($"Chromium web browser failed to render the URI: {uri}"));
+                    if (!TryGoToUri(uri, 3, cancellationToken))
+                    {
+                        onFailed.Invoke(new TimeoutException(renderingFailedErrorMessage));
+                        return false;
+                    }
+
+                    if (TryGetPageSource(out html)) return true;
+                    onFailed.Invoke(new MemberAccessException($"Chromium web browser failed to obtain page source of the URI: {uri}"));
                     return false;
                 }
-
-                if (TryGetPageSource(out html)) return true;
-                onFailed.Invoke(new MemberAccessException($"Chromium web browser failed to obtain page source of the URI: {uri}"));
-                return false;
+                catch (OperationCanceledException operationCanceledException)
+                {
+                    if (operationCanceledException.CancellationToken != cancellationToken) throw;
+                    onFailed.Invoke(new OperationCanceledException(renderingFailedErrorMessage, cancellationToken));
+                    return false;
+                }
+                finally { OnIdle?.Invoke(); }
             }
-            finally { OnIdle?.Invoke(); }
         }
 
         void DisableNetwork()
@@ -101,9 +115,6 @@ namespace Helix.Crawler
             _httpProxyServer?.Dispose();
             _httpProxyServer = null;
 
-            // TODO: static instanceCount
-            ManualResetEvent.Dispose();
-
             try { _chromeDriver?.Quit(); }
             catch (WebDriverException webDriverException)
             {
@@ -139,7 +150,6 @@ namespace Helix.Crawler
             if (!_configurations.ShowWebBrowsers) chromeOptions.AddArguments("--headless");
             chromeOptions.AddArguments("--window-size=1920,1080");
 
-            ManualResetEvent.WaitOne();
             _chromeDriver = new ChromeDriver(chromeDriverService, chromeOptions)
             {
                 NetworkConditions = new ChromeNetworkConditions
@@ -223,13 +233,15 @@ namespace Helix.Crawler
             return true;
         }
 
-        bool TryGoToUri(Uri uri, int attemptCount = 3)
+        bool TryGoToUri(Uri uri, int attemptCount, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             EnableNetwork();
             for (var attemptNo = 0; attemptNo < attemptCount; attemptNo++)
             {
                 try
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     _chromeDriver.Navigate().GoToUrl(uri);
                     break;
                 }

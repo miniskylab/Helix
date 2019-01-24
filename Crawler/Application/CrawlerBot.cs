@@ -252,7 +252,8 @@ namespace Helix.Crawler
 
                 Task.Run(() =>
                 {
-                    if (webBrowser.TryRender(toBeRenderedUri, exception => HandleException(exception), out var htmlText))
+                    void OnFailed(Exception exception) => HandleException(exception);
+                    if (webBrowser.TryRender(toBeRenderedUri, OnFailed, Memory.CancellationToken, out var htmlText))
                         Memory.Memorize(new HtmlDocument
                         {
                             Uri = toBeRenderedUri,

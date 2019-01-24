@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 
 namespace Helix.Crawler.Abstractions
 {
@@ -7,6 +8,6 @@ namespace Helix.Crawler.Abstractions
         event Action OnIdle;
         event Action<RawResource> OnRawResourceCaptured;
 
-        bool TryRender(Uri uri, Action<Exception> onFailed, out string html);
+        bool TryRender(Uri uri, Action<Exception> onFailed, CancellationToken cancellationToken, out string html);
     }
 }
