@@ -1,10 +1,14 @@
 ﻿using System;
+using Helix.Core;
 using Helix.Crawler.Abstractions;
 
 namespace Helix.Crawler
 {
     public sealed class RawResourceProcessor : IRawResourceProcessor
     {
+        [Obsolete(ErrorMessage.UseDependencyInjection, true)]
+        public RawResourceProcessor() { }
+
         public bool TryProcessRawResource(RawResource rawResource, out Resource resource)
         {
             if (rawResource == null) throw new ArgumentNullException();

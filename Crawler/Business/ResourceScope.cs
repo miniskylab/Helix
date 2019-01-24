@@ -1,4 +1,5 @@
 ﻿using System;
+using Helix.Core;
 using Helix.Crawler.Abstractions;
 
 namespace Helix.Crawler
@@ -7,6 +8,7 @@ namespace Helix.Crawler
     {
         readonly Configurations _configurations;
 
+        [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public ResourceScope(Configurations configurations) { _configurations = configurations; }
 
         public bool IsInternalResource(Resource resource)

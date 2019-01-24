@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Helix.Core;
 using Helix.Crawler.Abstractions;
 using HtmlAgilityPackDocument = HtmlAgilityPack.HtmlDocument;
 
@@ -12,6 +13,9 @@ namespace Helix.Crawler
                                                                    url.StartsWith("/", StringComparison.OrdinalIgnoreCase);
 
         public event IdleEvent OnIdle;
+
+        [Obsolete(ErrorMessage.UseDependencyInjection, true)]
+        public RawResourceExtractor() { }
 
         public void ExtractRawResourcesFrom(HtmlDocument htmlDocument, Action<RawResource> onRawResourceExtracted)
         {

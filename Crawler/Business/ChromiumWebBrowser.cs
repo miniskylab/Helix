@@ -7,6 +7,7 @@ using System.Net;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Helix.Core;
 using Helix.Crawler.Abstractions;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
@@ -29,6 +30,7 @@ namespace Helix.Crawler
         public event IdleEvent OnIdle;
         public event Action<RawResource> OnRawResourceCaptured;
 
+        [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public ChromiumWebBrowser(Configurations configurations, IResourceScope resourceScope)
         {
             _configurations = configurations;
@@ -96,7 +98,7 @@ namespace Helix.Crawler
             _httpProxyServer?.Stop();
             _httpProxyServer?.Dispose();
             _httpProxyServer = null;
-            
+
             // TODO: static instanceCount
             ManualResetEvent.Dispose();
 

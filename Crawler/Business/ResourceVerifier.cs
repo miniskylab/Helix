@@ -5,6 +5,7 @@ using System.Net.Http.Headers;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
+using Helix.Core;
 using Helix.Crawler.Abstractions;
 
 namespace Helix.Crawler
@@ -13,7 +14,6 @@ namespace Helix.Crawler
     {
         readonly CancellationTokenSource _cancellationTokenSource;
         readonly Configurations _configurations;
-        bool _disposed;
         readonly HttpClient _httpClient;
         readonly IRawResourceProcessor _rawResourceProcessor;
         readonly IResourceScope _resourceScope;
@@ -21,6 +21,7 @@ namespace Helix.Crawler
 
         public event IdleEvent OnIdle;
 
+        [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public ResourceVerifier(Configurations configurations, IRawResourceProcessor rawResourceProcessor, IResourceScope resourceScope)
         {
             _configurations = configurations;
@@ -41,9 +42,6 @@ namespace Helix.Crawler
 
         public void Dispose()
         {
-            if (_disposed) return;
-            _disposed = true;
-
             _cancellationTokenSource?.Cancel();
             try { _sendingGETRequestTask?.Wait(); }
             catch

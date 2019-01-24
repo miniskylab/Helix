@@ -6,7 +6,6 @@ using System.Reflection;
 using System.Threading;
 using Helix.Core;
 using Helix.Crawler.Abstractions;
-using JetBrains.Annotations;
 
 namespace Helix.Crawler
 {
@@ -54,7 +53,7 @@ namespace Helix.Crawler
             );
         }
 
-        [UsedImplicitly]
+        [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public Memory() { }
 
         public void CancelEverything() { _cancellationTokenSource.Cancel(); }
