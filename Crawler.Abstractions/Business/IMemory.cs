@@ -5,38 +5,26 @@ namespace Helix.Crawler.Abstractions
 {
     public interface IMemory
     {
-        int ActiveExtractionThreadCount { get; set; }
-
-        int ActiveRenderingThreadCount { get; set; }
-
-        int ActiveVerificationThreadCount { get; set; }
-
-        CancellationToken CancellationToken { get; }
-
         Configurations Configurations { get; }
 
-        CrawlerState CrawlerState { get; }
+        string ErrorLogFilePath { get; }
 
-        string ErrorFilePath { get; }
+        int ToBeExtractedHtmlDocumentCount { get; }
 
-        bool NothingLeftToDo { get; }
+        int ToBeRenderedUriCount { get; }
 
-        int RemainingUrlCount { get; }
+        int ToBeVerifiedRawResourceCount { get; }
 
-        void CancelEverything();
+        void Memorize(RawResource toBeVerifiedRawResource, CancellationToken cancellationToken);
 
-        void Memorize(RawResource toBeVerifiedRawResource);
+        void Memorize(Uri toBeRenderedUri, CancellationToken cancellationToken);
 
-        void Memorize(Uri toBeRenderedUri);
+        void Memorize(HtmlDocument toBeExtractedHtmlDocument, CancellationToken cancellationToken);
 
-        void Memorize(HtmlDocument toBeExtractedHtmlDocument);
+        HtmlDocument TakeToBeExtractedHtmlDocument(CancellationToken cancellationToken);
 
-        HtmlDocument TakeToBeExtractedHtmlDocument();
+        Uri TakeToBeRenderedUri(CancellationToken cancellationToken);
 
-        Uri TakeToBeRenderedUri();
-
-        RawResource TakeToBeVerifiedRawResource();
-
-        bool TryTransitTo(CrawlerState crawlerState);
+        RawResource TakeToBeVerifiedRawResource(CancellationToken cancellationToken);
     }
 }

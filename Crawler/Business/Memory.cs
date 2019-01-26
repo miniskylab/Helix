@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Threading;
 using Helix.Core;
@@ -12,35 +11,26 @@ namespace Helix.Crawler
     public sealed class Memory : IMemory
     {
         readonly ConcurrentSet<string> _alreadyVerifiedUrls = new ConcurrentSet<string>();
-        readonly CancellationTokenSource _cancellationTokenSource;
         readonly BlockingCollection<HtmlDocument> _toBeExtractedHtmlDocuments = new BlockingCollection<HtmlDocument>(100000);
         readonly BlockingCollection<Uri> _toBeRenderedUris = new BlockingCollection<Uri>(100000);
         readonly BlockingCollection<RawResource> _toBeVerifiedRawResources = new BlockingCollection<RawResource>(100000);
         static readonly object SyncRoot = new object();
 
-        public int ActiveExtractionThreadCount { get; set; }
-
-        public int ActiveRenderingThreadCount { get; set; }
-
-        public int ActiveVerificationThreadCount { get; set; }
-
         public Configurations Configurations { get; }
 
-        public CrawlerState CrawlerState { get; private set; } = CrawlerState.Ready;
+        public string ErrorLogFilePath { get; }
 
-        public string ErrorFilePath { get; }
+        public int ToBeExtractedHtmlDocumentCount => _toBeExtractedHtmlDocuments.Count;
 
-        public CancellationToken CancellationToken => _cancellationTokenSource.Token;
+        public int ToBeRenderedUriCount => _toBeRenderedUris.Count;
 
-        public bool NothingLeftToDo => !_toBeVerifiedRawResources.Any() && !_toBeRenderedUris.Any() && !_toBeExtractedHtmlDocuments.Any();
+        public int ToBeVerifiedRawResourceCount => _toBeVerifiedRawResources.Count;
 
-        public int RemainingUrlCount => ActiveVerificationThreadCount + _toBeVerifiedRawResources.Count;
-
+        [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public Memory(Configurations configurations)
         {
             Configurations = configurations;
-            ErrorFilePath = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "errors.txt");
-            _cancellationTokenSource = new CancellationTokenSource();
+            ErrorLogFilePath = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "helix_errors.log");
             _alreadyVerifiedUrls.Clear();
             _alreadyVerifiedUrls.Add(Configurations.StartUri.AbsoluteUri);
             _toBeVerifiedRawResources.Add(
@@ -48,90 +38,50 @@ namespace Helix.Crawler
                 {
                     ParentUri = null,
                     Url = Configurations.StartUri.AbsoluteUri
-                },
-                CancellationToken
+                }
             );
         }
 
-        [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public Memory() { }
-
-        public void CancelEverything() { _cancellationTokenSource.Cancel(); }
-
-        public void Memorize(RawResource toBeVerifiedRawResource)
+        public void Memorize(RawResource toBeVerifiedRawResource, CancellationToken cancellationToken)
         {
-            if (CancellationToken.IsCancellationRequested) return;
             lock (SyncRoot)
             {
                 if (_alreadyVerifiedUrls.Contains(toBeVerifiedRawResource.Url.StripFragment())) return;
                 _alreadyVerifiedUrls.Add(toBeVerifiedRawResource.Url.StripFragment());
             }
 
-            while (!_toBeVerifiedRawResources.TryAdd(toBeVerifiedRawResource))
+            while (!cancellationToken.IsCancellationRequested && !_toBeVerifiedRawResources.TryAdd(toBeVerifiedRawResource))
                 Thread.Sleep(TimeSpan.FromSeconds(3));
         }
 
-        public void Memorize(Uri toBeRenderedUri)
+        public void Memorize(Uri toBeRenderedUri, CancellationToken cancellationToken)
         {
-            while (!_toBeRenderedUris.TryAdd(toBeRenderedUri))
+            while (!cancellationToken.IsCancellationRequested && !_toBeRenderedUris.TryAdd(toBeRenderedUri))
                 Thread.Sleep(TimeSpan.FromSeconds(3));
         }
 
-        public void Memorize(HtmlDocument toBeExtractedHtmlDocument)
+        public void Memorize(HtmlDocument toBeExtractedHtmlDocument, CancellationToken cancellationToken)
         {
-            while (!_toBeExtractedHtmlDocuments.TryAdd(toBeExtractedHtmlDocument))
+            while (!cancellationToken.IsCancellationRequested && !_toBeExtractedHtmlDocuments.TryAdd(toBeExtractedHtmlDocument))
                 Thread.Sleep(TimeSpan.FromSeconds(3));
         }
 
-        public HtmlDocument TakeToBeExtractedHtmlDocument() { return _toBeExtractedHtmlDocuments.Take(CancellationToken); }
-
-        public Uri TakeToBeRenderedUri() { return _toBeRenderedUris.Take(CancellationToken); }
-
-        public RawResource TakeToBeVerifiedRawResource() { return _toBeVerifiedRawResources.Take(CancellationToken); }
-
-        public bool TryTransitTo(CrawlerState crawlerState)
+        public HtmlDocument TakeToBeExtractedHtmlDocument(CancellationToken cancellationToken)
         {
-            if (CrawlerState == CrawlerState.Unknown) return false;
-            switch (crawlerState)
-            {
-                case CrawlerState.Ready:
-                    lock (SyncRoot)
-                    {
-                        if (CrawlerState != CrawlerState.Stopping) return false;
-                        CrawlerState = CrawlerState.Ready;
-                        return true;
-                    }
-                case CrawlerState.Working:
-                    lock (SyncRoot)
-                    {
-                        if (CrawlerState != CrawlerState.Ready && CrawlerState != CrawlerState.Paused) return false;
-                        CrawlerState = CrawlerState.Working;
-                        return true;
-                    }
-                case CrawlerState.Stopping:
-                    lock (SyncRoot)
-                    {
-                        if (CrawlerState != CrawlerState.Working && CrawlerState != CrawlerState.Paused) return false;
-                        CrawlerState = CrawlerState.Stopping;
-                        return true;
-                    }
-                case CrawlerState.Paused:
-                    lock (SyncRoot)
-                    {
-                        if (CrawlerState != CrawlerState.Working) return false;
-                        CrawlerState = CrawlerState.Paused;
-                        return true;
-                    }
-                case CrawlerState.Unknown:
-                    throw new NotSupportedException($"Cannot transit to [{nameof(CrawlerState.Unknown)}] state.");
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(crawlerState), crawlerState, null);
-            }
+            return _toBeExtractedHtmlDocuments.Take(cancellationToken);
+        }
+
+        public Uri TakeToBeRenderedUri(CancellationToken cancellationToken) { return _toBeRenderedUris.Take(cancellationToken); }
+
+        public RawResource TakeToBeVerifiedRawResource(CancellationToken cancellationToken)
+        {
+            return _toBeVerifiedRawResources.Take(cancellationToken);
         }
 
         ~Memory()
         {
-            _cancellationTokenSource?.Dispose();
+            _toBeExtractedHtmlDocuments?.Dispose();
+            _toBeRenderedUris?.Dispose();
             _toBeVerifiedRawResources?.Dispose();
         }
     }

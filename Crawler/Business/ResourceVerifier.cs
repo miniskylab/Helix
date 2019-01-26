@@ -81,7 +81,6 @@ namespace Helix.Crawler
                     verificationResult.Resource = null;
                     verificationResult.HttpStatusCode = (int) HttpStatusCode.ExpectationFailed;
                     verificationResult.IsInternalResource = false;
-
                     return true;
                 }
 

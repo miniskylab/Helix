@@ -21,7 +21,8 @@ namespace Helix.Specifications
                 new ServiceDescriptor(typeof(IRawResourceProcessor), typeof(RawResourceProcessor), ServiceLifetime.Transient),
                 new ServiceDescriptor(typeof(IResourceScope), typeof(ResourceScope), ServiceLifetime.Transient),
                 new ServiceDescriptor(typeof(Configurations), new Configurations()),
-                new ServiceDescriptor(typeof(IMemory), typeof(Memory), ServiceLifetime.Singleton)
+                new ServiceDescriptor(typeof(IMemory), typeof(Memory), ServiceLifetime.Singleton),
+                new ServiceDescriptor(typeof(IManagement), typeof(Management), ServiceLifetime.Singleton)
             }).BuildServiceProvider();
         }
 

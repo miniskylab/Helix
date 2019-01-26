@@ -7,13 +7,6 @@ namespace Helix.Crawler
     {
         static ServiceProvider _serviceProvider;
 
-        static ServiceLocator()
-        {
-            _serviceProvider = new ServiceCollection()
-                .AddSingleton<IMemory, Memory>()
-                .BuildServiceProvider();
-        }
-
         public static void Dispose()
         {
             _serviceProvider.Dispose();
@@ -32,8 +25,9 @@ namespace Helix.Crawler
                 .AddTransient<IResourceVerifier, ResourceVerifier>()
                 .AddTransient<IRawResourceProcessor, RawResourceProcessor>()
                 .AddTransient<IResourceScope, ResourceScope>()
-                .AddSingleton(configurations)
                 .AddSingleton<IMemory, Memory>()
+                .AddSingleton<IManagement, Management>()
+                .AddSingleton(configurations)
                 .BuildServiceProvider();
         }
     }
