@@ -10,7 +10,7 @@ using Helix.Crawler.Abstractions;
 
 namespace Helix.Crawler
 {
-    public sealed class ResourceVerifier : IResourceVerifier
+    public sealed class RawResourceVerifier : IRawResourceVerifier
     {
         readonly CancellationTokenSource _cancellationTokenSource;
         readonly Configurations _configurations;
@@ -24,7 +24,8 @@ namespace Helix.Crawler
         public event Action OnIdle;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public ResourceVerifier(Configurations configurations, IRawResourceProcessor rawResourceProcessor, IResourceScope resourceScope)
+        public RawResourceVerifier(Configurations configurations, IRawResourceProcessor rawResourceProcessor,
+            IResourceScope resourceScope)
         {
             _configurations = configurations;
             _rawResourceProcessor = rawResourceProcessor;

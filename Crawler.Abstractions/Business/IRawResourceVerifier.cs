@@ -2,7 +2,7 @@ using System;
 
 namespace Helix.Crawler.Abstractions
 {
-    public interface IResourceVerifier : IDisposable
+    public interface IRawResourceVerifier : IDisposable
     {
         event Action OnIdle;
 

@@ -22,7 +22,7 @@ namespace Helix.Crawler
             _serviceProvider = new ServiceCollection()
                 .AddTransient<IWebBrowser, ChromiumWebBrowser>()
                 .AddTransient<IRawResourceExtractor, RawResourceExtractor>()
-                .AddTransient<IResourceVerifier, ResourceVerifier>()
+                .AddTransient<IRawResourceVerifier, RawResourceVerifier>()
                 .AddTransient<IRawResourceProcessor, RawResourceProcessor>()
                 .AddTransient<IResourceScope, ResourceScope>()
                 .AddSingleton<IMemory, Memory>()

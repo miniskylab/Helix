@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 
 namespace Helix.Crawler.Abstractions
@@ -14,17 +15,17 @@ namespace Helix.Crawler.Abstractions
 
         void CancelEverything();
 
-        void InterlockedDecrementActiveExtractionThreadCount();
+        void OnRawResourceExtractionTaskCompleted();
 
-        void InterlockedDecrementActiveRenderingThreadCount();
+        void OnRawResourceVerificationTaskCompleted();
 
-        void InterlockedDecrementActiveVerificationThreadCount();
+        void OnUriRenderingTaskCompleted();
 
-        void InterlockedIncrementActiveExtractionThreadCount();
+        HtmlDocument TakeToBeExtractedHtmlDocument();
 
-        void InterlockedIncrementActiveRenderingThreadCount();
+        Uri TakeToBeRenderedUri();
 
-        void InterlockedIncrementActiveVerificationThreadCount();
+        RawResource TakeToBeVerifiedRawResource();
 
         bool TryTransitTo(CrawlerState crawlerState);
     }

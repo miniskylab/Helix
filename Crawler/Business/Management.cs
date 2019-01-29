@@ -7,11 +7,11 @@ namespace Helix.Crawler
 {
     public sealed class Management : IManagement
     {
-        int _activeExtractionThreadCount;
-        int _activeRenderingThreadCount;
-        int _activeVerificationThreadCount;
         readonly CancellationTokenSource _cancellationTokenSource;
         readonly IMemory _memory;
+        int _pendingExtractionTaskCount;
+        int _pendingRenderingTaskCount;
+        int _pendingVerificationTaskCount;
         static readonly object ExtractionSyncRoot = new object();
         static readonly object RenderingSyncRoot = new object();
         static readonly object SyncRoot = new object();
@@ -33,13 +33,13 @@ namespace Helix.Crawler
                     var noMoreToBeRenderedUris = _memory.ToBeRenderedUriCount == 0;
                     var noMoreToBeVerifiedRawResources = _memory.ToBeVerifiedRawResourceCount == 0;
                     var nothingToDo = noMoreToBeExtractedHtmlDocuments && noMoreToBeRenderedUris && noMoreToBeVerifiedRawResources;
-                    var noActiveThread = _activeExtractionThreadCount + _activeRenderingThreadCount + _activeVerificationThreadCount == 0;
+                    var noActiveThread = _pendingExtractionTaskCount + _pendingRenderingTaskCount + _pendingVerificationTaskCount == 0;
                     return nothingToDo && noActiveThread;
                 }
             }
         }
 
-        public int RemainingUrlCount => _activeVerificationThreadCount + _memory.ToBeVerifiedRawResourceCount;
+        public int RemainingUrlCount => _pendingVerificationTaskCount + _memory.ToBeVerifiedRawResourceCount;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public Management(IMemory memory)
@@ -50,34 +50,37 @@ namespace Helix.Crawler
 
         public void CancelEverything() { _cancellationTokenSource.Cancel(); }
 
-        public void InterlockedDecrementActiveExtractionThreadCount()
+        public void OnRawResourceExtractionTaskCompleted()
         {
-            lock (ExtractionSyncRoot) _activeExtractionThreadCount--;
+            lock (ExtractionSyncRoot) _pendingExtractionTaskCount--;
         }
 
-        public void InterlockedDecrementActiveRenderingThreadCount()
+        public void OnRawResourceVerificationTaskCompleted()
         {
-            lock (RenderingSyncRoot) _activeRenderingThreadCount--;
+            lock (VerificationSyncRoot) _pendingVerificationTaskCount--;
         }
 
-        public void InterlockedDecrementActiveVerificationThreadCount()
+        public void OnUriRenderingTaskCompleted()
         {
-            lock (VerificationSyncRoot) _activeVerificationThreadCount--;
+            lock (RenderingSyncRoot) _pendingRenderingTaskCount--;
         }
 
-        public void InterlockedIncrementActiveExtractionThreadCount()
+        public HtmlDocument TakeToBeExtractedHtmlDocument()
         {
-            InterlockedIncrement(ref _activeExtractionThreadCount, ExtractionSyncRoot, 300);
+            InterlockedIncrement(ref _pendingExtractionTaskCount, ExtractionSyncRoot, 300);
+            return _memory.TakeToBeExtractedHtmlDocument(CancellationToken);
         }
 
-        public void InterlockedIncrementActiveRenderingThreadCount()
+        public Uri TakeToBeRenderedUri()
         {
-            InterlockedIncrement(ref _activeRenderingThreadCount, RenderingSyncRoot, 300);
+            InterlockedIncrement(ref _pendingRenderingTaskCount, RenderingSyncRoot, 300);
+            return _memory.TakeToBeRenderedUri(CancellationToken);
         }
 
-        public void InterlockedIncrementActiveVerificationThreadCount()
+        public RawResource TakeToBeVerifiedRawResource()
         {
-            InterlockedIncrement(ref _activeVerificationThreadCount, VerificationSyncRoot, 400);
+            InterlockedIncrement(ref _pendingVerificationTaskCount, VerificationSyncRoot, 400);
+            return _memory.TakeToBeVerifiedRawResource(CancellationToken);
         }
 
         public bool TryTransitTo(CrawlerState crawlerState)
