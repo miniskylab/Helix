@@ -15,17 +15,17 @@ namespace Helix.Crawler.Abstractions
 
         void CancelEverything();
 
+        HtmlDocument InterlockedTakeToBeExtractedHtmlDocument();
+
+        Uri InterlockedTakeToBeRenderedUri();
+
+        RawResource InterlockedTakeToBeVerifiedRawResource();
+
         void OnRawResourceExtractionTaskCompleted();
 
         void OnRawResourceVerificationTaskCompleted();
 
         void OnUriRenderingTaskCompleted();
-
-        HtmlDocument TakeToBeExtractedHtmlDocument();
-
-        Uri TakeToBeRenderedUri();
-
-        RawResource TakeToBeVerifiedRawResource();
 
         bool TryTransitTo(CrawlerState crawlerState);
     }

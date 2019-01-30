@@ -50,6 +50,60 @@ namespace Helix.Crawler
 
         public void CancelEverything() { _cancellationTokenSource.Cancel(); }
 
+        public HtmlDocument InterlockedTakeToBeExtractedHtmlDocument()
+        {
+            while (!EverythingIsDone && !CancellationToken.IsCancellationRequested)
+            {
+                Monitor.Enter(ExtractionSyncRoot);
+                if (!_memory.TryTakeToBeExtractedHtmlDocument(out var toBeExtractedHtmlDocument))
+                {
+                    Monitor.Exit(ExtractionSyncRoot);
+                    Thread.Sleep(TimeSpan.FromSeconds(3));
+                    continue;
+                }
+                InterlockedIncrement(ref _pendingExtractionTaskCount, ExtractionSyncRoot, 300);
+                Monitor.Exit(ExtractionSyncRoot);
+                return toBeExtractedHtmlDocument;
+            }
+            throw new OperationCanceledException(CancellationToken);
+        }
+
+        public Uri InterlockedTakeToBeRenderedUri()
+        {
+            while (!EverythingIsDone && !CancellationToken.IsCancellationRequested)
+            {
+                Monitor.Enter(RenderingSyncRoot);
+                if (!_memory.TryTakeToBeRenderedUri(out var toBeRenderedUri))
+                {
+                    Monitor.Exit(RenderingSyncRoot);
+                    Thread.Sleep(TimeSpan.FromSeconds(3));
+                    continue;
+                }
+                InterlockedIncrement(ref _pendingRenderingTaskCount, RenderingSyncRoot, 300);
+                Monitor.Exit(RenderingSyncRoot);
+                return toBeRenderedUri;
+            }
+            throw new OperationCanceledException(CancellationToken);
+        }
+
+        public RawResource InterlockedTakeToBeVerifiedRawResource()
+        {
+            while (!EverythingIsDone && !CancellationToken.IsCancellationRequested)
+            {
+                Monitor.Enter(VerificationSyncRoot);
+                if (!_memory.TryTakeToBeVerifiedRawResource(out var toBeVerifiedRawResource))
+                {
+                    Monitor.Exit(VerificationSyncRoot);
+                    Thread.Sleep(TimeSpan.FromSeconds(3));
+                    continue;
+                }
+                InterlockedIncrement(ref _pendingVerificationTaskCount, VerificationSyncRoot, 400);
+                Monitor.Exit(VerificationSyncRoot);
+                return toBeVerifiedRawResource;
+            }
+            throw new OperationCanceledException(CancellationToken);
+        }
+
         public void OnRawResourceExtractionTaskCompleted()
         {
             lock (ExtractionSyncRoot) _pendingExtractionTaskCount--;
@@ -63,24 +117,6 @@ namespace Helix.Crawler
         public void OnUriRenderingTaskCompleted()
         {
             lock (RenderingSyncRoot) _pendingRenderingTaskCount--;
-        }
-
-        public HtmlDocument TakeToBeExtractedHtmlDocument()
-        {
-            InterlockedIncrement(ref _pendingExtractionTaskCount, ExtractionSyncRoot, 300);
-            return _memory.TakeToBeExtractedHtmlDocument(CancellationToken);
-        }
-
-        public Uri TakeToBeRenderedUri()
-        {
-            InterlockedIncrement(ref _pendingRenderingTaskCount, RenderingSyncRoot, 300);
-            return _memory.TakeToBeRenderedUri(CancellationToken);
-        }
-
-        public RawResource TakeToBeVerifiedRawResource()
-        {
-            InterlockedIncrement(ref _pendingVerificationTaskCount, VerificationSyncRoot, 400);
-            return _memory.TakeToBeVerifiedRawResource(CancellationToken);
         }
 
         public bool TryTransitTo(CrawlerState crawlerState)
@@ -125,7 +161,7 @@ namespace Helix.Crawler
 
         void InterlockedIncrement(ref int value, object syncRoot, int boundary)
         {
-            while (!EverythingIsDone)
+            while (!EverythingIsDone && !CancellationToken.IsCancellationRequested)
             {
                 Monitor.Enter(syncRoot);
                 if (value >= boundary)

@@ -66,16 +66,16 @@ namespace Helix.Crawler
                 Thread.Sleep(TimeSpan.FromSeconds(3));
         }
 
-        public HtmlDocument TakeToBeExtractedHtmlDocument(CancellationToken cancellationToken)
+        public bool TryTakeToBeExtractedHtmlDocument(out HtmlDocument htmlDocument)
         {
-            return _toBeExtractedHtmlDocuments.Take(cancellationToken);
+            return _toBeExtractedHtmlDocuments.TryTake(out htmlDocument);
         }
 
-        public Uri TakeToBeRenderedUri(CancellationToken cancellationToken) { return _toBeRenderedUris.Take(cancellationToken); }
+        public bool TryTakeToBeRenderedUri(out Uri uri) { return _toBeRenderedUris.TryTake(out uri); }
 
-        public RawResource TakeToBeVerifiedRawResource(CancellationToken cancellationToken)
+        public bool TryTakeToBeVerifiedRawResource(out RawResource rawResource)
         {
-            return _toBeVerifiedRawResources.Take(cancellationToken);
+            return _toBeVerifiedRawResources.TryTake(out rawResource);
         }
 
         ~Memory()
