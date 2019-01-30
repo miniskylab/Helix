@@ -58,7 +58,7 @@ namespace Helix.Crawler
                 if (!_memory.TryTakeToBeExtractedHtmlDocument(out var toBeExtractedHtmlDocument))
                 {
                     Monitor.Exit(ExtractionSyncRoot);
-                    Thread.Sleep(TimeSpan.FromSeconds(3));
+                    Thread.Sleep(100);
                     continue;
                 }
                 InterlockedIncrement(ref _pendingExtractionTaskCount, ExtractionSyncRoot, 300);
@@ -76,7 +76,7 @@ namespace Helix.Crawler
                 if (!_memory.TryTakeToBeRenderedUri(out var toBeRenderedUri))
                 {
                     Monitor.Exit(RenderingSyncRoot);
-                    Thread.Sleep(TimeSpan.FromSeconds(3));
+                    Thread.Sleep(100);
                     continue;
                 }
                 InterlockedIncrement(ref _pendingRenderingTaskCount, RenderingSyncRoot, 300);
@@ -94,10 +94,10 @@ namespace Helix.Crawler
                 if (!_memory.TryTakeToBeVerifiedRawResource(out var toBeVerifiedRawResource))
                 {
                     Monitor.Exit(VerificationSyncRoot);
-                    Thread.Sleep(TimeSpan.FromSeconds(3));
+                    Thread.Sleep(100);
                     continue;
                 }
-                InterlockedIncrement(ref _pendingVerificationTaskCount, VerificationSyncRoot, 400);
+                InterlockedIncrement(ref _pendingVerificationTaskCount, VerificationSyncRoot, 400); // TODO: bug :v
                 Monitor.Exit(VerificationSyncRoot);
                 return toBeVerifiedRawResource;
             }
@@ -161,13 +161,13 @@ namespace Helix.Crawler
 
         void InterlockedIncrement(ref int value, object syncRoot, int boundary)
         {
-            while (!EverythingIsDone && !CancellationToken.IsCancellationRequested)
+            while (!CancellationToken.IsCancellationRequested)
             {
                 Monitor.Enter(syncRoot);
                 if (value >= boundary)
                 {
                     Monitor.Exit(syncRoot);
-                    Thread.Sleep(TimeSpan.FromSeconds(3));
+                    Thread.Sleep(100);
                     continue;
                 }
                 value++;
