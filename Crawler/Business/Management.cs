@@ -48,7 +48,11 @@ namespace Helix.Crawler
             _cancellationTokenSource = new CancellationTokenSource();
         }
 
-        public void CancelEverything() { _cancellationTokenSource.Cancel(); }
+        public void CancelEverything()
+        {
+            _cancellationTokenSource.Cancel();
+            while (_pendingExtractionTaskCount + _pendingRenderingTaskCount + _pendingVerificationTaskCount > 0) Thread.Sleep(100);
+        }
 
         public HtmlDocument InterlockedTakeToBeExtractedHtmlDocument()
         {

@@ -116,16 +116,14 @@ namespace Helix.Crawler
                 }
 
                 Task.Run(() =>
-                {
-                    try
                     {
                         rawResourceExtractor.ExtractRawResourcesFrom(
                             toBeExtractedHtmlDocument,
                             rawResource => _memory.Memorize(rawResource, Management.CancellationToken)
                         );
-                    }
-                    finally { Management.OnRawResourceExtractionTaskCompleted(); }
-                }, Management.CancellationToken);
+                    },
+                    Management.CancellationToken
+                ).ContinueWith(_ => Management.OnRawResourceExtractionTaskCompleted(), TaskContinuationOptions.ExecuteSynchronously);
             }
         }
 
@@ -211,8 +209,6 @@ namespace Helix.Crawler
                 }
 
                 Task.Run(() =>
-                {
-                    try
                     {
                         void OnFailed(Exception exception) => HandleException(exception);
                         if (webBrowser.TryRender(toBeRenderedUri, OnFailed, Management.CancellationToken, out var htmlText))
@@ -221,9 +217,9 @@ namespace Helix.Crawler
                                 Uri = toBeRenderedUri,
                                 Text = htmlText
                             }, Management.CancellationToken);
-                    }
-                    finally { Management.OnUriRenderingTaskCompleted(); }
-                }, Management.CancellationToken);
+                    },
+                    Management.CancellationToken
+                ).ContinueWith(_ => Management.OnUriRenderingTaskCompleted(), TaskContinuationOptions.ExecuteSynchronously);
             }
         }
 
@@ -246,8 +242,6 @@ namespace Helix.Crawler
                 }
 
                 Task.Run(() =>
-                {
-                    try
                     {
                         if (!rawResourceVerifier.TryVerify(toBeVerifiedRawResource, out var verificationResult)) return;
                         var isStartUrl = verificationResult.Resource != null && resourceScope.IsStartUri(verificationResult.Resource.Uri);
@@ -265,9 +259,9 @@ namespace Helix.Crawler
                         var isInternal = verificationResult.IsInternalResource;
                         if (resourceExists && isExtracted && isNotBroken && isInternal)
                             _memory.Memorize(verificationResult.Resource.Uri, Management.CancellationToken);
-                    }
-                    finally { Management.OnRawResourceVerificationTaskCompleted(); }
-                }, Management.CancellationToken);
+                    },
+                    Management.CancellationToken
+                ).ContinueWith(_ => Management.OnRawResourceVerificationTaskCompleted(), TaskContinuationOptions.ExecuteSynchronously);
             }
         }
 
