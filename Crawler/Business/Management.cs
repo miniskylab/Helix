@@ -55,13 +55,21 @@ namespace Helix.Crawler
             while (!EverythingIsDone && !CancellationToken.IsCancellationRequested)
             {
                 Monitor.Enter(ExtractionSyncRoot);
-                if (!_memory.TryTakeToBeExtractedHtmlDocument(out var toBeExtractedHtmlDocument))
+                if (_pendingExtractionTaskCount >= 300)
                 {
                     Monitor.Exit(ExtractionSyncRoot);
                     Thread.Sleep(100);
                     continue;
                 }
-                InterlockedIncrement(ref _pendingExtractionTaskCount, ExtractionSyncRoot, 300);
+
+                _pendingExtractionTaskCount++;
+                if (!_memory.TryTakeToBeExtractedHtmlDocument(out var toBeExtractedHtmlDocument))
+                {
+                    _pendingExtractionTaskCount--;
+                    Monitor.Exit(ExtractionSyncRoot);
+                    Thread.Sleep(100);
+                    continue;
+                }
                 Monitor.Exit(ExtractionSyncRoot);
                 return toBeExtractedHtmlDocument;
             }
@@ -73,13 +81,21 @@ namespace Helix.Crawler
             while (!EverythingIsDone && !CancellationToken.IsCancellationRequested)
             {
                 Monitor.Enter(RenderingSyncRoot);
-                if (!_memory.TryTakeToBeRenderedUri(out var toBeRenderedUri))
+                if (_pendingRenderingTaskCount >= 300)
                 {
                     Monitor.Exit(RenderingSyncRoot);
                     Thread.Sleep(100);
                     continue;
                 }
-                InterlockedIncrement(ref _pendingRenderingTaskCount, RenderingSyncRoot, 300);
+
+                _pendingRenderingTaskCount++;
+                if (!_memory.TryTakeToBeRenderedUri(out var toBeRenderedUri))
+                {
+                    _pendingRenderingTaskCount--;
+                    Monitor.Exit(RenderingSyncRoot);
+                    Thread.Sleep(100);
+                    continue;
+                }
                 Monitor.Exit(RenderingSyncRoot);
                 return toBeRenderedUri;
             }
@@ -91,13 +107,21 @@ namespace Helix.Crawler
             while (!EverythingIsDone && !CancellationToken.IsCancellationRequested)
             {
                 Monitor.Enter(VerificationSyncRoot);
-                if (!_memory.TryTakeToBeVerifiedRawResource(out var toBeVerifiedRawResource))
+                if (_pendingVerificationTaskCount >= 400)
                 {
                     Monitor.Exit(VerificationSyncRoot);
                     Thread.Sleep(100);
                     continue;
                 }
-                InterlockedIncrement(ref _pendingVerificationTaskCount, VerificationSyncRoot, 400); // TODO: bug :v
+
+                _pendingVerificationTaskCount++;
+                if (!_memory.TryTakeToBeVerifiedRawResource(out var toBeVerifiedRawResource))
+                {
+                    _pendingVerificationTaskCount--;
+                    Monitor.Exit(VerificationSyncRoot);
+                    Thread.Sleep(100);
+                    continue;
+                }
                 Monitor.Exit(VerificationSyncRoot);
                 return toBeVerifiedRawResource;
             }
@@ -156,23 +180,6 @@ namespace Helix.Crawler
                     throw new NotSupportedException($"Cannot transit to [{nameof(CrawlerState.Unknown)}] state.");
                 default:
                     throw new ArgumentOutOfRangeException(nameof(crawlerState), crawlerState, null);
-            }
-        }
-
-        void InterlockedIncrement(ref int value, object syncRoot, int boundary)
-        {
-            while (!CancellationToken.IsCancellationRequested)
-            {
-                Monitor.Enter(syncRoot);
-                if (value >= boundary)
-                {
-                    Monitor.Exit(syncRoot);
-                    Thread.Sleep(100);
-                    continue;
-                }
-                value++;
-                Monitor.Exit(syncRoot);
-                break;
             }
         }
 

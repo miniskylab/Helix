@@ -111,7 +111,6 @@ namespace Helix.Crawler
                 }
                 catch (Exception exception)
                 {
-                    Management.OnRawResourceExtractionTaskCompleted();
                     HandleException(exception);
                     continue;
                 }
@@ -207,7 +206,6 @@ namespace Helix.Crawler
                 }
                 catch (Exception exception)
                 {
-                    Management.OnUriRenderingTaskCompleted();
                     HandleException(exception);
                     continue;
                 }
@@ -243,7 +241,6 @@ namespace Helix.Crawler
                 }
                 catch (Exception exception)
                 {
-                    Management.OnRawResourceVerificationTaskCompleted();
                     HandleException(exception);
                     continue;
                 }
