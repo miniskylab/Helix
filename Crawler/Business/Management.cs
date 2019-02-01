@@ -154,7 +154,8 @@ namespace Helix.Crawler
                 }
                 return;
             }
-            throw new OperationCanceledException(CancellationToken);
+            CancellationToken.ThrowIfCancellationRequested();
+            throw new EverythingIsDoneException();
         }
 
         public void InterlockedCoordinate(out IWebBrowser webBrowser, out Uri toBeRenderedUri)
@@ -187,7 +188,8 @@ namespace Helix.Crawler
                 }
                 return;
             }
-            throw new OperationCanceledException(CancellationToken);
+            CancellationToken.ThrowIfCancellationRequested();
+            throw new EverythingIsDoneException();
         }
 
         public void InterlockedCoordinate(out IRawResourceVerifier rawResourceVerifier, out RawResource toBeVerifiedRawResource)
@@ -220,7 +222,8 @@ namespace Helix.Crawler
                 }
                 return;
             }
-            throw new OperationCanceledException(CancellationToken);
+            CancellationToken.ThrowIfCancellationRequested();
+            throw new EverythingIsDoneException();
         }
 
         public void OnRawResourceExtractionTaskCompleted()
@@ -358,6 +361,8 @@ namespace Helix.Crawler
                 }
             }
         }
+
+        public class EverythingIsDoneException : Exception { }
 
         ~Management() { ReleaseUnmanagedResources(); }
     }

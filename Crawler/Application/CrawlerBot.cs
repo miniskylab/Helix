@@ -114,6 +114,7 @@ namespace Helix.Crawler
                         TaskContinuationOptions.OnlyOnCanceled | TaskContinuationOptions.ExecuteSynchronously
                     );
                 }
+                catch (Management.EverythingIsDoneException) { }
                 catch (Exception exception) { HandleException(exception); }
             }
         }
@@ -167,6 +168,7 @@ namespace Helix.Crawler
                         TaskContinuationOptions.OnlyOnCanceled | TaskContinuationOptions.ExecuteSynchronously
                     );
                 }
+                catch (Management.EverythingIsDoneException) { }
                 catch (Exception exception) { HandleException(exception); }
             }
         }
@@ -211,6 +213,7 @@ namespace Helix.Crawler
                         TaskContinuationOptions.OnlyOnCanceled | TaskContinuationOptions.ExecuteSynchronously
                     );
                 }
+                catch (Management.EverythingIsDoneException) { }
                 catch (Exception exception) { HandleException(exception); }
             }
         }
