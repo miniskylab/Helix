@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Concurrent;
+using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Helix.Core;
 using Helix.Crawler.Abstractions;
 
@@ -7,15 +10,18 @@ namespace Helix.Crawler
 {
     public sealed class Management : IManagement
     {
-        readonly CancellationTokenSource _cancellationTokenSource;
+        CancellationTokenSource _cancellationTokenSource;
+        readonly object _extractionSyncRoot = new object();
         readonly IMemory _memory;
         int _pendingExtractionTaskCount;
         int _pendingRenderingTaskCount;
         int _pendingVerificationTaskCount;
-        static readonly object ExtractionSyncRoot = new object();
-        static readonly object RenderingSyncRoot = new object();
-        static readonly object SyncRoot = new object();
-        static readonly object VerificationSyncRoot = new object();
+        BlockingCollection<IRawResourceExtractor> _rawResourceExtractorPool;
+        BlockingCollection<IRawResourceVerifier> _rawResourceVerifierPool;
+        readonly object _renderingSyncRoot = new object();
+        readonly object _syncRoot = new object();
+        readonly object _verificationSyncRoot = new object();
+        BlockingCollection<IWebBrowser> _webBrowserPool;
 
         public CrawlerState CrawlerState { get; private set; } = CrawlerState.Ready;
 
@@ -25,9 +31,9 @@ namespace Helix.Crawler
         {
             get
             {
-                lock (ExtractionSyncRoot)
-                lock (RenderingSyncRoot)
-                lock (VerificationSyncRoot)
+                lock (_extractionSyncRoot)
+                lock (_renderingSyncRoot)
+                lock (_verificationSyncRoot)
                 {
                     var noMoreToBeExtractedHtmlDocuments = _memory.ToBeExtractedHtmlDocumentCount == 0;
                     var noMoreToBeRenderedUris = _memory.ToBeRenderedUriCount == 0;
@@ -46,6 +52,9 @@ namespace Helix.Crawler
         {
             _memory = memory;
             _cancellationTokenSource = new CancellationTokenSource();
+            _rawResourceExtractorPool = new BlockingCollection<IRawResourceExtractor>();
+            _rawResourceVerifierPool = new BlockingCollection<IRawResourceVerifier>();
+            _webBrowserPool = new BlockingCollection<IWebBrowser>();
         }
 
         public void CancelEverything()
@@ -54,97 +63,171 @@ namespace Helix.Crawler
             while (_pendingExtractionTaskCount + _pendingRenderingTaskCount + _pendingVerificationTaskCount > 0) Thread.Sleep(100);
         }
 
-        public HtmlDocument InterlockedTakeToBeExtractedHtmlDocument()
+        public void Dispose()
+        {
+            ReleaseUnmanagedResources();
+            GC.SuppressFinalize(this);
+        }
+
+        public void EnsureResources()
+        {
+            InitializeRawResourceExtractorPool();
+            InitializeRawResourceVerifierPool();
+            InitializeWebBrowserPool();
+
+            void InitializeRawResourceExtractorPool()
+            {
+                const int rawResourceExtractorCount = 300;
+                for (var rawResourceExtractorId = 0; rawResourceExtractorId < rawResourceExtractorCount; rawResourceExtractorId++)
+                {
+                    if (CancellationToken.IsCancellationRequested)
+                        throw new OperationCanceledException(CancellationToken);
+
+                    var rawResourceExtractor = ServiceLocator.Get<IRawResourceExtractor>();
+                    rawResourceExtractor.OnIdle += () => _rawResourceExtractorPool.Add(rawResourceExtractor, CancellationToken);
+                    _rawResourceExtractorPool.Add(rawResourceExtractor, CancellationToken);
+                }
+            }
+            void InitializeRawResourceVerifierPool()
+            {
+                const int rawResourceVerifierCount = 2500;
+                for (var rawResourceVerifierId = 0; rawResourceVerifierId < rawResourceVerifierCount; rawResourceVerifierId++)
+                {
+                    if (CancellationToken.IsCancellationRequested)
+                        throw new OperationCanceledException(CancellationToken);
+
+                    var rawResourceVerifier = ServiceLocator.Get<IRawResourceVerifier>();
+                    rawResourceVerifier.OnIdle += () => _rawResourceVerifierPool.Add(rawResourceVerifier, CancellationToken);
+                    _rawResourceVerifierPool.Add(rawResourceVerifier, CancellationToken);
+                }
+            }
+            void InitializeWebBrowserPool()
+            {
+                Parallel.For(0, _memory.Configurations.WebBrowserCount, webBrowserId =>
+                {
+                    if (CancellationToken.IsCancellationRequested)
+                        throw new OperationCanceledException(CancellationToken);
+
+                    var webBrowser = ServiceLocator.Get<IWebBrowser>();
+                    webBrowser.OnIdle += () => _webBrowserPool.Add(webBrowser, CancellationToken);
+                    webBrowser.OnRawResourceCaptured += rawResource => _memory.Memorize(rawResource, CancellationToken);
+                    _webBrowserPool.Add(webBrowser, CancellationToken);
+                });
+            }
+        }
+
+        public void InterlockedCoordinate(out IRawResourceExtractor rawResourceExtractor, out HtmlDocument toBeExtractedHtmlDocument)
         {
             while (!EverythingIsDone && !CancellationToken.IsCancellationRequested)
             {
-                Monitor.Enter(ExtractionSyncRoot);
+                Monitor.Enter(_extractionSyncRoot);
                 if (_pendingExtractionTaskCount >= 300)
                 {
-                    Monitor.Exit(ExtractionSyncRoot);
+                    Monitor.Exit(_extractionSyncRoot);
                     Thread.Sleep(100);
                     continue;
                 }
 
                 _pendingExtractionTaskCount++;
-                if (!_memory.TryTakeToBeExtractedHtmlDocument(out var toBeExtractedHtmlDocument))
+                if (!_memory.TryTakeToBeExtractedHtmlDocument(out toBeExtractedHtmlDocument))
                 {
                     _pendingExtractionTaskCount--;
-                    Monitor.Exit(ExtractionSyncRoot);
+                    Monitor.Exit(_extractionSyncRoot);
                     Thread.Sleep(100);
                     continue;
                 }
-                Monitor.Exit(ExtractionSyncRoot);
-                return toBeExtractedHtmlDocument;
+                Monitor.Exit(_extractionSyncRoot);
+
+                try { rawResourceExtractor = _rawResourceExtractorPool.Take(CancellationToken); }
+                catch (OperationCanceledException)
+                {
+                    _pendingExtractionTaskCount--;
+                    throw;
+                }
+                return;
             }
             throw new OperationCanceledException(CancellationToken);
         }
 
-        public Uri InterlockedTakeToBeRenderedUri()
+        public void InterlockedCoordinate(out IWebBrowser webBrowser, out Uri toBeRenderedUri)
         {
             while (!EverythingIsDone && !CancellationToken.IsCancellationRequested)
             {
-                Monitor.Enter(RenderingSyncRoot);
+                Monitor.Enter(_renderingSyncRoot);
                 if (_pendingRenderingTaskCount >= 300)
                 {
-                    Monitor.Exit(RenderingSyncRoot);
+                    Monitor.Exit(_renderingSyncRoot);
                     Thread.Sleep(100);
                     continue;
                 }
 
                 _pendingRenderingTaskCount++;
-                if (!_memory.TryTakeToBeRenderedUri(out var toBeRenderedUri))
+                if (!_memory.TryTakeToBeRenderedUri(out toBeRenderedUri))
                 {
                     _pendingRenderingTaskCount--;
-                    Monitor.Exit(RenderingSyncRoot);
+                    Monitor.Exit(_renderingSyncRoot);
                     Thread.Sleep(100);
                     continue;
                 }
-                Monitor.Exit(RenderingSyncRoot);
-                return toBeRenderedUri;
+                Monitor.Exit(_renderingSyncRoot);
+
+                try { webBrowser = _webBrowserPool.Take(CancellationToken); }
+                catch (OperationCanceledException)
+                {
+                    _pendingRenderingTaskCount--;
+                    throw;
+                }
+                return;
             }
             throw new OperationCanceledException(CancellationToken);
         }
 
-        public RawResource InterlockedTakeToBeVerifiedRawResource()
+        public void InterlockedCoordinate(out IRawResourceVerifier rawResourceVerifier, out RawResource toBeVerifiedRawResource)
         {
             while (!EverythingIsDone && !CancellationToken.IsCancellationRequested)
             {
-                Monitor.Enter(VerificationSyncRoot);
+                Monitor.Enter(_verificationSyncRoot);
                 if (_pendingVerificationTaskCount >= 400)
                 {
-                    Monitor.Exit(VerificationSyncRoot);
+                    Monitor.Exit(_verificationSyncRoot);
                     Thread.Sleep(100);
                     continue;
                 }
 
                 _pendingVerificationTaskCount++;
-                if (!_memory.TryTakeToBeVerifiedRawResource(out var toBeVerifiedRawResource))
+                if (!_memory.TryTakeToBeVerifiedRawResource(out toBeVerifiedRawResource))
                 {
                     _pendingVerificationTaskCount--;
-                    Monitor.Exit(VerificationSyncRoot);
+                    Monitor.Exit(_verificationSyncRoot);
                     Thread.Sleep(100);
                     continue;
                 }
-                Monitor.Exit(VerificationSyncRoot);
-                return toBeVerifiedRawResource;
+                Monitor.Exit(_verificationSyncRoot);
+
+                try { rawResourceVerifier = _rawResourceVerifierPool.Take(CancellationToken); }
+                catch (OperationCanceledException)
+                {
+                    _pendingVerificationTaskCount--;
+                    throw;
+                }
+                return;
             }
             throw new OperationCanceledException(CancellationToken);
         }
 
         public void OnRawResourceExtractionTaskCompleted()
         {
-            lock (ExtractionSyncRoot) _pendingExtractionTaskCount--;
+            lock (_extractionSyncRoot) _pendingExtractionTaskCount--;
         }
 
         public void OnRawResourceVerificationTaskCompleted()
         {
-            lock (VerificationSyncRoot) _pendingVerificationTaskCount--;
+            lock (_verificationSyncRoot) _pendingVerificationTaskCount--;
         }
 
         public void OnUriRenderingTaskCompleted()
         {
-            lock (RenderingSyncRoot) _pendingRenderingTaskCount--;
+            lock (_renderingSyncRoot) _pendingRenderingTaskCount--;
         }
 
         public bool TryTransitTo(CrawlerState crawlerState)
@@ -153,28 +236,28 @@ namespace Helix.Crawler
             switch (crawlerState)
             {
                 case CrawlerState.Ready:
-                    lock (SyncRoot)
+                    lock (_syncRoot)
                     {
                         if (CrawlerState != CrawlerState.Stopping) return false;
                         CrawlerState = CrawlerState.Ready;
                         return true;
                     }
                 case CrawlerState.Working:
-                    lock (SyncRoot)
+                    lock (_syncRoot)
                     {
                         if (CrawlerState != CrawlerState.Ready && CrawlerState != CrawlerState.Paused) return false;
                         CrawlerState = CrawlerState.Working;
                         return true;
                     }
                 case CrawlerState.Stopping:
-                    lock (SyncRoot)
+                    lock (_syncRoot)
                     {
                         if (CrawlerState != CrawlerState.Working && CrawlerState != CrawlerState.Paused) return false;
                         CrawlerState = CrawlerState.Stopping;
                         return true;
                     }
                 case CrawlerState.Paused:
-                    lock (SyncRoot)
+                    lock (_syncRoot)
                     {
                         if (CrawlerState != CrawlerState.Working) return false;
                         CrawlerState = CrawlerState.Paused;
@@ -187,6 +270,26 @@ namespace Helix.Crawler
             }
         }
 
-        ~Management() { _cancellationTokenSource?.Dispose(); }
+        void ReleaseUnmanagedResources()
+        {
+            lock (_syncRoot)
+            {
+                while (_rawResourceVerifierPool?.Any() ?? false) _rawResourceVerifierPool.Take().Dispose();
+                while (_rawResourceExtractorPool?.Any() ?? false) _rawResourceExtractorPool.Take();
+                while (_webBrowserPool?.Any() ?? false) _webBrowserPool.Take().Dispose();
+
+                _cancellationTokenSource?.Dispose();
+                _rawResourceExtractorPool?.Dispose();
+                _rawResourceVerifierPool?.Dispose();
+                _webBrowserPool?.Dispose();
+
+                _cancellationTokenSource = null;
+                _rawResourceExtractorPool = null;
+                _rawResourceVerifierPool = null;
+                _webBrowserPool = null;
+            }
+        }
+
+        ~Management() { ReleaseUnmanagedResources(); }
     }
 }

@@ -32,17 +32,9 @@ namespace Helix.Gui
             {
                 if (CrawlerBot.Management != null && CrawlerBot.Management.CrawlerState != CrawlerState.Ready) return;
                 var configurations = new Configurations(configurationJsonString);
-                CrawlerBot.OnWebBrowserOpened += openedWebBrowserCount =>
+                CrawlerBot.OnStopped += everythingIsDone =>
                 {
-                    RedrawGui($"Opening web browsers ... ({openedWebBrowserCount}/{configurations.WebBrowserCount})");
-                };
-                CrawlerBot.OnWebBrowserClosed += closedWebBrowserCount =>
-                {
-                    RedrawGui($"Closing web browsers ... ({closedWebBrowserCount}/{configurations.WebBrowserCount})");
-                };
-                CrawlerBot.OnStopped += isAllWorkDone =>
-                {
-                    RedrawGui(isAllWorkDone ? "Done." : "Stopped.");
+                    RedrawGui(everythingIsDone ? "Done." : "Stopped.");
                     Stopwatch.Stop();
                 };
                 CrawlerBot.OnResourceVerified += verificationResult => Task.Run(() =>
@@ -59,7 +51,6 @@ namespace Helix.Gui
                 Stopwatch.Stop();
                 CrawlerBot.StopWorking();
                 Task.WhenAll(BackgroundTasks).Wait();
-                CrawlerBot.Dispose();
                 ManualResetEvent.Set();
             });
             GuiProcess.Start();

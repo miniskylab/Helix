@@ -34,7 +34,7 @@ namespace Helix.Crawler.Specifications
                 new List<RawResource>
                 {
                     new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://www.helix.com/anything" },
-                    new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://www.sanity.com" },
+                    new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://www.sanity.com" }
                 }
             );
             AddTheoryDescription(
@@ -46,7 +46,7 @@ namespace Helix.Crawler.Specifications
                 new List<RawResource>
                 {
                     new RawResource { ParentUri = new Uri("https://www.helix.com"), Url = "https://www.helix.com/anything" },
-                    new RawResource { ParentUri = new Uri("https://www.helix.com"), Url = "https://www.sanity.com" },
+                    new RawResource { ParentUri = new Uri("https://www.helix.com"), Url = "https://www.sanity.com" }
                 }
             );
         }
@@ -68,7 +68,7 @@ namespace Helix.Crawler.Specifications
                 new List<RawResource>
                 {
                     new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://www.sanity.com/" },
-                    new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://192.168.1.2" },
+                    new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://192.168.1.2" }
                 }
             );
         }

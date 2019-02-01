@@ -3,7 +3,7 @@ using System.Threading;
 
 namespace Helix.Crawler.Abstractions
 {
-    public interface IManagement
+    public interface IManagement : IDisposable
     {
         CancellationToken CancellationToken { get; }
 
@@ -15,11 +15,13 @@ namespace Helix.Crawler.Abstractions
 
         void CancelEverything();
 
-        HtmlDocument InterlockedTakeToBeExtractedHtmlDocument();
+        void EnsureResources();
 
-        Uri InterlockedTakeToBeRenderedUri();
+        void InterlockedCoordinate(out IRawResourceExtractor rawResourceExtractor, out HtmlDocument toBeExtractedHtmlDocument);
 
-        RawResource InterlockedTakeToBeVerifiedRawResource();
+        void InterlockedCoordinate(out IWebBrowser webBrowser, out Uri toBeRenderedUri);
+
+        void InterlockedCoordinate(out IRawResourceVerifier rawResourceVerifier, out RawResource toBeVerifiedRawResource);
 
         void OnRawResourceExtractionTaskCompleted();
 
