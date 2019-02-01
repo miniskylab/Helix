@@ -30,8 +30,9 @@ namespace Helix.Gui
 
             IpcSocket.On("btn-start-clicked", configurationJsonString =>
             {
-                if (CrawlerBot.Management != null && CrawlerBot.Management.CrawlerState != CrawlerState.Ready) return;
+                if (CrawlerBot.CrawlerState != CrawlerState.Ready) return;
                 var configurations = new Configurations(configurationJsonString);
+                RedrawGui("Initializing ...");
                 CrawlerBot.OnStopped += everythingIsDone =>
                 {
                     RedrawGui(everythingIsDone ? "Done." : "Stopped.");
@@ -40,7 +41,7 @@ namespace Helix.Gui
                 CrawlerBot.OnResourceVerified += verificationResult => Task.Run(() =>
                 {
                     RedrawGui($"{verificationResult.HttpStatusCode} - {verificationResult.RawResource.Url}");
-                });
+                }, CrawlerBot.CancellationToken);
                 CrawlerBot.OnExceptionOccurred += exception => { RedrawGui(exception.Message); };
                 CrawlerBot.StartWorking(configurations);
                 RedrawGuiEvery(TimeSpan.FromSeconds(1));
@@ -48,7 +49,7 @@ namespace Helix.Gui
             });
             IpcSocket.On("btn-close-clicked", _ =>
             {
-                Stopwatch.Stop();
+                RedrawGui("Shutting down ...");
                 CrawlerBot.StopWorking();
                 Task.WhenAll(BackgroundTasks).Wait();
                 ManualResetEvent.Set();
@@ -56,6 +57,7 @@ namespace Helix.Gui
             GuiProcess.Start();
 
             ManualResetEvent.WaitOne();
+            Stopwatch.Stop();
             IpcSocket.Dispose();
             GuiProcess.Close();
         }
@@ -67,11 +69,11 @@ namespace Helix.Gui
                 Text = "redraw",
                 Payload = JsonConvert.SerializeObject(new ViewModel
                 {
-                    CrawlerState = CrawlerBot.Management.CrawlerState,
+                    CrawlerState = CrawlerBot.CrawlerState,
                     VerifiedUrlCount = null,
                     ValidUrlCount = null,
                     BrokenUrlCount = null,
-                    RemainingUrlCount = CrawlerBot.Management.RemainingUrlCount,
+                    RemainingUrlCount = CrawlerBot.RemainingUrlCount,
                     ElapsedTime = Stopwatch.Elapsed.ToString("hh' : 'mm' : 'ss"),
                     StatusText = statusText
                 })
@@ -82,12 +84,12 @@ namespace Helix.Gui
         {
             BackgroundTasks.Add(Task.Run(() =>
             {
-                while (!CrawlerBot.Management.CancellationToken.IsCancellationRequested)
+                while (CrawlerBot.CrawlerState != CrawlerState.Ready)
                 {
                     RedrawGui();
                     Thread.Sleep(timeSpan);
                 }
-            }, CrawlerBot.Management.CancellationToken));
+            }));
         }
 
         [DllImport("user32.dll")]

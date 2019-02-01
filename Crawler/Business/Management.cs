@@ -45,7 +45,9 @@ namespace Helix.Crawler
             }
         }
 
-        public int RemainingUrlCount => _pendingVerificationTaskCount + _memory.ToBeVerifiedRawResourceCount;
+        public int RemainingUrlCount => _pendingExtractionTaskCount + _pendingRenderingTaskCount + _pendingVerificationTaskCount +
+                                        _memory.ToBeExtractedHtmlDocumentCount + _memory.ToBeRenderedUriCount +
+                                        _memory.ToBeVerifiedRawResourceCount;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public Management(IMemory memory)
@@ -60,13 +62,17 @@ namespace Helix.Crawler
         public void CancelEverything()
         {
             _cancellationTokenSource.Cancel();
-            while (_pendingExtractionTaskCount + _pendingRenderingTaskCount + _pendingVerificationTaskCount > 0) Thread.Sleep(100);
+            _memory.Clear();
+            while (!EverythingIsDone) Thread.Sleep(100);
         }
 
         public void Dispose()
         {
-            ReleaseUnmanagedResources();
-            GC.SuppressFinalize(this);
+            lock (_syncRoot)
+            {
+                ReleaseUnmanagedResources();
+                GC.SuppressFinalize(this);
+            }
         }
 
         public void EnsureResources()
@@ -272,22 +278,19 @@ namespace Helix.Crawler
 
         void ReleaseUnmanagedResources()
         {
-            lock (_syncRoot)
-            {
-                while (_rawResourceVerifierPool?.Any() ?? false) _rawResourceVerifierPool.Take().Dispose();
-                while (_rawResourceExtractorPool?.Any() ?? false) _rawResourceExtractorPool.Take();
-                while (_webBrowserPool?.Any() ?? false) _webBrowserPool.Take().Dispose();
+            while (_rawResourceVerifierPool?.Any() ?? false) _rawResourceVerifierPool.Take().Dispose();
+            while (_rawResourceExtractorPool?.Any() ?? false) _rawResourceExtractorPool.Take();
+            while (_webBrowserPool?.Any() ?? false) _webBrowserPool.Take().Dispose();
 
-                _cancellationTokenSource?.Dispose();
-                _rawResourceExtractorPool?.Dispose();
-                _rawResourceVerifierPool?.Dispose();
-                _webBrowserPool?.Dispose();
+            _cancellationTokenSource?.Dispose();
+            _rawResourceExtractorPool?.Dispose();
+            _rawResourceVerifierPool?.Dispose();
+            _webBrowserPool?.Dispose();
 
-                _cancellationTokenSource = null;
-                _rawResourceExtractorPool = null;
-                _rawResourceVerifierPool = null;
-                _webBrowserPool = null;
-            }
+            _cancellationTokenSource = null;
+            _rawResourceExtractorPool = null;
+            _rawResourceVerifierPool = null;
+            _webBrowserPool = null;
         }
 
         ~Management() { ReleaseUnmanagedResources(); }

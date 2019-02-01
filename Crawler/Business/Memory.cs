@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
-using System.IO;
-using System.Reflection;
+using System.Linq;
 using System.Threading;
 using Helix.Core;
 using Helix.Crawler.Abstractions;
@@ -11,14 +10,12 @@ namespace Helix.Crawler
     public sealed class Memory : IMemory
     {
         readonly ConcurrentSet<string> _alreadyVerifiedUrls = new ConcurrentSet<string>();
+        readonly object _syncRoot = new object();
         readonly BlockingCollection<HtmlDocument> _toBeExtractedHtmlDocuments = new BlockingCollection<HtmlDocument>(100000);
         readonly BlockingCollection<Uri> _toBeRenderedUris = new BlockingCollection<Uri>(100000);
         readonly BlockingCollection<RawResource> _toBeVerifiedRawResources = new BlockingCollection<RawResource>(100000);
-        static readonly object SyncRoot = new object();
 
         public Configurations Configurations { get; }
-
-        public string ErrorLogFilePath { get; }
 
         public int ToBeExtractedHtmlDocumentCount => _toBeExtractedHtmlDocuments.Count;
 
@@ -30,7 +27,6 @@ namespace Helix.Crawler
         public Memory(Configurations configurations)
         {
             Configurations = configurations;
-            ErrorLogFilePath = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "helix_errors.log");
             _alreadyVerifiedUrls.Clear();
             _alreadyVerifiedUrls.Add(Configurations.StartUri.AbsoluteUri);
             _toBeVerifiedRawResources.Add(
@@ -42,9 +38,20 @@ namespace Helix.Crawler
             );
         }
 
+        public void Clear()
+        {
+            lock (_syncRoot)
+            {
+                _alreadyVerifiedUrls.Clear();
+                while (_toBeVerifiedRawResources.Any()) _toBeVerifiedRawResources.Take();
+            }
+            while (_toBeExtractedHtmlDocuments.Any()) _toBeExtractedHtmlDocuments.Take();
+            while (_toBeRenderedUris.Any()) _toBeRenderedUris.Take();
+        }
+
         public void Memorize(RawResource toBeVerifiedRawResource, CancellationToken cancellationToken)
         {
-            lock (SyncRoot)
+            lock (_syncRoot)
             {
                 if (_alreadyVerifiedUrls.Contains(toBeVerifiedRawResource.Url.StripFragment())) return;
                 _alreadyVerifiedUrls.Add(toBeVerifiedRawResource.Url.StripFragment());

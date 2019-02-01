@@ -9,7 +9,7 @@ namespace Helix.Crawler
 
         public static void Dispose()
         {
-            _serviceProvider.Dispose();
+            _serviceProvider?.Dispose();
             _serviceProvider = null;
         }
 

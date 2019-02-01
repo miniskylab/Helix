@@ -61,7 +61,7 @@ namespace Helix.Crawler
             {
                 try
                 {
-                    if (!TryGoToUri(uri, 3, cancellationToken))
+                    if (!TryGoToUri(3))
                     {
                         onFailed.Invoke(new TimeoutException(renderingFailedErrorMessage));
                         return false;
@@ -79,28 +79,60 @@ namespace Helix.Crawler
                 }
                 finally { OnIdle?.Invoke(); }
             }
-        }
 
-        void DisableNetwork()
-        {
-            _chromeDriver.NetworkConditions = new ChromeNetworkConditions
+            bool TryGetPageSource(out string pageSource)
             {
-                IsOffline = true,
-                Latency = TimeSpan.FromTicks(1),
-                UploadThroughput = long.MaxValue,
-                DownloadThroughput = long.MaxValue
-            };
-        }
+                try { pageSource = _chromeDriver.PageSource; }
+                catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
+                {
+                    pageSource = null;
+                    return false;
+                }
+                return true;
+            }
+            bool TryGoToUri(int attemptCount)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                EnableNetwork();
+                for (var attemptNo = 0; attemptNo < attemptCount; attemptNo++)
+                {
+                    try
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        _chromeDriver.Navigate().GoToUrl(uri);
+                        break;
+                    }
+                    catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
+                    {
+                        Restart();
+                        if (attemptNo < attemptCount) continue;
+                        return false;
+                    }
+                }
+                DisableNetwork();
+                return true;
 
-        void EnableNetwork()
-        {
-            _chromeDriver.NetworkConditions = new ChromeNetworkConditions
-            {
-                IsOffline = false,
-                Latency = TimeSpan.FromTicks(1),
-                UploadThroughput = long.MaxValue,
-                DownloadThroughput = long.MaxValue
-            };
+                void DisableNetwork()
+                {
+                    _chromeDriver.NetworkConditions = new ChromeNetworkConditions
+                    {
+                        IsOffline = true,
+                        Latency = TimeSpan.FromTicks(1),
+                        UploadThroughput = long.MaxValue,
+                        DownloadThroughput = long.MaxValue
+                    };
+                }
+                void EnableNetwork()
+                {
+                    _chromeDriver.NetworkConditions = new ChromeNetworkConditions
+                    {
+                        IsOffline = false,
+                        Latency = TimeSpan.FromTicks(1),
+                        UploadThroughput = long.MaxValue,
+                        DownloadThroughput = long.MaxValue
+                    };
+                }
+            }
         }
 
         void ForceQuit()
@@ -220,40 +252,6 @@ namespace Helix.Crawler
         {
             return exception is WebDriverTimeoutException ||
                    exception.InnerException is WebException webException && webException.Status == WebExceptionStatus.Timeout;
-        }
-
-        bool TryGetPageSource(out string html)
-        {
-            try { html = _chromeDriver.PageSource; }
-            catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
-            {
-                html = null;
-                return false;
-            }
-            return true;
-        }
-
-        bool TryGoToUri(Uri uri, int attemptCount, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            EnableNetwork();
-            for (var attemptNo = 0; attemptNo < attemptCount; attemptNo++)
-            {
-                try
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    _chromeDriver.Navigate().GoToUrl(uri);
-                    break;
-                }
-                catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
-                {
-                    Restart();
-                    if (attemptNo < attemptCount) continue;
-                    return false;
-                }
-            }
-            DisableNetwork();
-            return true;
         }
 
         ~ChromiumWebBrowser() { ReleaseUnmanagedResources(); }

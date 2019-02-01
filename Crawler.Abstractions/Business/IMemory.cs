@@ -7,13 +7,13 @@ namespace Helix.Crawler.Abstractions
     {
         Configurations Configurations { get; }
 
-        string ErrorLogFilePath { get; }
-
         int ToBeExtractedHtmlDocumentCount { get; }
 
         int ToBeRenderedUriCount { get; }
 
         int ToBeVerifiedRawResourceCount { get; }
+
+        void Clear();
 
         void Memorize(RawResource toBeVerifiedRawResource, CancellationToken cancellationToken);
 

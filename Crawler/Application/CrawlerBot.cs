@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using Helix.Core;
 using Helix.Crawler.Abstractions;
@@ -10,34 +13,40 @@ namespace Helix.Crawler
 {
     public static class CrawlerBot
     {
-        public static IManagement Management;
         static FilePersistence _filePersistence;
+        static IManagement _management;
         static IMemory _memory;
         static readonly List<Task> BackgroundTasks;
 
-        public static event ExceptionOccurredEvent OnExceptionOccurred;
-        public static event ResourceVerifiedEvent OnResourceVerified;
-        public static event StoppedEvent OnStopped;
+        public static CancellationToken CancellationToken => _management?.CancellationToken ?? CancellationToken.None;
+
+        public static CrawlerState CrawlerState => _management?.CrawlerState ?? CrawlerState.Ready;
+
+        public static int RemainingUrlCount => _management?.RemainingUrlCount ?? 0;
+
+        public static event Action<Exception> OnExceptionOccurred;
+        public static event Func<VerificationResult, Task> OnResourceVerified;
+        public static event Action<bool> OnStopped;
 
         static CrawlerBot() { BackgroundTasks = new List<Task>(); }
 
         public static void StartWorking(Configurations configurations)
         {
             ServiceLocator.RegisterServices(configurations);
-            Management = ServiceLocator.Get<IManagement>();
+            _management = ServiceLocator.Get<IManagement>();
             _memory = ServiceLocator.Get<IMemory>();
 
-            if (!Management.TryTransitTo(CrawlerState.Working)) return;
+            if (!_management.TryTransitTo(CrawlerState.Working)) return;
             BackgroundTasks.Add(Task.Run(() =>
             {
                 try
                 {
                     EnsureErrorLogFileIsRecreated();
-                    Management.EnsureResources();
+                    _management.EnsureResources();
 
-                    var renderingTask = Task.Run(Render, Management.CancellationToken);
-                    var extractionTask = Task.Run(Extract, Management.CancellationToken);
-                    var verificationTask = Task.Run(Verify, Management.CancellationToken);
+                    var renderingTask = Task.Run(Render, _management.CancellationToken);
+                    var extractionTask = Task.Run(Extract, _management.CancellationToken);
+                    var verificationTask = Task.Run(Verify, _management.CancellationToken);
                     BackgroundTasks.Add(renderingTask);
                     BackgroundTasks.Add(extractionTask);
                     BackgroundTasks.Add(verificationTask);
@@ -45,38 +54,41 @@ namespace Helix.Crawler
                 }
                 catch (Exception exception) { HandleException(exception); }
                 finally { Task.Run(StopWorking); }
-            }, Management.CancellationToken));
+            }, _management.CancellationToken));
+
+            void EnsureErrorLogFileIsRecreated()
+            {
+                var errorLogFilePath = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "helix_errors.log");
+                _filePersistence = new FilePersistence(errorLogFilePath);
+                _filePersistence.WriteLineAsync(DateTime.Now.ToString(CultureInfo.InvariantCulture));
+            }
         }
 
         public static void StopWorking()
         {
-            if (!Management.TryTransitTo(CrawlerState.Stopping)) return;
-            var everythingIsDone = Management.EverythingIsDone;
-            Management.CancelEverything();
+            if (_management != null && !_management.TryTransitTo(CrawlerState.Stopping)) return;
+            var everythingIsDone = _management?.EverythingIsDone ?? false;
+
+            _management?.CancelEverything();
             try { Task.WhenAll(BackgroundTasks).Wait(); }
             catch (Exception exception) { HandleException(exception); }
+
             ReportWriter.Instance.Dispose();
-            Management.Dispose();
+            _management?.Dispose();
+            _filePersistence?.Dispose();
             ServiceLocator.Dispose();
-            _filePersistence.Dispose();
 
-            Management.TryTransitTo(CrawlerState.Ready);
+            _management?.TryTransitTo(CrawlerState.Ready);
             OnStopped?.Invoke(everythingIsDone);
-        }
-
-        static void EnsureErrorLogFileIsRecreated()
-        {
-            _filePersistence = new FilePersistence(_memory.ErrorLogFilePath);
-            _filePersistence.WriteLineAsync(DateTime.Now.ToString(CultureInfo.InvariantCulture));
         }
 
         static void Extract()
         {
-            while (!Management.EverythingIsDone && !Management.CancellationToken.IsCancellationRequested)
+            while (!_management.EverythingIsDone && !_management.CancellationToken.IsCancellationRequested)
             {
                 try
                 {
-                    Management.InterlockedCoordinate(out IRawResourceExtractor rawResourceExtractor, out var toBeExtractedHtmlDocument);
+                    _management.InterlockedCoordinate(out IRawResourceExtractor rawResourceExtractor, out var toBeExtractedHtmlDocument);
                     Task.Run(
                         () =>
                         {
@@ -84,15 +96,15 @@ namespace Helix.Crawler
                             {
                                 rawResourceExtractor.ExtractRawResourcesFrom(
                                     toBeExtractedHtmlDocument,
-                                    rawResource => _memory.Memorize(rawResource, Management.CancellationToken)
+                                    rawResource => _memory.Memorize(rawResource, _management.CancellationToken)
                                 );
                             }
                             catch (OperationCanceledException operationCanceledException) { HandleException(operationCanceledException); }
-                            finally { Management.OnRawResourceExtractionTaskCompleted(); }
+                            finally { _management.OnRawResourceExtractionTaskCompleted(); }
                         },
-                        Management.CancellationToken
+                        _management.CancellationToken
                     ).ContinueWith(
-                        _ => Management.OnRawResourceExtractionTaskCompleted(),
+                        _ => _management.OnRawResourceExtractionTaskCompleted(),
                         TaskContinuationOptions.OnlyOnCanceled | TaskContinuationOptions.ExecuteSynchronously
                     );
                 }
@@ -122,30 +134,30 @@ namespace Helix.Crawler
 
         static void Render()
         {
-            while (!Management.EverythingIsDone && !Management.CancellationToken.IsCancellationRequested)
+            while (!_management.EverythingIsDone && !_management.CancellationToken.IsCancellationRequested)
             {
                 try
                 {
-                    Management.InterlockedCoordinate(out IWebBrowser webBrowser, out var toBeRenderedUri);
+                    _management.InterlockedCoordinate(out IWebBrowser webBrowser, out var toBeRenderedUri);
                     Task.Run(
                         () =>
                         {
                             try
                             {
                                 void OnFailed(Exception exception) => HandleException(exception);
-                                if (webBrowser.TryRender(toBeRenderedUri, OnFailed, Management.CancellationToken, out var htmlText))
+                                if (webBrowser.TryRender(toBeRenderedUri, OnFailed, _management.CancellationToken, out var htmlText))
                                     _memory.Memorize(new HtmlDocument
                                     {
                                         Uri = toBeRenderedUri,
                                         Text = htmlText
-                                    }, Management.CancellationToken);
+                                    }, _management.CancellationToken);
                             }
                             catch (OperationCanceledException operationCanceledException) { HandleException(operationCanceledException); }
-                            finally { Management.OnUriRenderingTaskCompleted(); }
+                            finally { _management.OnUriRenderingTaskCompleted(); }
                         },
-                        Management.CancellationToken
+                        _management.CancellationToken
                     ).ContinueWith(
-                        _ => Management.OnUriRenderingTaskCompleted(),
+                        _ => _management.OnUriRenderingTaskCompleted(),
                         TaskContinuationOptions.OnlyOnCanceled | TaskContinuationOptions.ExecuteSynchronously
                     );
                 }
@@ -156,11 +168,11 @@ namespace Helix.Crawler
         static void Verify()
         {
             var resourceScope = ServiceLocator.Get<IResourceScope>();
-            while (!Management.EverythingIsDone && !Management.CancellationToken.IsCancellationRequested)
+            while (!_management.EverythingIsDone && !_management.CancellationToken.IsCancellationRequested)
             {
                 try
                 {
-                    Management.InterlockedCoordinate(out IRawResourceVerifier rawResourceVerifier, out var toBeVerifiedRawResource);
+                    _management.InterlockedCoordinate(out IRawResourceVerifier rawResourceVerifier, out var toBeVerifiedRawResource);
                     Task.Run(
                         () =>
                         {
@@ -182,24 +194,19 @@ namespace Helix.Crawler
                                 var isNotBroken = !verificationResult.IsBrokenResource;
                                 var isInternal = verificationResult.IsInternalResource;
                                 if (resourceExists && isExtracted && isNotBroken && isInternal)
-                                    _memory.Memorize(verifiedResource.Uri, Management.CancellationToken);
+                                    _memory.Memorize(verifiedResource.Uri, _management.CancellationToken);
                             }
                             catch (OperationCanceledException operationCanceledException) { HandleException(operationCanceledException); }
-                            finally { Management.OnRawResourceVerificationTaskCompleted(); }
+                            finally { _management.OnRawResourceVerificationTaskCompleted(); }
                         },
-                        Management.CancellationToken
+                        _management.CancellationToken
                     ).ContinueWith(
-                        _ => Management.OnRawResourceVerificationTaskCompleted(),
+                        _ => _management.OnRawResourceVerificationTaskCompleted(),
                         TaskContinuationOptions.OnlyOnCanceled | TaskContinuationOptions.ExecuteSynchronously
                     );
                 }
                 catch (Exception exception) { HandleException(exception); }
             }
         }
-
-        // TODO: Clean-up
-        public delegate void ExceptionOccurredEvent(Exception exception);
-        public delegate Task ResourceVerifiedEvent(VerificationResult verificationResult);
-        public delegate void StoppedEvent(bool isAllWorkDone = false);
     }
 }
