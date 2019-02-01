@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -73,8 +74,13 @@ namespace Helix.Crawler
             try { Task.WhenAll(BackgroundTasks).Wait(); }
             catch (Exception exception) { HandleException(exception); }
 
+            if (_management != null)
+            {
+                _management.OnOrphanedResourcesDetected += errorMessage => HandleException(new WarningException(errorMessage));
+                _management.Dispose();
+            }
+
             ReportWriter.Instance.Dispose();
-            _management?.Dispose();
             _filePersistence?.Dispose();
             ServiceLocator.Dispose();
 

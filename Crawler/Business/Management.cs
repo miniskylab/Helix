@@ -10,6 +10,8 @@ namespace Helix.Crawler
 {
     public sealed class Management : IManagement
     {
+        const int RawResourceExtractorCount = 300;
+        const int RawResourceVerifierCount = 2500;
         CancellationTokenSource _cancellationTokenSource;
         readonly object _extractionSyncRoot = new object();
         readonly IMemory _memory;
@@ -49,6 +51,8 @@ namespace Helix.Crawler
                                         _memory.ToBeExtractedHtmlDocumentCount + _memory.ToBeRenderedUriCount +
                                         _memory.ToBeVerifiedRawResourceCount;
 
+        public event Action<string> OnOrphanedResourcesDetected;
+
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public Management(IMemory memory)
         {
@@ -83,8 +87,7 @@ namespace Helix.Crawler
 
             void InitializeRawResourceExtractorPool()
             {
-                const int rawResourceExtractorCount = 300;
-                for (var rawResourceExtractorId = 0; rawResourceExtractorId < rawResourceExtractorCount; rawResourceExtractorId++)
+                for (var rawResourceExtractorId = 0; rawResourceExtractorId < RawResourceExtractorCount; rawResourceExtractorId++)
                 {
                     if (CancellationToken.IsCancellationRequested)
                         throw new OperationCanceledException(CancellationToken);
@@ -96,8 +99,7 @@ namespace Helix.Crawler
             }
             void InitializeRawResourceVerifierPool()
             {
-                const int rawResourceVerifierCount = 2500;
-                for (var rawResourceVerifierId = 0; rawResourceVerifierId < rawResourceVerifierCount; rawResourceVerifierId++)
+                for (var rawResourceVerifierId = 0; rawResourceVerifierId < RawResourceVerifierCount; rawResourceVerifierId++)
                 {
                     if (CancellationToken.IsCancellationRequested)
                         throw new OperationCanceledException(CancellationToken);
@@ -278,9 +280,12 @@ namespace Helix.Crawler
 
         void ReleaseUnmanagedResources()
         {
-            while (_rawResourceVerifierPool?.Any() ?? false) _rawResourceVerifierPool.Take().Dispose();
-            while (_rawResourceExtractorPool?.Any() ?? false) _rawResourceExtractorPool.Take();
-            while (_webBrowserPool?.Any() ?? false) _webBrowserPool.Take().Dispose();
+            var disposedRawResourceExtractorCount = 0;
+            var disposedRawResourceVerifierCount = 0;
+            var disposedWebBrowserCount = 0;
+            DisposeRawResourceExtractorPool();
+            DisposeRawResourceVerifierPool();
+            DisposeWebBrowserPool();
 
             _cancellationTokenSource?.Dispose();
             _rawResourceExtractorPool?.Dispose();
@@ -291,6 +296,67 @@ namespace Helix.Crawler
             _rawResourceExtractorPool = null;
             _rawResourceVerifierPool = null;
             _webBrowserPool = null;
+
+            CheckForOrphanedResources();
+
+            void DisposeRawResourceExtractorPool()
+            {
+                while (_rawResourceExtractorPool?.Any() ?? false)
+                {
+                    _rawResourceExtractorPool.Take();
+                    disposedRawResourceExtractorCount++;
+                }
+            }
+            void DisposeRawResourceVerifierPool()
+            {
+                while (_rawResourceVerifierPool?.Any() ?? false)
+                {
+                    _rawResourceVerifierPool.Take().Dispose();
+                    disposedRawResourceVerifierCount++;
+                }
+            }
+            void DisposeWebBrowserPool()
+            {
+                while (_webBrowserPool?.Any() ?? false)
+                {
+                    _webBrowserPool.Take().Dispose();
+                    disposedWebBrowserCount++;
+                }
+            }
+            void CheckForOrphanedResources()
+            {
+                var orphanedResourceErrorMessage = string.Empty;
+                if (disposedRawResourceExtractorCount != RawResourceExtractorCount)
+                    orphanedResourceErrorMessage += GetErrorMessage(
+                        RawResourceExtractorCount,
+                        nameof(RawResourceExtractor),
+                        disposedRawResourceExtractorCount
+                    );
+
+                if (disposedRawResourceVerifierCount != RawResourceVerifierCount)
+                    orphanedResourceErrorMessage += GetErrorMessage(
+                        RawResourceVerifierCount,
+                        nameof(RawResourceVerifier),
+                        disposedRawResourceVerifierCount
+                    );
+
+                if (disposedWebBrowserCount != _memory.Configurations.WebBrowserCount)
+                    orphanedResourceErrorMessage += GetErrorMessage(
+                        _memory.Configurations.WebBrowserCount,
+                        nameof(ChromiumWebBrowser),
+                        disposedWebBrowserCount
+                    );
+
+                if (string.IsNullOrEmpty(orphanedResourceErrorMessage)) return;
+                OnOrphanedResourcesDetected?.Invoke($"Orphaned resources detected!{orphanedResourceErrorMessage}");
+
+                string GetErrorMessage(int createdCount, string resourceName, int disposedCount)
+                {
+                    resourceName = $"{resourceName}{(createdCount > 1 ? "s" : string.Empty)}";
+                    var disposedCountText = disposedCount == 0 ? "none" : $"only {disposedCount}";
+                    return $" There were {createdCount} {resourceName} created but {disposedCountText} could be found and disposed.";
+                }
+            }
         }
 
         ~Management() { ReleaseUnmanagedResources(); }
