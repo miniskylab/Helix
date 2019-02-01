@@ -110,7 +110,7 @@ namespace Helix.Crawler
                         },
                         _management.CancellationToken
                     ).ContinueWith(
-                        _ => _management.OnRawResourceExtractionTaskCompleted(),
+                        _ => _management.OnRawResourceExtractionTaskCompleted(rawResourceExtractor, toBeExtractedHtmlDocument),
                         TaskContinuationOptions.OnlyOnCanceled | TaskContinuationOptions.ExecuteSynchronously
                     );
                 }
@@ -164,7 +164,7 @@ namespace Helix.Crawler
                         },
                         _management.CancellationToken
                     ).ContinueWith(
-                        _ => _management.OnUriRenderingTaskCompleted(),
+                        _ => _management.OnUriRenderingTaskCompleted(webBrowser, toBeRenderedUri),
                         TaskContinuationOptions.OnlyOnCanceled | TaskContinuationOptions.ExecuteSynchronously
                     );
                 }
@@ -209,7 +209,7 @@ namespace Helix.Crawler
                         },
                         _management.CancellationToken
                     ).ContinueWith(
-                        _ => _management.OnRawResourceVerificationTaskCompleted(),
+                        _ => _management.OnRawResourceVerificationTaskCompleted(rawResourceVerifier, toBeVerifiedRawResource),
                         TaskContinuationOptions.OnlyOnCanceled | TaskContinuationOptions.ExecuteSynchronously
                     );
                 }

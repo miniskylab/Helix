@@ -25,11 +25,13 @@ namespace Helix.Crawler.Abstractions
 
         void InterlockedCoordinate(out IRawResourceVerifier rawResourceVerifier, out RawResource toBeVerifiedRawResource);
 
-        void OnRawResourceExtractionTaskCompleted();
+        void OnRawResourceExtractionTaskCompleted(IRawResourceExtractor rawResourceExtractor = null,
+            HtmlDocument toBeExtractedHtmlDocument = null);
 
-        void OnRawResourceVerificationTaskCompleted();
+        void OnRawResourceVerificationTaskCompleted(IRawResourceVerifier rawResourceVerifier = null,
+            RawResource toBeVerifiedRawResource = null);
 
-        void OnUriRenderingTaskCompleted();
+        void OnUriRenderingTaskCompleted(IWebBrowser webBrowser = null, Uri toBeRenderedUri = null);
 
         bool TryTransitTo(CrawlerState crawlerState);
     }
