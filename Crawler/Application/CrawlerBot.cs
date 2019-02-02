@@ -1,32 +1,24 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Globalization;
-using System.IO;
-using System.Linq;
-using System.Reflection;
-using System.Threading;
 using System.Threading.Tasks;
-using Helix.Core;
 using Helix.Crawler.Abstractions;
+using Helix.Persistence.Abstractions;
 
 namespace Helix.Crawler
 {
     public static class CrawlerBot
     {
-        static FilePersistence _filePersistence;
+        static ILogger _logger;
         static IManagement _management;
         static IMemory _memory;
+        static IReportWriter _reportWriter;
         static readonly List<Task> BackgroundTasks;
-
-        public static CancellationToken CancellationToken => _management?.CancellationToken ?? CancellationToken.None;
 
         public static CrawlerState CrawlerState => _management?.CrawlerState ?? CrawlerState.Ready;
 
         public static int RemainingUrlCount => _management?.RemainingUrlCount ?? 0;
 
-        public static event Action<Exception> OnExceptionOccurred;
-        public static event Func<VerificationResult, Task> OnResourceVerified;
+        public static event Action<VerificationResult> OnResourceVerified;
         public static event Action<bool> OnStopped;
 
         static CrawlerBot() { BackgroundTasks = new List<Task>(); }
@@ -36,6 +28,7 @@ namespace Helix.Crawler
             ServiceLocator.RegisterServices(configurations);
             _management = ServiceLocator.Get<IManagement>();
             _memory = ServiceLocator.Get<IMemory>();
+            _reportWriter = ServiceLocator.Get<IReportWriter>();
 
             if (!_management.TryTransitTo(CrawlerState.Working)) return;
             BackgroundTasks.Add(Task.Run(() =>
@@ -43,7 +36,7 @@ namespace Helix.Crawler
                 try
                 {
                     EnsureErrorLogFileIsRecreated();
-                    _management.EnsureResources();
+                    _management.EnsureEnoughResources();
 
                     var renderingTask = Task.Run(Render, _management.CancellationToken);
                     var extractionTask = Task.Run(Extract, _management.CancellationToken);
@@ -53,15 +46,14 @@ namespace Helix.Crawler
                     BackgroundTasks.Add(verificationTask);
                     Task.WhenAll(renderingTask, extractionTask, verificationTask).Wait();
                 }
-                catch (Exception exception) { HandleException(exception); }
+                catch (Exception exception) { _logger.LogException(exception); }
                 finally { Task.Run(StopWorking); }
             }, _management.CancellationToken));
 
             void EnsureErrorLogFileIsRecreated()
             {
-                var errorLogFilePath = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "helix_errors.log");
-                _filePersistence = new FilePersistence(errorLogFilePath);
-                _filePersistence.WriteLineAsync(DateTime.Now.ToString(CultureInfo.InvariantCulture));
+                _logger = ServiceLocator.Get<ILogger>();
+                _logger.LogInfo("Started working ...");
             }
         }
 
@@ -72,16 +64,11 @@ namespace Helix.Crawler
 
             _management?.CancelEverything();
             try { Task.WhenAll(BackgroundTasks).Wait(); }
-            catch (Exception exception) { HandleException(exception); }
+            catch (Exception exception) { _logger.LogException(exception); }
 
-            if (_management != null)
-            {
-                _management.OnOrphanedResourcesDetected += errorMessage => HandleException(new WarningException(errorMessage));
-                _management.Dispose();
-            }
-
-            ReportWriter.Instance.Dispose();
-            _filePersistence?.Dispose();
+            _management?.Dispose();
+            _reportWriter?.Dispose();
+            _logger?.Dispose();
             ServiceLocator.Dispose();
 
             _management?.TryTransitTo(CrawlerState.Ready);
@@ -105,7 +92,10 @@ namespace Helix.Crawler
                                     rawResource => _memory.Memorize(rawResource, _management.CancellationToken)
                                 );
                             }
-                            catch (OperationCanceledException operationCanceledException) { HandleException(operationCanceledException); }
+                            catch (OperationCanceledException operationCanceledException)
+                            {
+                                _logger.LogException(operationCanceledException);
+                            }
                             finally { _management.OnRawResourceExtractionTaskCompleted(); }
                         },
                         _management.CancellationToken
@@ -115,28 +105,8 @@ namespace Helix.Crawler
                     );
                 }
                 catch (Management.EverythingIsDoneException) { }
-                catch (Exception exception) { HandleException(exception); }
+                catch (Exception exception) { _logger.LogException(exception); }
             }
-        }
-
-        static void HandleException(Exception exception)
-        {
-            switch (exception)
-            {
-                case OperationCanceledException operationCanceledException:
-                    if (operationCanceledException.CancellationToken.IsCancellationRequested) return;
-                    break;
-                case AggregateException aggregateException:
-                    var thereIsNoUnhandledInnerException = !aggregateException.InnerExceptions.Any(innerException =>
-                    {
-                        if (!(innerException is OperationCanceledException operationCanceledException)) return false;
-                        return !operationCanceledException.CancellationToken.IsCancellationRequested;
-                    });
-                    if (thereIsNoUnhandledInnerException) return;
-                    break;
-            }
-            _filePersistence.WriteLineAsync(exception.ToString());
-            OnExceptionOccurred?.Invoke(exception);
         }
 
         static void Render()
@@ -151,15 +121,18 @@ namespace Helix.Crawler
                         {
                             try
                             {
-                                void OnFailed(Exception exception) => HandleException(exception);
-                                if (webBrowser.TryRender(toBeRenderedUri, OnFailed, _management.CancellationToken, out var htmlText))
+                                Action<Exception> onFailed = _logger.LogException;
+                                if (webBrowser.TryRender(toBeRenderedUri, onFailed, _management.CancellationToken, out var htmlText))
                                     _memory.Memorize(new HtmlDocument
                                     {
                                         Uri = toBeRenderedUri,
                                         Text = htmlText
                                     }, _management.CancellationToken);
                             }
-                            catch (OperationCanceledException operationCanceledException) { HandleException(operationCanceledException); }
+                            catch (OperationCanceledException operationCanceledException)
+                            {
+                                _logger.LogException(operationCanceledException);
+                            }
                             finally { _management.OnUriRenderingTaskCompleted(); }
                         },
                         _management.CancellationToken
@@ -169,7 +142,7 @@ namespace Helix.Crawler
                     );
                 }
                 catch (Management.EverythingIsDoneException) { }
-                catch (Exception exception) { HandleException(exception); }
+                catch (Exception exception) { _logger.LogException(exception); }
             }
         }
 
@@ -193,8 +166,8 @@ namespace Helix.Crawler
                                 if (isStartUrl || !isOrphanedUrl)
                                 {
                                     // TODO: Investigate where those orphaned Uri-s came from.
-                                    ReportWriter.Instance.WriteReport(verificationResult, _memory.Configurations.ReportBrokenLinksOnly);
-                                    OnResourceVerified?.Invoke(verificationResult);
+                                    _reportWriter.WriteReport(verificationResult, _memory.Configurations.ReportBrokenLinksOnly);
+                                    Task.Run(() => { OnResourceVerified?.Invoke(verificationResult); }, _management.CancellationToken);
                                 }
 
                                 var resourceExists = verifiedResource != null;
@@ -204,7 +177,10 @@ namespace Helix.Crawler
                                 if (resourceExists && isExtracted && isNotBroken && isInternal)
                                     _memory.Memorize(verifiedResource.Uri, _management.CancellationToken);
                             }
-                            catch (OperationCanceledException operationCanceledException) { HandleException(operationCanceledException); }
+                            catch (OperationCanceledException operationCanceledException)
+                            {
+                                _logger.LogException(operationCanceledException);
+                            }
                             finally { _management.OnRawResourceVerificationTaskCompleted(); }
                         },
                         _management.CancellationToken
@@ -214,7 +190,7 @@ namespace Helix.Crawler
                     );
                 }
                 catch (Management.EverythingIsDoneException) { }
-                catch (Exception exception) { HandleException(exception); }
+                catch (Exception exception) { _logger.LogException(exception); }
             }
         }
     }

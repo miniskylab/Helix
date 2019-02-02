@@ -15,6 +15,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Crawler.Abstractions\Crawler.Abstractions.csproj" />
+        <ProjectReference Include="..\Persistence\Persistence.csproj" />
     </ItemGroup>
 
 </Project>

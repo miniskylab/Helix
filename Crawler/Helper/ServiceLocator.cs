@@ -1,4 +1,6 @@
 using Helix.Crawler.Abstractions;
+using Helix.Persistence;
+using Helix.Persistence.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Helix.Crawler
@@ -25,6 +27,9 @@ namespace Helix.Crawler
                 .AddTransient<IRawResourceVerifier, RawResourceVerifier>()
                 .AddTransient<IRawResourceProcessor, RawResourceProcessor>()
                 .AddTransient<IResourceScope, ResourceScope>()
+                .AddTransient<IPersistenceProvider, PersistenceProvider>()
+                .AddSingleton<ILogger, Logger>()
+                .AddSingleton<IReportWriter, ReportWriter>()
                 .AddSingleton<IMemory, Memory>()
                 .AddSingleton<IManagement, Management>()
                 .AddSingleton(configurations)

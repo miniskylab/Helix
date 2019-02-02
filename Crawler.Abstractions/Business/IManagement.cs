@@ -13,11 +13,9 @@ namespace Helix.Crawler.Abstractions
 
         int RemainingUrlCount { get; }
 
-        event Action<string> OnOrphanedResourcesDetected;
-
         void CancelEverything();
 
-        void EnsureResources();
+        void EnsureEnoughResources();
 
         void InterlockedCoordinate(out IRawResourceExtractor rawResourceExtractor, out HtmlDocument toBeExtractedHtmlDocument);
 

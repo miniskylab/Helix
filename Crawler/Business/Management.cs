@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Helix.Core;
 using Helix.Crawler.Abstractions;
+using Helix.Persistence.Abstractions;
 
 namespace Helix.Crawler
 {
@@ -14,6 +15,7 @@ namespace Helix.Crawler
         const int RawResourceVerifierCount = 2500;
         CancellationTokenSource _cancellationTokenSource;
         readonly object _extractionSyncRoot = new object();
+        readonly ILogger _logger;
         readonly IMemory _memory;
         int _pendingExtractionTaskCount;
         int _pendingRenderingTaskCount;
@@ -51,12 +53,11 @@ namespace Helix.Crawler
                                         _memory.ToBeExtractedHtmlDocumentCount + _memory.ToBeRenderedUriCount +
                                         _memory.ToBeVerifiedRawResourceCount;
 
-        public event Action<string> OnOrphanedResourcesDetected;
-
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public Management(IMemory memory)
+        public Management(IMemory memory, ILogger logger)
         {
             _memory = memory;
+            _logger = logger;
             _cancellationTokenSource = new CancellationTokenSource();
             _rawResourceExtractorPool = new BlockingCollection<IRawResourceExtractor>();
             _rawResourceVerifierPool = new BlockingCollection<IRawResourceVerifier>();
@@ -79,7 +80,7 @@ namespace Helix.Crawler
             }
         }
 
-        public void EnsureResources()
+        public void EnsureEnoughResources()
         {
             InitializeRawResourceExtractorPool();
             InitializeRawResourceVerifierPool();
@@ -353,13 +354,13 @@ namespace Helix.Crawler
                     );
 
                 if (string.IsNullOrEmpty(orphanedResourceErrorMessage)) return;
-                OnOrphanedResourcesDetected?.Invoke($"Orphaned resources detected!{orphanedResourceErrorMessage}");
+                _logger.LogInfo($"Orphaned resources detected!{orphanedResourceErrorMessage}");
 
                 string GetErrorMessage(int createdCount, string resourceName, int disposedCount)
                 {
                     resourceName = $"{resourceName}{(createdCount > 1 ? "s" : string.Empty)}";
                     var disposedCountText = disposedCount == 0 ? "none" : $"only {disposedCount}";
-                    return $" There were {createdCount} {resourceName} created but {disposedCountText} could be found and disposed.";
+                    return $"\r\nThere were {createdCount} {resourceName} created but {disposedCountText} could be found and disposed.";
                 }
             }
         }

@@ -28,6 +28,10 @@ namespace Helix.Gui
              * TODO: Will be removed and replaced with built-in .Net Core 3.0 feature. */
             ShowWindow(GetConsoleWindow(), 0);
 
+            void OnResourceVerified(VerificationResult verificationResult)
+            {
+                RedrawGui($"{verificationResult.HttpStatusCode} - {verificationResult.RawResource.Url}");
+            }
             IpcSocket.On("btn-start-clicked", configurationJsonString =>
             {
                 if (CrawlerBot.CrawlerState != CrawlerState.Ready) return;
@@ -38,17 +42,14 @@ namespace Helix.Gui
                     RedrawGui(everythingIsDone ? "Done." : "Stopped.");
                     Stopwatch.Stop();
                 };
-                CrawlerBot.OnResourceVerified += verificationResult => Task.Run(() =>
-                {
-                    RedrawGui($"{verificationResult.HttpStatusCode} - {verificationResult.RawResource.Url}");
-                }, CrawlerBot.CancellationToken);
-                CrawlerBot.OnExceptionOccurred += exception => { RedrawGui(exception.Message); };
+                CrawlerBot.OnResourceVerified += OnResourceVerified;
                 CrawlerBot.StartWorking(configurations);
                 RedrawGuiEvery(TimeSpan.FromSeconds(1));
                 Stopwatch.Restart();
             });
             IpcSocket.On("btn-close-clicked", _ =>
             {
+                CrawlerBot.OnResourceVerified -= OnResourceVerified;
                 RedrawGui("Shutting down ...");
                 CrawlerBot.StopWorking();
                 Task.WhenAll(BackgroundTasks).Wait();

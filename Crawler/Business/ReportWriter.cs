@@ -3,28 +3,30 @@ using System.IO;
 using System.Reflection;
 using Helix.Core;
 using Helix.Crawler.Abstractions;
+using Helix.Persistence.Abstractions;
 
 namespace Helix.Crawler
 {
-    // TODO: Singleton via Dependency Injection
-    sealed class ReportWriter : FilePersistence
+    public sealed class ReportWriter : IReportWriter
     {
-        static ReportWriter _instance;
+        readonly IFilePersistence _filePersistence;
 
-        public static ReportWriter Instance =>
-            _instance ?? (_instance = new ReportWriter($@"{Path.GetDirectoryName(Assembly.GetEntryAssembly().Location)}\Report.csv"));
-
-        ReportWriter(string filePath, TimeSpan? flushDataToDiskInterval = null) : base(filePath, flushDataToDiskInterval)
+        [Obsolete(ErrorMessage.UseDependencyInjection, true)]
+        public ReportWriter(IPersistenceProvider persistenceProvider)
         {
-            WriteLineAsync("HTTP Status Code,Parent Url,Verified Url");
+            var reportFilePath = $@"{Path.GetDirectoryName(Assembly.GetEntryAssembly().Location)}\Report.csv";
+            _filePersistence = persistenceProvider.GetFilePersistence(reportFilePath);
+            _filePersistence.WriteLineAsync("HTTP Status Code,Parent Url,Verified Url");
         }
+
+        public void Dispose() { _filePersistence?.Dispose(); }
 
         public void WriteReport(VerificationResult verificationResult, bool writeBrokenLinksOnly = false)
         {
             if (writeBrokenLinksOnly && !verificationResult.IsBrokenResource) return;
             var parentUri = verificationResult.Resource?.ParentUri;
             var verifiedUrl = verificationResult.Resource?.Uri.OriginalString ?? verificationResult.RawResource.Url;
-            WriteLineAsync($"{verificationResult.HttpStatusCode},{parentUri?.OriginalString},{verifiedUrl}");
+            _filePersistence.WriteLineAsync($"{verificationResult.HttpStatusCode},{parentUri?.OriginalString},{verifiedUrl}");
         }
     }
 }
