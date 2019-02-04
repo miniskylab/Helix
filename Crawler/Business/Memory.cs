@@ -11,9 +11,9 @@ namespace Helix.Crawler
     {
         readonly ConcurrentSet<string> _alreadyVerifiedUrls = new ConcurrentSet<string>();
         readonly object _syncRoot = new object();
-        readonly BlockingCollection<HtmlDocument> _toBeExtractedHtmlDocuments = new BlockingCollection<HtmlDocument>(100000);
-        readonly BlockingCollection<Uri> _toBeRenderedUris = new BlockingCollection<Uri>(100000);
-        readonly BlockingCollection<RawResource> _toBeVerifiedRawResources = new BlockingCollection<RawResource>(100000);
+        readonly BlockingCollection<HtmlDocument> _toBeExtractedHtmlDocuments = new BlockingCollection<HtmlDocument>();
+        readonly BlockingCollection<Uri> _toBeRenderedUris = new BlockingCollection<Uri>();
+        readonly BlockingCollection<RawResource> _toBeVerifiedRawResources = new BlockingCollection<RawResource>();
 
         public Configurations Configurations { get; }
 

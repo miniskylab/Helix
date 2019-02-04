@@ -1,4 +1,4 @@
-﻿const { remote, ipcRenderer } = require("electron");
+﻿const {remote, ipcRenderer} = require("electron");
 const socket = new require("net").Socket();
 
 socket.connect(18880, "127.0.0.1", () => {
@@ -26,7 +26,7 @@ socket.connect(18880, "127.0.0.1", () => {
     });
 
     document.getElementById("btn-close").addEventListener("click", () => {
-        socket.end(JSON.stringify({ text: "btn-close-clicked" }));
+        socket.end(JSON.stringify({text: "btn-close-clicked"}));
         socket.on("end", () => { ipcRenderer.send("btn-close-clicked"); });
     });
 
@@ -36,6 +36,7 @@ socket.connect(18880, "127.0.0.1", () => {
     const lblValidUrls = document.getElementById("lbl-valid-urls");
     const lblBrokenUrls = document.getElementById("lbl-broken-urls");
     const lblRemainingUrls = document.getElementById("lbl-remaining-urls");
+    const lblAveragePageLoadTime = document.getElementById("lbl-average-page-load-time");
     const lblElapsedTime = document.getElementById("lbl-elapsed-time");
     const lblStatusText = document.getElementById("lbl-status-text");
     const btnStop = document.getElementById("btn-stop");
@@ -45,13 +46,14 @@ socket.connect(18880, "127.0.0.1", () => {
         switch (ipcMessage.Text) {
             case "redraw":
                 const viewModel = JSON.parse(ipcMessage.Payload);
-                if (isNumeric(viewModel.VerifiedUrlCount)) lblVerifiedUrls.textContent = viewModel.VerifiedUrlCount;
-                if (isNumeric(viewModel.ValidUrlCount)) lblValidUrls.textContent = viewModel.ValidUrlCount;
-                if (isNumeric(viewModel.BrokenUrlCount)) lblBrokenUrls.textContent = viewModel.BrokenUrlCount;
-                if (isNumeric(viewModel.RemainingUrlCount)) lblRemainingUrls.textContent = viewModel.RemainingUrlCount;
+                if (isNumeric(viewModel.VerifiedUrlCount)) lblVerifiedUrls.textContent = viewModel.VerifiedUrlCount.toLocaleString("en-US", {maximumFractionDigits: 2});
+                if (isNumeric(viewModel.ValidUrlCount)) lblValidUrls.textContent = viewModel.ValidUrlCount.toLocaleString("en-US", {maximumFractionDigits: 2});
+                if (isNumeric(viewModel.BrokenUrlCount)) lblBrokenUrls.textContent = viewModel.BrokenUrlCount.toLocaleString("en-US", {maximumFractionDigits: 2});
+                if (isNumeric(viewModel.RemainingUrlCount)) lblRemainingUrls.textContent = viewModel.RemainingUrlCount.toLocaleString("en-US", {maximumFractionDigits: 2});
+                if (isNumeric(viewModel.AveragePageLoadTime)) lblAveragePageLoadTime.textContent = viewModel.AveragePageLoadTime.toLocaleString("en-US", {maximumFractionDigits: 0});
                 if (viewModel.ElapsedTime) lblElapsedTime.textContent = viewModel.ElapsedTime;
                 if (viewModel.StatusText) lblStatusText.textContent = viewModel.StatusText;
-        
+
                 const btnMainIsStartButton = btnMain.firstElementChild.className === "controls__play-icon";
                 const btnMainIsPauseButton = btnMain.firstElementChild.className === "controls__pause-icon";
                 switch (viewModel.CrawlerState) {
@@ -69,11 +71,11 @@ socket.connect(18880, "127.0.0.1", () => {
                         if (!btnMain.classList.contains("controls__main-button--amber")) btnMain.classList.add("controls__main-button--amber");
                         if (btnMain.hasAttribute("disabled")) btnMain.removeAttribute("disabled");
                         if (!configurationPanel.hasAttribute("disabled")) configurationPanel.setAttribute("disabled", "");
-                        // if (btnStop.hasAttribute("disabled")) btnStop.removeAttribute("disabled");
+                    // if (btnStop.hasAttribute("disabled")) btnStop.removeAttribute("disabled");
                 }
                 break;
         }
     });
 });
 
-function isNumeric(number) { return !isNaN(number) && typeof(number) === "number"; }
+function isNumeric(number) { return !isNaN(number) && typeof (number) === "number"; }

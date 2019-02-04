@@ -25,6 +25,7 @@ namespace Helix.Crawler
         ProxyServer _httpProxyServer;
         readonly List<int> _processIds;
         readonly IResourceScope _resourceScope;
+        readonly Stopwatch _stopwatch;
         readonly object _syncRoot;
 
         public event Action OnIdle;
@@ -37,6 +38,7 @@ namespace Helix.Crawler
             _resourceScope = resourceScope;
             _processIds = new List<int>();
             _syncRoot = new object();
+            _stopwatch = new Stopwatch();
             SetupHttpProxyServer();
             Restart();
         }
@@ -50,12 +52,14 @@ namespace Helix.Crawler
             }
         }
 
-        public bool TryRender(Uri uri, Action<Exception> onFailed, CancellationToken cancellationToken, out string html)
+        public bool TryRender(Uri uri, Action<Exception> onFailed, CancellationToken cancellationToken, out string html,
+            out long? pageLoadTime)
         {
             _currentUri = uri ?? throw new ArgumentNullException(nameof(uri));
             if (onFailed == null) throw new ArgumentNullException(nameof(onFailed));
 
             html = null;
+            pageLoadTime = null;
             var renderingFailedErrorMessage = $"Chromium web browser failed to render the URI: {uri}";
             lock (_syncRoot)
             {
@@ -67,7 +71,11 @@ namespace Helix.Crawler
                         return false;
                     }
 
-                    if (TryGetPageSource(out html)) return true;
+                    if (TryGetPageSource(out html))
+                    {
+                        pageLoadTime = _stopwatch.ElapsedMilliseconds;
+                        return true;
+                    }
                     onFailed.Invoke(new MemberAccessException($"Chromium web browser failed to obtain page source of the URI: {uri}"));
                     return false;
                 }
@@ -77,60 +85,67 @@ namespace Helix.Crawler
                     onFailed.Invoke(new OperationCanceledException(renderingFailedErrorMessage, cancellationToken));
                     return false;
                 }
-                finally { OnIdle?.Invoke(); }
-            }
-
-            bool TryGetPageSource(out string pageSource)
-            {
-                try { pageSource = _chromeDriver.PageSource; }
-                catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
+                finally
                 {
-                    pageSource = null;
-                    return false;
+                    _stopwatch.Reset();
+                    OnIdle?.Invoke();
                 }
-                return true;
-            }
-            bool TryGoToUri(int attemptCount)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                EnableNetwork();
-                for (var attemptNo = 0; attemptNo < attemptCount; attemptNo++)
+
+                bool TryGetPageSource(out string pageSource)
                 {
-                    try
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        _chromeDriver.Navigate().GoToUrl(uri);
-                        break;
-                    }
+                    try { pageSource = _chromeDriver.PageSource; }
                     catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
                     {
-                        Restart();
-                        if (attemptNo < attemptCount) continue;
+                        pageSource = null;
                         return false;
                     }
+                    return true;
                 }
-                DisableNetwork();
-                return true;
+                bool TryGoToUri(int attemptCount)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    EnableNetwork();
+                    for (var attemptNo = 0; attemptNo < attemptCount; attemptNo++)
+                    {
+                        try
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            _stopwatch.Start();
+                            _chromeDriver.Navigate().GoToUrl(uri);
+                            _stopwatch.Stop();
+                            break;
+                        }
+                        catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
+                        {
+                            _stopwatch.Stop();
+                            Restart();
+                            if (attemptNo < attemptCount) continue;
+                            return false;
+                        }
+                    }
+                    DisableNetwork();
+                    return true;
 
-                void DisableNetwork()
-                {
-                    _chromeDriver.NetworkConditions = new ChromeNetworkConditions
+                    void DisableNetwork()
                     {
-                        IsOffline = true,
-                        Latency = TimeSpan.FromTicks(1),
-                        UploadThroughput = long.MaxValue,
-                        DownloadThroughput = long.MaxValue
-                    };
-                }
-                void EnableNetwork()
-                {
-                    _chromeDriver.NetworkConditions = new ChromeNetworkConditions
+                        _chromeDriver.NetworkConditions = new ChromeNetworkConditions
+                        {
+                            IsOffline = true,
+                            Latency = TimeSpan.FromTicks(1),
+                            UploadThroughput = long.MaxValue,
+                            DownloadThroughput = long.MaxValue
+                        };
+                    }
+                    void EnableNetwork()
                     {
-                        IsOffline = false,
-                        Latency = TimeSpan.FromTicks(1),
-                        UploadThroughput = long.MaxValue,
-                        DownloadThroughput = long.MaxValue
-                    };
+                        _chromeDriver.NetworkConditions = new ChromeNetworkConditions
+                        {
+                            IsOffline = false,
+                            Latency = TimeSpan.FromTicks(1),
+                            UploadThroughput = long.MaxValue,
+                            DownloadThroughput = long.MaxValue
+                        };
+                    }
                 }
             }
         }

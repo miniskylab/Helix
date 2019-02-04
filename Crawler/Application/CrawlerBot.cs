@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Threading.Tasks;
 using Helix.Crawler.Abstractions;
 using Helix.Persistence.Abstractions;
@@ -14,6 +15,8 @@ namespace Helix.Crawler
         static IReportWriter _reportWriter;
         static readonly List<Task> BackgroundTasks;
 
+        public static Statistics Statistics { get; }
+
         public static CrawlerState CrawlerState => _management?.CrawlerState ?? CrawlerState.Ready;
 
         public static int RemainingUrlCount => _management?.RemainingUrlCount ?? 0;
@@ -21,7 +24,11 @@ namespace Helix.Crawler
         public static event Action<VerificationResult> OnResourceVerified;
         public static event Action<bool> OnStopped;
 
-        static CrawlerBot() { BackgroundTasks = new List<Task>(); }
+        static CrawlerBot()
+        {
+            Statistics = new Statistics();
+            BackgroundTasks = new List<Task>();
+        }
 
         public static void StartWorking(Configurations configurations)
         {
@@ -122,12 +129,28 @@ namespace Helix.Crawler
                             try
                             {
                                 Action<Exception> onFailed = _logger.LogException;
-                                if (webBrowser.TryRender(toBeRenderedUri, onFailed, _management.CancellationToken, out var htmlText))
-                                    _memory.Memorize(new HtmlDocument
+                                if (!webBrowser.TryRender(toBeRenderedUri, onFailed, _management.CancellationToken, out var htmlText,
+                                    out var pageLoadTime)) return;
+
+                                if (pageLoadTime.HasValue)
+                                {
+                                    Statistics.SuccessfullyRenderedPageCount++;
+                                    Statistics.TotalPageLoadTime += pageLoadTime.Value;
+                                }
+                                else
+                                {
+                                    try { throw new InvalidConstraintException(); }
+                                    catch (InvalidConstraintException invalidConstraintException)
                                     {
-                                        Uri = toBeRenderedUri,
-                                        Text = htmlText
-                                    }, _management.CancellationToken);
+                                        _logger.LogException(invalidConstraintException);
+                                    }
+                                }
+
+                                _memory.Memorize(new HtmlDocument
+                                {
+                                    Uri = toBeRenderedUri,
+                                    Text = htmlText
+                                }, _management.CancellationToken);
                             }
                             catch (OperationCanceledException operationCanceledException)
                             {
@@ -167,7 +190,10 @@ namespace Helix.Crawler
                                 {
                                     // TODO: Investigate where those orphaned Uri-s came from.
                                     _reportWriter.WriteReport(verificationResult, _memory.Configurations.ReportBrokenLinksOnly);
-                                    Task.Run(() => { OnResourceVerified?.Invoke(verificationResult); }, _management.CancellationToken);
+                                    Statistics.VerifiedUrlCount++;
+                                    if (verificationResult.IsBrokenResource) Statistics.BrokenUrlCount++;
+                                    else Statistics.ValidUrlCount++;
+                                    OnResourceVerified?.Invoke(verificationResult);
                                 }
 
                                 var resourceExists = verifiedResource != null;

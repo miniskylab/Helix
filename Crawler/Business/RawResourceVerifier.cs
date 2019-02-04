@@ -12,27 +12,24 @@ namespace Helix.Crawler
 {
     public sealed class RawResourceVerifier : IRawResourceVerifier
     {
-        readonly CancellationTokenSource _cancellationTokenSource;
+        CancellationTokenSource _cancellationTokenSource;
         readonly Configurations _configurations;
-        bool _disposed;
-        readonly object _disposeSync;
-        readonly HttpClient _httpClient;
+        HttpClient _httpClient;
         readonly IRawResourceProcessor _rawResourceProcessor;
         readonly IResourceScope _resourceScope;
         Task<HttpResponseMessage> _sendingGETRequestTask;
+        readonly object _syncRoot;
 
         public event Action OnIdle;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public RawResourceVerifier(Configurations configurations, IRawResourceProcessor rawResourceProcessor,
-            IResourceScope resourceScope)
+        public RawResourceVerifier(Configurations configurations, IRawResourceProcessor rawResourceProcessor, IResourceScope resourceScope)
         {
             _configurations = configurations;
             _rawResourceProcessor = rawResourceProcessor;
             _resourceScope = resourceScope;
             _cancellationTokenSource = new CancellationTokenSource();
-            _disposed = false;
-            _disposeSync = new object();
+            _syncRoot = new object();
 
             _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(configurations.RequestTimeoutDuration) };
             _httpClient.DefaultRequestHeaders.Accept.ParseAdd("*/*");
@@ -47,22 +44,10 @@ namespace Helix.Crawler
 
         public void Dispose()
         {
-            lock (_disposeSync)
+            lock (_syncRoot)
             {
-                if (_disposed) return;
-                _cancellationTokenSource?.Cancel();
-                try { _sendingGETRequestTask?.Wait(); }
-                catch
-                {
-                    /* At this point, all exceptions should be fully handled.
-                     * I just want to wait for the task to complete.
-                     * I don't care about the result of the task. */
-                }
-
-                _sendingGETRequestTask?.Dispose();
-                _cancellationTokenSource?.Dispose();
-                _httpClient?.Dispose();
-                _disposed = true;
+                ReleaseUnmanagedResources();
+                GC.SuppressFinalize(this);
             }
         }
 
@@ -117,5 +102,27 @@ namespace Helix.Crawler
             }
             finally { OnIdle?.Invoke(); }
         }
+
+        void ReleaseUnmanagedResources()
+        {
+            _cancellationTokenSource?.Cancel();
+            try { _sendingGETRequestTask?.Wait(); }
+            catch
+            {
+                /* At this point, all exceptions should be fully handled.
+                 * I just want to wait for the task to complete.
+                 * I don't care about the result of the task. */
+            }
+
+            _sendingGETRequestTask?.Dispose();
+            _cancellationTokenSource?.Dispose();
+            _httpClient?.Dispose();
+
+            _cancellationTokenSource = null;
+            _sendingGETRequestTask = null;
+            _httpClient = null;
+        }
+
+        ~RawResourceVerifier() { Dispose(); }
     }
 }

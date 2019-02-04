@@ -68,12 +68,13 @@ namespace Helix.Gui
             IpcSocket.Send(new IpcMessage
             {
                 Text = "redraw",
-                Payload = JsonConvert.SerializeObject(new ViewModel
+                Payload = JsonConvert.SerializeObject(new Frame
                 {
                     CrawlerState = CrawlerBot.CrawlerState,
-                    VerifiedUrlCount = null,
-                    ValidUrlCount = null,
-                    BrokenUrlCount = null,
+                    VerifiedUrlCount = CrawlerBot.Statistics.VerifiedUrlCount,
+                    ValidUrlCount = CrawlerBot.Statistics.ValidUrlCount,
+                    BrokenUrlCount = CrawlerBot.Statistics.BrokenUrlCount,
+                    AveragePageLoadTime = CrawlerBot.Statistics.AveragePageLoadTime,
                     RemainingUrlCount = CrawlerBot.RemainingUrlCount,
                     ElapsedTime = Stopwatch.Elapsed.ToString("hh' : 'mm' : 'ss"),
                     StatusText = statusText

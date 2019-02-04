@@ -3,10 +3,12 @@ using JetBrains.Annotations;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 
-namespace Helix.Crawler
+namespace Helix.Gui
 {
-    public class ViewModel
+    public class Frame
     {
+        public double? AveragePageLoadTime { [UsedImplicitly] get; set; }
+
         public int? BrokenUrlCount { [UsedImplicitly] get; set; }
 
         [JsonConverter(typeof(StringEnumConverter))]

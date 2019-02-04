@@ -49,9 +49,19 @@ namespace Helix.Crawler
             }
         }
 
-        public int RemainingUrlCount => _pendingExtractionTaskCount + _pendingRenderingTaskCount + _pendingVerificationTaskCount +
-                                        _memory.ToBeExtractedHtmlDocumentCount + _memory.ToBeRenderedUriCount +
-                                        _memory.ToBeVerifiedRawResourceCount;
+        public int RemainingUrlCount
+        {
+            get
+            {
+                lock (_extractionSyncRoot)
+                lock (_renderingSyncRoot)
+                lock (_verificationSyncRoot)
+                {
+                    return _pendingExtractionTaskCount + _pendingRenderingTaskCount + _pendingVerificationTaskCount +
+                           _memory.ToBeExtractedHtmlDocumentCount + _memory.ToBeRenderedUriCount + _memory.ToBeVerifiedRawResourceCount;
+                }
+            }
+        }
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public Management(IMemory memory, ILogger logger)
