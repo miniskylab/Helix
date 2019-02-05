@@ -37,6 +37,7 @@ socket.connect(18880, "127.0.0.1", () => {
     const lblBrokenUrls = document.getElementById("lbl-broken-urls");
     const lblRemainingUrls = document.getElementById("lbl-remaining-urls");
     const lblAveragePageLoadTime = document.getElementById("lbl-average-page-load-time");
+    const lblAveragePageLoadTimeUnitOfMeasure = document.getElementById("lbl-average-page-load-time-unit-of-measure");
     const lblElapsedTime = document.getElementById("lbl-elapsed-time");
     const lblStatusText = document.getElementById("lbl-status-text");
     const btnStop = document.getElementById("btn-stop");
@@ -50,7 +51,10 @@ socket.connect(18880, "127.0.0.1", () => {
                 if (isNumeric(viewModel.ValidUrlCount)) lblValidUrls.textContent = viewModel.ValidUrlCount.toLocaleString("en-US", {maximumFractionDigits: 2});
                 if (isNumeric(viewModel.BrokenUrlCount)) lblBrokenUrls.textContent = viewModel.BrokenUrlCount.toLocaleString("en-US", {maximumFractionDigits: 2});
                 if (isNumeric(viewModel.RemainingUrlCount)) lblRemainingUrls.textContent = viewModel.RemainingUrlCount.toLocaleString("en-US", {maximumFractionDigits: 2});
-                if (isNumeric(viewModel.AveragePageLoadTime)) lblAveragePageLoadTime.textContent = viewModel.AveragePageLoadTime.toLocaleString("en-US", {maximumFractionDigits: 0});
+                if (isNumeric(viewModel.AveragePageLoadTime)) {
+                    lblAveragePageLoadTime.textContent = viewModel.AveragePageLoadTime.toLocaleString("en-US", {maximumFractionDigits: 0});
+                    lblAveragePageLoadTimeUnitOfMeasure.style.visibility = "visible";
+                }
                 if (viewModel.ElapsedTime) lblElapsedTime.textContent = viewModel.ElapsedTime;
                 if (viewModel.StatusText) lblStatusText.textContent = viewModel.StatusText;
 

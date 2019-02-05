@@ -24,6 +24,24 @@
     font-size: 20px;
 }
 
+.statistics__card-value--with-unit-of-measure {
+    display: inline-block;
+    margin-left: 25px;
+}
+
+.statistics__unit-of-measure {
+    display: inline-block;
+    height: 25px;
+    padding-top: 5px;
+    margin-left: 2px;
+    box-sizing: border-box;
+    text-align: left;
+    font-size: 15px;
+    filter: grayscale(85%);
+    opacity: .65;
+    visibility: hidden;
+}
+
 .statistics__header {
     position: absolute;
     width: fit-content;
