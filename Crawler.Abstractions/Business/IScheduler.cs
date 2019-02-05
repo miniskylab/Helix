@@ -7,30 +7,16 @@ namespace Helix.Crawler.Abstractions
     {
         CancellationToken CancellationToken { get; }
 
-        CrawlerState CrawlerState { get; }
-
         bool EverythingIsDone { get; }
 
         int RemainingUrlCount { get; }
 
         void CancelEverything();
 
-        void EnsureEnoughResources();
+        void CreateTask(Action<IRawResourceExtractor, HtmlDocument> taskDescription);
 
-        void InterlockedCoordinate(out IRawResourceExtractor rawResourceExtractor, out HtmlDocument toBeExtractedHtmlDocument);
+        void CreateTask(Action<IWebBrowser, Uri> taskDescription);
 
-        void InterlockedCoordinate(out IWebBrowser webBrowser, out Uri toBeRenderedUri);
-
-        void InterlockedCoordinate(out IRawResourceVerifier rawResourceVerifier, out RawResource toBeVerifiedRawResource);
-
-        void OnRawResourceExtractionTaskCompleted(IRawResourceExtractor rawResourceExtractor = null,
-            HtmlDocument toBeExtractedHtmlDocument = null);
-
-        void OnRawResourceVerificationTaskCompleted(IRawResourceVerifier rawResourceVerifier = null,
-            RawResource toBeVerifiedRawResource = null);
-
-        void OnUriRenderingTaskCompleted(IWebBrowser webBrowser = null, Uri toBeRenderedUri = null);
-
-        bool TryTransitTo(CrawlerState crawlerState);
+        void CreateTask(Action<IRawResourceVerifier, RawResource> taskDescription);
     }
 }

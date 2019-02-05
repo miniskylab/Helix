@@ -6,6 +6,6 @@ namespace Helix.IPC.Abstractions
     {
         void On(string ipcTextMessage, Action<string> action);
 
-        void Send(IIpcMessage ipcMessage);
+        void Send(IpcMessage ipcMessage);
     }
 }

@@ -1,8 +1,6 @@
-﻿using Helix.IPC.Abstractions;
-
-namespace Helix.IPC
+﻿namespace Helix.IPC.Abstractions
 {
-    public class IpcMessage : IIpcMessage
+    public class IpcMessage
     {
         public string Payload { get; set; }
 

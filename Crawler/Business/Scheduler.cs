@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Concurrent;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Helix.Core;
@@ -11,23 +9,17 @@ namespace Helix.Crawler
 {
     public sealed class Scheduler : IScheduler
     {
-        const int RawResourceExtractorCount = 300;
-        const int RawResourceVerifierCount = 2500;
         CancellationTokenSource _cancellationTokenSource;
-        readonly object _extractionSyncRoot = new object();
+        readonly object _disposalSyncRoot;
+        readonly object _extractionSyncRoot;
         readonly ILogger _logger;
         readonly IMemory _memory;
         int _pendingExtractionTaskCount;
         int _pendingRenderingTaskCount;
         int _pendingVerificationTaskCount;
-        BlockingCollection<IRawResourceExtractor> _rawResourceExtractorPool;
-        BlockingCollection<IRawResourceVerifier> _rawResourceVerifierPool;
-        readonly object _renderingSyncRoot = new object();
-        readonly object _syncRoot = new object();
-        readonly object _verificationSyncRoot = new object();
-        BlockingCollection<IWebBrowser> _webBrowserPool;
-
-        public CrawlerState CrawlerState { get; private set; } = CrawlerState.Ready;
+        readonly object _renderingSyncRoot;
+        readonly IServicePool _servicePool;
+        readonly object _verificationSyncRoot;
 
         public CancellationToken CancellationToken => _cancellationTokenSource.Token;
 
@@ -64,14 +56,16 @@ namespace Helix.Crawler
         }
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public Scheduler(IMemory memory, ILogger logger)
+        public Scheduler(IMemory memory, ILogger logger, IServicePool servicePool)
         {
             _memory = memory;
             _logger = logger;
+            _servicePool = servicePool;
+            _disposalSyncRoot = new object();
+            _renderingSyncRoot = new object();
+            _extractionSyncRoot = new object();
+            _verificationSyncRoot = new object();
             _cancellationTokenSource = new CancellationTokenSource();
-            _rawResourceExtractorPool = new BlockingCollection<IRawResourceExtractor>();
-            _rawResourceVerifierPool = new BlockingCollection<IRawResourceVerifier>();
-            _webBrowserPool = new BlockingCollection<IWebBrowser>();
         }
 
         public void CancelEverything()
@@ -81,301 +75,235 @@ namespace Helix.Crawler
             _memory.Clear();
         }
 
+        public void CreateTask(Action<IRawResourceExtractor, HtmlDocument> taskDescription)
+        {
+            IRawResourceExtractor rawResourceExtractor;
+            HtmlDocument toBeExtractedHtmlDocument;
+            try
+            {
+                GetRawResourceExtractorAndToBeExtractedHtmlDocument();
+                Task.Run(
+                    () =>
+                    {
+                        try { taskDescription(rawResourceExtractor, toBeExtractedHtmlDocument); }
+                        catch (OperationCanceledException operationCanceledException) { _logger.LogException(operationCanceledException); }
+                        finally { ReleaseRawResourceExtractor(); }
+                    },
+                    CancellationToken
+                ).ContinueWith(
+                    _ =>
+                    {
+                        ReleaseRawResourceExtractor();
+                        ReturnToBeExtractedHtmlDocument();
+                    },
+                    TaskContinuationOptions.OnlyOnCanceled | TaskContinuationOptions.ExecuteSynchronously
+                );
+            }
+            catch (Exception exception)
+            {
+                if (exception is EverythingIsDoneException) return;
+                _logger.LogException(exception);
+            }
+
+            void GetRawResourceExtractorAndToBeExtractedHtmlDocument()
+            {
+                while (!EverythingIsDone && !CancellationToken.IsCancellationRequested)
+                {
+                    Monitor.Enter(_extractionSyncRoot);
+                    if (_pendingExtractionTaskCount >= 300)
+                    {
+                        Monitor.Exit(_extractionSyncRoot);
+                        Thread.Sleep(100);
+                        continue;
+                    }
+
+                    _pendingExtractionTaskCount++;
+                    if (!_memory.TryTake(out toBeExtractedHtmlDocument))
+                    {
+                        _pendingExtractionTaskCount--;
+                        Monitor.Exit(_extractionSyncRoot);
+                        Thread.Sleep(100);
+                        continue;
+                    }
+                    Monitor.Exit(_extractionSyncRoot);
+
+                    try { rawResourceExtractor = _servicePool.GetRawResourceExtractor(CancellationToken); }
+                    catch (OperationCanceledException)
+                    {
+                        _pendingExtractionTaskCount--;
+                        throw;
+                    }
+                    return;
+                }
+                CancellationToken.ThrowIfCancellationRequested();
+                throw new EverythingIsDoneException();
+            }
+            void ReleaseRawResourceExtractor()
+            {
+                lock (_extractionSyncRoot) _pendingExtractionTaskCount--;
+                _servicePool.Return(rawResourceExtractor);
+            }
+            void ReturnToBeExtractedHtmlDocument() { _memory.Memorize(toBeExtractedHtmlDocument, CancellationToken.None); }
+        }
+
+        public void CreateTask(Action<IWebBrowser, Uri> taskDescription)
+        {
+            IWebBrowser webBrowser;
+            Uri toBeRenderedUri;
+            try
+            {
+                GetWebBrowserAndToBeRenderedUri();
+                Task.Run(
+                    () =>
+                    {
+                        try { taskDescription(webBrowser, toBeRenderedUri); }
+                        catch (OperationCanceledException operationCanceledException) { _logger.LogException(operationCanceledException); }
+                        finally { ReleaseWebBrowser(); }
+                    },
+                    CancellationToken
+                ).ContinueWith(
+                    _ =>
+                    {
+                        ReleaseWebBrowser();
+                        ReturnToBeRenderedUri();
+                    },
+                    TaskContinuationOptions.OnlyOnCanceled | TaskContinuationOptions.ExecuteSynchronously
+                );
+            }
+            catch (Exception exception)
+            {
+                if (exception is EverythingIsDoneException) return;
+                _logger.LogException(exception);
+            }
+
+            void GetWebBrowserAndToBeRenderedUri()
+            {
+                while (!EverythingIsDone && !CancellationToken.IsCancellationRequested)
+                {
+                    Monitor.Enter(_renderingSyncRoot);
+                    if (_pendingRenderingTaskCount >= 300)
+                    {
+                        Monitor.Exit(_renderingSyncRoot);
+                        Thread.Sleep(100);
+                        continue;
+                    }
+
+                    _pendingRenderingTaskCount++;
+                    if (!_memory.TryTake(out toBeRenderedUri))
+                    {
+                        _pendingRenderingTaskCount--;
+                        Monitor.Exit(_renderingSyncRoot);
+                        Thread.Sleep(100);
+                        continue;
+                    }
+                    Monitor.Exit(_renderingSyncRoot);
+
+                    try { webBrowser = _servicePool.GetWebBrowser(CancellationToken); }
+                    catch (OperationCanceledException)
+                    {
+                        _pendingRenderingTaskCount--;
+                        throw;
+                    }
+                    return;
+                }
+                CancellationToken.ThrowIfCancellationRequested();
+                throw new EverythingIsDoneException();
+            }
+            void ReleaseWebBrowser()
+            {
+                lock (_renderingSyncRoot) _pendingRenderingTaskCount--;
+                _servicePool.Return(webBrowser);
+            }
+            void ReturnToBeRenderedUri() { _memory.Memorize(toBeRenderedUri, CancellationToken.None); }
+        }
+
+        public void CreateTask(Action<IRawResourceVerifier, RawResource> taskDescription)
+        {
+            IRawResourceVerifier rawResourceVerifier;
+            RawResource toBeVerifiedRawResource;
+            try
+            {
+                GetRawResourceVerifierAndToBeVerifiedRawResource();
+                Task.Run(
+                    () =>
+                    {
+                        try { taskDescription(rawResourceVerifier, toBeVerifiedRawResource); }
+                        catch (OperationCanceledException operationCanceledException) { _logger.LogException(operationCanceledException); }
+                        finally { ReleaseRawResourceVerifier(); }
+                    },
+                    CancellationToken
+                ).ContinueWith(
+                    _ =>
+                    {
+                        ReleaseRawResourceVerifier();
+                        ReturnToBeVerifiedRawResource();
+                    },
+                    TaskContinuationOptions.OnlyOnCanceled | TaskContinuationOptions.ExecuteSynchronously
+                );
+            }
+            catch (Exception exception)
+            {
+                if (exception is EverythingIsDoneException) return;
+                _logger.LogException(exception);
+            }
+
+            void GetRawResourceVerifierAndToBeVerifiedRawResource()
+            {
+                while (!EverythingIsDone && !CancellationToken.IsCancellationRequested)
+                {
+                    Monitor.Enter(_verificationSyncRoot);
+                    if (_pendingVerificationTaskCount >= 400)
+                    {
+                        Monitor.Exit(_verificationSyncRoot);
+                        Thread.Sleep(100);
+                        continue;
+                    }
+
+                    _pendingVerificationTaskCount++;
+                    if (!_memory.TryTake(out toBeVerifiedRawResource))
+                    {
+                        _pendingVerificationTaskCount--;
+                        Monitor.Exit(_verificationSyncRoot);
+                        Thread.Sleep(100);
+                        continue;
+                    }
+                    Monitor.Exit(_verificationSyncRoot);
+
+                    try { rawResourceVerifier = _servicePool.GetResourceVerifier(CancellationToken); }
+                    catch (OperationCanceledException)
+                    {
+                        _pendingVerificationTaskCount--;
+                        throw;
+                    }
+                    return;
+                }
+                CancellationToken.ThrowIfCancellationRequested();
+                throw new EverythingIsDoneException();
+            }
+            void ReleaseRawResourceVerifier()
+            {
+                lock (_verificationSyncRoot) _pendingVerificationTaskCount--;
+                _servicePool.Return(rawResourceVerifier);
+            }
+            void ReturnToBeVerifiedRawResource() { _memory.Memorize(toBeVerifiedRawResource, CancellationToken.None); }
+        }
+
         public void Dispose()
         {
-            lock (_syncRoot)
+            lock (_disposalSyncRoot)
             {
                 ReleaseUnmanagedResources();
                 GC.SuppressFinalize(this);
             }
         }
 
-        public void EnsureEnoughResources()
-        {
-            InitializeRawResourceExtractorPool();
-            InitializeRawResourceVerifierPool();
-            InitializeWebBrowserPool();
-
-            void InitializeRawResourceExtractorPool()
-            {
-                for (var rawResourceExtractorId = 0; rawResourceExtractorId < RawResourceExtractorCount; rawResourceExtractorId++)
-                {
-                    CancellationToken.ThrowIfCancellationRequested();
-                    var rawResourceExtractor = ServiceLocator.Get<IRawResourceExtractor>();
-                    rawResourceExtractor.OnIdle += () => _rawResourceExtractorPool.Add(rawResourceExtractor, CancellationToken.None);
-                    _rawResourceExtractorPool.Add(rawResourceExtractor, CancellationToken.None);
-                }
-            }
-            void InitializeRawResourceVerifierPool()
-            {
-                for (var rawResourceVerifierId = 0; rawResourceVerifierId < RawResourceVerifierCount; rawResourceVerifierId++)
-                {
-                    CancellationToken.ThrowIfCancellationRequested();
-                    var rawResourceVerifier = ServiceLocator.Get<IRawResourceVerifier>();
-                    rawResourceVerifier.OnIdle += () => _rawResourceVerifierPool.Add(rawResourceVerifier, CancellationToken.None);
-                    _rawResourceVerifierPool.Add(rawResourceVerifier, CancellationToken.None);
-                }
-            }
-            void InitializeWebBrowserPool()
-            {
-                Parallel.For(0, _memory.Configurations.WebBrowserCount, webBrowserId =>
-                {
-                    CancellationToken.ThrowIfCancellationRequested();
-                    var webBrowser = ServiceLocator.Get<IWebBrowser>();
-                    webBrowser.OnIdle += () => _webBrowserPool.Add(webBrowser, CancellationToken.None);
-                    webBrowser.OnRawResourceCaptured += rawResource => _memory.Memorize(rawResource, CancellationToken.None);
-                    _webBrowserPool.Add(webBrowser, CancellationToken.None);
-                });
-            }
-        }
-
-        public void InterlockedCoordinate(out IRawResourceExtractor rawResourceExtractor, out HtmlDocument toBeExtractedHtmlDocument)
-        {
-            while (!EverythingIsDone && !CancellationToken.IsCancellationRequested)
-            {
-                Monitor.Enter(_extractionSyncRoot);
-                if (_pendingExtractionTaskCount >= 300)
-                {
-                    Monitor.Exit(_extractionSyncRoot);
-                    Thread.Sleep(100);
-                    continue;
-                }
-
-                _pendingExtractionTaskCount++;
-                if (!_memory.TryTakeToBeExtractedHtmlDocument(out toBeExtractedHtmlDocument))
-                {
-                    _pendingExtractionTaskCount--;
-                    Monitor.Exit(_extractionSyncRoot);
-                    Thread.Sleep(100);
-                    continue;
-                }
-                Monitor.Exit(_extractionSyncRoot);
-
-                try { rawResourceExtractor = _rawResourceExtractorPool.Take(CancellationToken); }
-                catch (OperationCanceledException)
-                {
-                    _pendingExtractionTaskCount--;
-                    throw;
-                }
-                return;
-            }
-            CancellationToken.ThrowIfCancellationRequested();
-            throw new EverythingIsDoneException();
-        }
-
-        public void InterlockedCoordinate(out IWebBrowser webBrowser, out Uri toBeRenderedUri)
-        {
-            while (!EverythingIsDone && !CancellationToken.IsCancellationRequested)
-            {
-                Monitor.Enter(_renderingSyncRoot);
-                if (_pendingRenderingTaskCount >= 300)
-                {
-                    Monitor.Exit(_renderingSyncRoot);
-                    Thread.Sleep(100);
-                    continue;
-                }
-
-                _pendingRenderingTaskCount++;
-                if (!_memory.TryTakeToBeRenderedUri(out toBeRenderedUri))
-                {
-                    _pendingRenderingTaskCount--;
-                    Monitor.Exit(_renderingSyncRoot);
-                    Thread.Sleep(100);
-                    continue;
-                }
-                Monitor.Exit(_renderingSyncRoot);
-
-                try { webBrowser = _webBrowserPool.Take(CancellationToken); }
-                catch (OperationCanceledException)
-                {
-                    _pendingRenderingTaskCount--;
-                    throw;
-                }
-                return;
-            }
-            CancellationToken.ThrowIfCancellationRequested();
-            throw new EverythingIsDoneException();
-        }
-
-        public void InterlockedCoordinate(out IRawResourceVerifier rawResourceVerifier, out RawResource toBeVerifiedRawResource)
-        {
-            while (!EverythingIsDone && !CancellationToken.IsCancellationRequested)
-            {
-                Monitor.Enter(_verificationSyncRoot);
-                if (_pendingVerificationTaskCount >= 400)
-                {
-                    Monitor.Exit(_verificationSyncRoot);
-                    Thread.Sleep(100);
-                    continue;
-                }
-
-                _pendingVerificationTaskCount++;
-                if (!_memory.TryTakeToBeVerifiedRawResource(out toBeVerifiedRawResource))
-                {
-                    _pendingVerificationTaskCount--;
-                    Monitor.Exit(_verificationSyncRoot);
-                    Thread.Sleep(100);
-                    continue;
-                }
-                Monitor.Exit(_verificationSyncRoot);
-
-                try { rawResourceVerifier = _rawResourceVerifierPool.Take(CancellationToken); }
-                catch (OperationCanceledException)
-                {
-                    _pendingVerificationTaskCount--;
-                    throw;
-                }
-                return;
-            }
-            CancellationToken.ThrowIfCancellationRequested();
-            throw new EverythingIsDoneException();
-        }
-
-        public void OnRawResourceExtractionTaskCompleted(IRawResourceExtractor rawResourceExtractor = null,
-            HtmlDocument toBeExtractedHtmlDocument = null)
-        {
-            lock (_extractionSyncRoot) _pendingExtractionTaskCount--;
-            if (rawResourceExtractor != null) _rawResourceExtractorPool.Add(rawResourceExtractor, CancellationToken.None);
-            if (toBeExtractedHtmlDocument != null) _memory.Memorize(toBeExtractedHtmlDocument, CancellationToken.None);
-        }
-
-        public void OnRawResourceVerificationTaskCompleted(IRawResourceVerifier rawResourceVerifier = null,
-            RawResource toBeVerifiedRawResource = null)
-        {
-            lock (_verificationSyncRoot) _pendingVerificationTaskCount--;
-            if (rawResourceVerifier != null) _rawResourceVerifierPool.Add(rawResourceVerifier, CancellationToken.None);
-            if (toBeVerifiedRawResource != null) _memory.Memorize(toBeVerifiedRawResource, CancellationToken.None);
-        }
-
-        public void OnUriRenderingTaskCompleted(IWebBrowser webBrowser = null, Uri toBeRenderedUri = null)
-        {
-            lock (_renderingSyncRoot) _pendingRenderingTaskCount--;
-            if (webBrowser != null) _webBrowserPool.Add(webBrowser, CancellationToken.None);
-            if (toBeRenderedUri != null) _memory.Memorize(toBeRenderedUri, CancellationToken.None);
-        }
-
-        public bool TryTransitTo(CrawlerState crawlerState)
-        {
-            if (CrawlerState == CrawlerState.Unknown) return false;
-            switch (crawlerState)
-            {
-                case CrawlerState.Ready:
-                    lock (_syncRoot)
-                    {
-                        if (CrawlerState != CrawlerState.Stopping) return false;
-                        CrawlerState = CrawlerState.Ready;
-                        return true;
-                    }
-                case CrawlerState.Working:
-                    lock (_syncRoot)
-                    {
-                        if (CrawlerState != CrawlerState.Ready && CrawlerState != CrawlerState.Paused) return false;
-                        CrawlerState = CrawlerState.Working;
-                        return true;
-                    }
-                case CrawlerState.Stopping:
-                    lock (_syncRoot)
-                    {
-                        if (CrawlerState != CrawlerState.Working && CrawlerState != CrawlerState.Paused) return false;
-                        CrawlerState = CrawlerState.Stopping;
-                        return true;
-                    }
-                case CrawlerState.Paused:
-                    lock (_syncRoot)
-                    {
-                        if (CrawlerState != CrawlerState.Working) return false;
-                        CrawlerState = CrawlerState.Paused;
-                        return true;
-                    }
-                case CrawlerState.Unknown:
-                    throw new NotSupportedException($"Cannot transit to [{nameof(CrawlerState.Unknown)}] state.");
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(crawlerState), crawlerState, null);
-            }
-        }
-
         void ReleaseUnmanagedResources()
         {
-            var disposedRawResourceExtractorCount = 0;
-            var disposedRawResourceVerifierCount = 0;
-            var disposedWebBrowserCount = 0;
-            DisposeRawResourceExtractorPool();
-            DisposeRawResourceVerifierPool();
-            DisposeWebBrowserPool();
-
             _cancellationTokenSource?.Dispose();
-            _rawResourceExtractorPool?.Dispose();
-            _rawResourceVerifierPool?.Dispose();
-            _webBrowserPool?.Dispose();
-
             _cancellationTokenSource = null;
-            _rawResourceExtractorPool = null;
-            _rawResourceVerifierPool = null;
-            _webBrowserPool = null;
-
-            CheckForOrphanedResources();
-
-            void DisposeRawResourceExtractorPool()
-            {
-                while (_rawResourceExtractorPool?.Any() ?? false)
-                {
-                    _rawResourceExtractorPool.Take();
-                    disposedRawResourceExtractorCount++;
-                }
-            }
-            void DisposeRawResourceVerifierPool()
-            {
-                while (_rawResourceVerifierPool?.Any() ?? false)
-                {
-                    _rawResourceVerifierPool.Take().Dispose();
-                    disposedRawResourceVerifierCount++;
-                }
-            }
-            void DisposeWebBrowserPool()
-            {
-                while (_webBrowserPool?.Any() ?? false)
-                {
-                    _webBrowserPool.Take().Dispose();
-                    disposedWebBrowserCount++;
-                }
-            }
-            void CheckForOrphanedResources()
-            {
-                var orphanedResourceErrorMessage = string.Empty;
-                if (disposedRawResourceExtractorCount != RawResourceExtractorCount)
-                    orphanedResourceErrorMessage += GetErrorMessage(
-                        RawResourceExtractorCount,
-                        nameof(RawResourceExtractor),
-                        disposedRawResourceExtractorCount
-                    );
-
-                if (disposedRawResourceVerifierCount != RawResourceVerifierCount)
-                    orphanedResourceErrorMessage += GetErrorMessage(
-                        RawResourceVerifierCount,
-                        nameof(RawResourceVerifier),
-                        disposedRawResourceVerifierCount
-                    );
-
-                if (disposedWebBrowserCount != _memory.Configurations.WebBrowserCount)
-                    orphanedResourceErrorMessage += GetErrorMessage(
-                        _memory.Configurations.WebBrowserCount,
-                        nameof(ChromiumWebBrowser),
-                        disposedWebBrowserCount
-                    );
-
-                if (string.IsNullOrEmpty(orphanedResourceErrorMessage)) return;
-                _logger.LogInfo($"Orphaned resources detected!{orphanedResourceErrorMessage}");
-
-                string GetErrorMessage(int createdCount, string resourceName, int disposedCount)
-                {
-                    resourceName = $"{resourceName}{(createdCount > 1 ? "s" : string.Empty)}";
-                    var disposedCountText = disposedCount == 0 ? "none" : $"only {disposedCount}";
-                    return $"\r\nThere were {createdCount} {resourceName} created but {disposedCountText} could be found and disposed.";
-                }
-            }
         }
 
-        public class EverythingIsDoneException : Exception { }
+        class EverythingIsDoneException : Exception { }
 
         ~Scheduler() { ReleaseUnmanagedResources(); }
     }

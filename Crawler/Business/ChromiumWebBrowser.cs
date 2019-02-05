@@ -28,7 +28,6 @@ namespace Helix.Crawler
         readonly Stopwatch _stopwatch;
         readonly object _syncRoot;
 
-        public event Action OnIdle;
         public event Action<RawResource> OnRawResourceCaptured;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
@@ -85,11 +84,7 @@ namespace Helix.Crawler
                     onFailed.Invoke(new OperationCanceledException(renderingFailedErrorMessage, cancellationToken));
                     return false;
                 }
-                finally
-                {
-                    _stopwatch.Reset();
-                    OnIdle?.Invoke();
-                }
+                finally { _stopwatch.Reset(); }
 
                 bool TryGetPageSource(out string pageSource)
                 {

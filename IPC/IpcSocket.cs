@@ -72,6 +72,6 @@ namespace Helix.IPC
 
         public void On(string ipcTextMessage, Action<string> action) { _actions[ipcTextMessage] = action; }
 
-        public void Send(IIpcMessage ipcMessage) { _handlerSocket.Send(Encoding.ASCII.GetBytes(JsonConvert.SerializeObject(ipcMessage))); }
+        public void Send(IpcMessage ipcMessage) { _handlerSocket.Send(Encoding.ASCII.GetBytes(JsonConvert.SerializeObject(ipcMessage))); }
     }
 }

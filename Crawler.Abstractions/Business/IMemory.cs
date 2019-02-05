@@ -21,10 +21,10 @@ namespace Helix.Crawler.Abstractions
 
         void Memorize(HtmlDocument toBeExtractedHtmlDocument, CancellationToken cancellationToken);
 
-        bool TryTakeToBeExtractedHtmlDocument(out HtmlDocument htmlDocument);
+        bool TryTake(out HtmlDocument htmlDocument);
 
-        bool TryTakeToBeRenderedUri(out Uri uri);
+        bool TryTake(out Uri uri);
 
-        bool TryTakeToBeVerifiedRawResource(out RawResource rawResource);
+        bool TryTake(out RawResource rawResource);
     }
 }

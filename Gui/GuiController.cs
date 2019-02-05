@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Helix.Crawler;
 using Helix.Crawler.Abstractions;
 using Helix.IPC;
+using Helix.IPC.Abstractions;
 using Newtonsoft.Json;
 
 namespace Helix.Gui
@@ -15,7 +16,7 @@ namespace Helix.Gui
     {
         static readonly List<Task> BackgroundTasks = new List<Task>();
         static readonly Process GuiProcess = new Process { StartInfo = { FileName = "ui/electron.exe" } };
-        static readonly IpcSocket IpcSocket = new IpcSocket("127.0.0.1", 18880);
+        static readonly IIpcSocket IpcSocket = new IpcSocket("127.0.0.1", 18880); // TODO: Dependency Injection?
         static readonly ManualResetEvent ManualResetEvent = new ManualResetEvent(false);
         static readonly Stopwatch Stopwatch = new Stopwatch();
 

@@ -12,8 +12,6 @@ namespace Helix.Crawler
                                                                    url.StartsWith("https", StringComparison.OrdinalIgnoreCase) ||
                                                                    url.StartsWith("/", StringComparison.OrdinalIgnoreCase);
 
-        public event Action OnIdle;
-
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public RawResourceExtractor() { }
 
@@ -22,25 +20,21 @@ namespace Helix.Crawler
             if (htmlDocument == null) throw new ArgumentNullException(nameof(htmlDocument));
             if (onRawResourceExtracted == null) throw new ArgumentNullException(nameof(onRawResourceExtracted));
 
-            try
-            {
-                var htmlAgilityPackDocument = new HtmlAgilityPackDocument();
-                htmlAgilityPackDocument.LoadHtml(htmlDocument.Text);
+            var htmlAgilityPackDocument = new HtmlAgilityPackDocument();
+            htmlAgilityPackDocument.LoadHtml(htmlDocument.Text);
 
-                var anchorTags = htmlAgilityPackDocument.DocumentNode.SelectNodes("//a[@href]");
-                if (anchorTags == null) return;
-                Parallel.ForEach(anchorTags, anchorTag =>
-                {
-                    var url = anchorTag.Attributes["href"].Value;
-                    if (_urlSchemeIsSupported(url))
-                        onRawResourceExtracted.Invoke(new RawResource
-                        {
-                            ParentUri = htmlDocument.Uri,
-                            Url = EnsureAbsolute(url, htmlDocument.Uri)
-                        });
-                });
-            }
-            finally { OnIdle?.Invoke(); }
+            var anchorTags = htmlAgilityPackDocument.DocumentNode.SelectNodes("//a[@href]");
+            if (anchorTags == null) return;
+            Parallel.ForEach(anchorTags, anchorTag =>
+            {
+                var url = anchorTag.Attributes["href"].Value;
+                if (_urlSchemeIsSupported(url))
+                    onRawResourceExtracted.Invoke(new RawResource
+                    {
+                        ParentUri = htmlDocument.Uri,
+                        Url = EnsureAbsolute(url, htmlDocument.Uri)
+                    });
+            });
 
             string EnsureAbsolute(string possiblyRelativeUrl, Uri parentUri)
             {

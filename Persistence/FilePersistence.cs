@@ -11,12 +11,12 @@ namespace Helix.Persistence
     {
         readonly List<Task> _backgroundTasks;
         CancellationTokenSource _cancellationTokenSource;
-        readonly object _syncRoot;
+        readonly object _disposalSyncRoot;
         TextWriter _textWriter;
 
         public FilePersistence(string filePath, TimeSpan? flushDataToDiskInterval = null)
         {
-            _syncRoot = new object();
+            _disposalSyncRoot = new object();
             _cancellationTokenSource = new CancellationTokenSource();
             _backgroundTasks = new List<Task>();
 
@@ -44,7 +44,7 @@ namespace Helix.Persistence
 
         public void Dispose()
         {
-            lock (_syncRoot)
+            lock (_disposalSyncRoot)
             {
                 ReleaseUnmanagedResources();
                 GC.SuppressFinalize(this);

@@ -9,11 +9,11 @@ namespace Helix.Crawler
 {
     public sealed class Memory : IMemory
     {
-        readonly ConcurrentSet<string> _alreadyVerifiedUrls = new ConcurrentSet<string>();
-        readonly object _syncRoot = new object();
-        readonly BlockingCollection<HtmlDocument> _toBeExtractedHtmlDocuments = new BlockingCollection<HtmlDocument>();
-        readonly BlockingCollection<Uri> _toBeRenderedUris = new BlockingCollection<Uri>();
-        readonly BlockingCollection<RawResource> _toBeVerifiedRawResources = new BlockingCollection<RawResource>();
+        readonly ConcurrentSet<string> _alreadyVerifiedUrls;
+        readonly object _syncRoot;
+        readonly BlockingCollection<HtmlDocument> _toBeExtractedHtmlDocuments;
+        readonly BlockingCollection<Uri> _toBeRenderedUris;
+        readonly BlockingCollection<RawResource> _toBeVerifiedRawResources;
 
         public Configurations Configurations { get; }
 
@@ -27,15 +27,14 @@ namespace Helix.Crawler
         public Memory(Configurations configurations)
         {
             Configurations = configurations;
-            _alreadyVerifiedUrls.Clear();
-            _alreadyVerifiedUrls.Add(Configurations.StartUri.AbsoluteUri);
-            _toBeVerifiedRawResources.Add(
-                new RawResource
-                {
-                    ParentUri = null,
-                    Url = Configurations.StartUri.AbsoluteUri
-                }
-            );
+            _syncRoot = new object();
+            _toBeExtractedHtmlDocuments = new BlockingCollection<HtmlDocument>();
+            _toBeRenderedUris = new BlockingCollection<Uri>();
+            _alreadyVerifiedUrls = new ConcurrentSet<string> { Configurations.StartUri.AbsoluteUri };
+            _toBeVerifiedRawResources = new BlockingCollection<RawResource>
+            {
+                new RawResource { ParentUri = null, Url = Configurations.StartUri.AbsoluteUri }
+            };
         }
 
         public void Clear()
@@ -73,17 +72,11 @@ namespace Helix.Crawler
                 Thread.Sleep(TimeSpan.FromSeconds(3));
         }
 
-        public bool TryTakeToBeExtractedHtmlDocument(out HtmlDocument htmlDocument)
-        {
-            return _toBeExtractedHtmlDocuments.TryTake(out htmlDocument);
-        }
+        public bool TryTake(out HtmlDocument htmlDocument) { return _toBeExtractedHtmlDocuments.TryTake(out htmlDocument); }
 
-        public bool TryTakeToBeRenderedUri(out Uri uri) { return _toBeRenderedUris.TryTake(out uri); }
+        public bool TryTake(out Uri uri) { return _toBeRenderedUris.TryTake(out uri); }
 
-        public bool TryTakeToBeVerifiedRawResource(out RawResource rawResource)
-        {
-            return _toBeVerifiedRawResources.TryTake(out rawResource);
-        }
+        public bool TryTake(out RawResource rawResource) { return _toBeVerifiedRawResources.TryTake(out rawResource); }
 
         ~Memory()
         {
