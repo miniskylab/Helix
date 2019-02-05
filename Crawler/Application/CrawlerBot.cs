@@ -10,16 +10,16 @@ namespace Helix.Crawler
     public static class CrawlerBot
     {
         static ILogger _logger;
-        static IManagement _management;
+        static IScheduler _scheduler;
         static IMemory _memory;
         static IReportWriter _reportWriter;
         static readonly List<Task> BackgroundTasks;
 
         public static Statistics Statistics { get; }
 
-        public static CrawlerState CrawlerState => _management?.CrawlerState ?? CrawlerState.Ready;
+        public static CrawlerState CrawlerState => _scheduler?.CrawlerState ?? CrawlerState.Ready;
 
-        public static int RemainingUrlCount => _management?.RemainingUrlCount ?? 0;
+        public static int RemainingUrlCount => _scheduler?.RemainingUrlCount ?? 0;
 
         public static event Action<VerificationResult> OnResourceVerified;
         public static event Action<bool> OnStopped;
@@ -33,21 +33,21 @@ namespace Helix.Crawler
         public static void StartWorking(Configurations configurations)
         {
             ServiceLocator.RegisterServices(configurations);
-            _management = ServiceLocator.Get<IManagement>();
+            _scheduler = ServiceLocator.Get<IScheduler>();
             _memory = ServiceLocator.Get<IMemory>();
             _reportWriter = ServiceLocator.Get<IReportWriter>();
 
-            if (!_management.TryTransitTo(CrawlerState.Working)) return;
+            if (!_scheduler.TryTransitTo(CrawlerState.Working)) return;
             BackgroundTasks.Add(Task.Run(() =>
             {
                 try
                 {
                     EnsureErrorLogFileIsRecreated();
-                    _management.EnsureEnoughResources();
+                    _scheduler.EnsureEnoughResources();
 
-                    var renderingTask = Task.Run(Render, _management.CancellationToken);
-                    var extractionTask = Task.Run(Extract, _management.CancellationToken);
-                    var verificationTask = Task.Run(Verify, _management.CancellationToken);
+                    var renderingTask = Task.Run(Render, _scheduler.CancellationToken);
+                    var extractionTask = Task.Run(Extract, _scheduler.CancellationToken);
+                    var verificationTask = Task.Run(Verify, _scheduler.CancellationToken);
                     BackgroundTasks.Add(renderingTask);
                     BackgroundTasks.Add(extractionTask);
                     BackgroundTasks.Add(verificationTask);
@@ -55,7 +55,7 @@ namespace Helix.Crawler
                 }
                 catch (Exception exception) { _logger.LogException(exception); }
                 finally { Task.Run(StopWorking); }
-            }, _management.CancellationToken));
+            }, _scheduler.CancellationToken));
 
             void EnsureErrorLogFileIsRecreated()
             {
@@ -66,29 +66,29 @@ namespace Helix.Crawler
 
         public static void StopWorking()
         {
-            if (_management != null && !_management.TryTransitTo(CrawlerState.Stopping)) return;
-            var everythingIsDone = _management?.EverythingIsDone ?? false;
+            if (_scheduler != null && !_scheduler.TryTransitTo(CrawlerState.Stopping)) return;
+            var everythingIsDone = _scheduler?.EverythingIsDone ?? false;
 
-            _management?.CancelEverything();
+            _scheduler?.CancelEverything();
             try { Task.WhenAll(BackgroundTasks).Wait(); }
             catch (Exception exception) { _logger.LogException(exception); }
 
-            _management?.Dispose();
+            _scheduler?.Dispose();
             _reportWriter?.Dispose();
             _logger?.Dispose();
             ServiceLocator.Dispose();
 
-            _management?.TryTransitTo(CrawlerState.Ready);
+            _scheduler?.TryTransitTo(CrawlerState.Ready);
             OnStopped?.Invoke(everythingIsDone);
         }
 
         static void Extract()
         {
-            while (!_management.EverythingIsDone && !_management.CancellationToken.IsCancellationRequested)
+            while (!_scheduler.EverythingIsDone && !_scheduler.CancellationToken.IsCancellationRequested)
             {
                 try
                 {
-                    _management.InterlockedCoordinate(out IRawResourceExtractor rawResourceExtractor, out var toBeExtractedHtmlDocument);
+                    _scheduler.InterlockedCoordinate(out IRawResourceExtractor rawResourceExtractor, out var toBeExtractedHtmlDocument);
                     Task.Run(
                         () =>
                         {
@@ -96,40 +96,40 @@ namespace Helix.Crawler
                             {
                                 rawResourceExtractor.ExtractRawResourcesFrom(
                                     toBeExtractedHtmlDocument,
-                                    rawResource => _memory.Memorize(rawResource, _management.CancellationToken)
+                                    rawResource => _memory.Memorize(rawResource, _scheduler.CancellationToken)
                                 );
                             }
                             catch (OperationCanceledException operationCanceledException)
                             {
                                 _logger.LogException(operationCanceledException);
                             }
-                            finally { _management.OnRawResourceExtractionTaskCompleted(); }
+                            finally { _scheduler.OnRawResourceExtractionTaskCompleted(); }
                         },
-                        _management.CancellationToken
+                        _scheduler.CancellationToken
                     ).ContinueWith(
-                        _ => _management.OnRawResourceExtractionTaskCompleted(rawResourceExtractor, toBeExtractedHtmlDocument),
+                        _ => _scheduler.OnRawResourceExtractionTaskCompleted(rawResourceExtractor, toBeExtractedHtmlDocument),
                         TaskContinuationOptions.OnlyOnCanceled | TaskContinuationOptions.ExecuteSynchronously
                     );
                 }
-                catch (Management.EverythingIsDoneException) { }
+                catch (Scheduler.EverythingIsDoneException) { }
                 catch (Exception exception) { _logger.LogException(exception); }
             }
         }
 
         static void Render()
         {
-            while (!_management.EverythingIsDone && !_management.CancellationToken.IsCancellationRequested)
+            while (!_scheduler.EverythingIsDone && !_scheduler.CancellationToken.IsCancellationRequested)
             {
                 try
                 {
-                    _management.InterlockedCoordinate(out IWebBrowser webBrowser, out var toBeRenderedUri);
+                    _scheduler.InterlockedCoordinate(out IWebBrowser webBrowser, out var toBeRenderedUri);
                     Task.Run(
                         () =>
                         {
                             try
                             {
                                 Action<Exception> onFailed = _logger.LogException;
-                                if (!webBrowser.TryRender(toBeRenderedUri, onFailed, _management.CancellationToken, out var htmlText,
+                                if (!webBrowser.TryRender(toBeRenderedUri, onFailed, _scheduler.CancellationToken, out var htmlText,
                                     out var pageLoadTime)) return;
 
                                 if (pageLoadTime.HasValue)
@@ -150,21 +150,21 @@ namespace Helix.Crawler
                                 {
                                     Uri = toBeRenderedUri,
                                     Text = htmlText
-                                }, _management.CancellationToken);
+                                }, _scheduler.CancellationToken);
                             }
                             catch (OperationCanceledException operationCanceledException)
                             {
                                 _logger.LogException(operationCanceledException);
                             }
-                            finally { _management.OnUriRenderingTaskCompleted(); }
+                            finally { _scheduler.OnUriRenderingTaskCompleted(); }
                         },
-                        _management.CancellationToken
+                        _scheduler.CancellationToken
                     ).ContinueWith(
-                        _ => _management.OnUriRenderingTaskCompleted(webBrowser, toBeRenderedUri),
+                        _ => _scheduler.OnUriRenderingTaskCompleted(webBrowser, toBeRenderedUri),
                         TaskContinuationOptions.OnlyOnCanceled | TaskContinuationOptions.ExecuteSynchronously
                     );
                 }
-                catch (Management.EverythingIsDoneException) { }
+                catch (Scheduler.EverythingIsDoneException) { }
                 catch (Exception exception) { _logger.LogException(exception); }
             }
         }
@@ -172,11 +172,11 @@ namespace Helix.Crawler
         static void Verify()
         {
             var resourceScope = ServiceLocator.Get<IResourceScope>();
-            while (!_management.EverythingIsDone && !_management.CancellationToken.IsCancellationRequested)
+            while (!_scheduler.EverythingIsDone && !_scheduler.CancellationToken.IsCancellationRequested)
             {
                 try
                 {
-                    _management.InterlockedCoordinate(out IRawResourceVerifier rawResourceVerifier, out var toBeVerifiedRawResource);
+                    _scheduler.InterlockedCoordinate(out IRawResourceVerifier rawResourceVerifier, out var toBeVerifiedRawResource);
                     Task.Run(
                         () =>
                         {
@@ -201,21 +201,21 @@ namespace Helix.Crawler
                                 var isNotBroken = !verificationResult.IsBrokenResource;
                                 var isInternal = verificationResult.IsInternalResource;
                                 if (resourceExists && isExtracted && isNotBroken && isInternal)
-                                    _memory.Memorize(verifiedResource.Uri, _management.CancellationToken);
+                                    _memory.Memorize(verifiedResource.Uri, _scheduler.CancellationToken);
                             }
                             catch (OperationCanceledException operationCanceledException)
                             {
                                 _logger.LogException(operationCanceledException);
                             }
-                            finally { _management.OnRawResourceVerificationTaskCompleted(); }
+                            finally { _scheduler.OnRawResourceVerificationTaskCompleted(); }
                         },
-                        _management.CancellationToken
+                        _scheduler.CancellationToken
                     ).ContinueWith(
-                        _ => _management.OnRawResourceVerificationTaskCompleted(rawResourceVerifier, toBeVerifiedRawResource),
+                        _ => _scheduler.OnRawResourceVerificationTaskCompleted(rawResourceVerifier, toBeVerifiedRawResource),
                         TaskContinuationOptions.OnlyOnCanceled | TaskContinuationOptions.ExecuteSynchronously
                     );
                 }
-                catch (Management.EverythingIsDoneException) { }
+                catch (Scheduler.EverythingIsDoneException) { }
                 catch (Exception exception) { _logger.LogException(exception); }
             }
         }

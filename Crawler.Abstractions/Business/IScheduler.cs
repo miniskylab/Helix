@@ -3,7 +3,7 @@ using System.Threading;
 
 namespace Helix.Crawler.Abstractions
 {
-    public interface IManagement : IDisposable
+    public interface IScheduler : IDisposable
     {
         CancellationToken CancellationToken { get; }
 

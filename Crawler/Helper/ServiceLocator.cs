@@ -31,7 +31,7 @@ namespace Helix.Crawler
                 .AddSingleton<ILogger, Logger>()
                 .AddSingleton<IReportWriter, ReportWriter>()
                 .AddSingleton<IMemory, Memory>()
-                .AddSingleton<IManagement, Management>()
+                .AddSingleton<IScheduler, Scheduler>()
                 .AddSingleton(configurations)
                 .BuildServiceProvider();
         }

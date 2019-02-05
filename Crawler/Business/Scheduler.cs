@@ -9,7 +9,7 @@ using Helix.Persistence.Abstractions;
 
 namespace Helix.Crawler
 {
-    public sealed class Management : IManagement
+    public sealed class Scheduler : IScheduler
     {
         const int RawResourceExtractorCount = 300;
         const int RawResourceVerifierCount = 2500;
@@ -64,7 +64,7 @@ namespace Helix.Crawler
         }
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public Management(IMemory memory, ILogger logger)
+        public Scheduler(IMemory memory, ILogger logger)
         {
             _memory = memory;
             _logger = logger;
@@ -377,6 +377,6 @@ namespace Helix.Crawler
 
         public class EverythingIsDoneException : Exception { }
 
-        ~Management() { ReleaseUnmanagedResources(); }
+        ~Scheduler() { ReleaseUnmanagedResources(); }
     }
 }
