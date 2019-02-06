@@ -10,7 +10,7 @@ namespace Helix.Crawler
     public class Logger : FileLogger
     {
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public Logger() : base(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "helix_errors.log")) { }
+        public Logger() : base(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "helix.log")) { }
 
         public override void LogException(Exception exception)
         {

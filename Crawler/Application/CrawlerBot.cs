@@ -73,6 +73,7 @@ namespace Helix.Crawler
             if (_scheduler != null && !TryTransitTo(CrawlerState.Stopping)) return;
             var everythingIsDone = _scheduler?.EverythingIsDone ?? false;
 
+            _logger.LogInfo("Stopping ...");
             _scheduler?.CancelEverything();
             try { Task.WhenAll(BackgroundTasks).Wait(); }
             catch (Exception exception) { _logger.LogException(exception); }

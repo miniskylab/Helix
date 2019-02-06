@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -50,11 +51,16 @@ namespace Helix.Gui
             });
             IpcSocket.On("btn-close-clicked", _ =>
             {
-                CrawlerBot.OnResourceVerified -= OnResourceVerified;
-                RedrawGui("Shutting down ...");
-                CrawlerBot.StopWorking();
-                Task.WhenAll(BackgroundTasks).Wait();
-                ManualResetEvent.Set();
+                try
+                {
+                    CrawlerBot.OnResourceVerified -= OnResourceVerified;
+                    RedrawGui("Shutting down ...");
+                    CrawlerBot.StopWorking();
+                    if (!Task.WhenAll(BackgroundTasks).Wait(TimeSpan.FromMinutes(1)))
+                        File.AppendAllText("debug.log", "");
+                }
+                catch (Exception exception) { File.AppendAllText("debug.log", exception.ToString()); }
+                finally { ManualResetEvent.Set(); }
             });
             GuiProcess.Start();
 
