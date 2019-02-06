@@ -12,6 +12,7 @@ namespace Helix.Crawler.Specifications
             ExtractRawResourcesFromHtmlDocument();
             ConvertRelativeUrlToAbsoluteUrl();
             OnlySupportHttpAndHttpsSchemes();
+            IgnoreAnchorTagsWithoutHrefAttribute();
             ThrowExceptionIfArgumentNull();
         }
 
@@ -20,7 +21,8 @@ namespace Helix.Crawler.Specifications
             const string htmlDocumentText = @"
                 <html>
                     <body>
-                        <a href=""/anything""></a>
+                        <a href=""without-leading-slash""></a>
+                        <a href=""/with-leading-slash""></a>
                         <a href=""//www.sanity.com""></a>
                     </body>
                 </html>";
@@ -33,7 +35,8 @@ namespace Helix.Crawler.Specifications
                 },
                 new List<RawResource>
                 {
-                    new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://www.helix.com/anything" },
+                    new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://www.helix.com/without-leading-slash" },
+                    new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://www.helix.com/with-leading-slash" },
                     new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://www.sanity.com" }
                 }
             );
@@ -45,7 +48,8 @@ namespace Helix.Crawler.Specifications
                 },
                 new List<RawResource>
                 {
-                    new RawResource { ParentUri = new Uri("https://www.helix.com"), Url = "https://www.helix.com/anything" },
+                    new RawResource { ParentUri = new Uri("https://www.helix.com"), Url = "https://www.helix.com/without-leading-slash" },
+                    new RawResource { ParentUri = new Uri("https://www.helix.com"), Url = "https://www.helix.com/with-leading-slash" },
                     new RawResource { ParentUri = new Uri("https://www.helix.com"), Url = "https://www.sanity.com" }
                 }
             );
@@ -70,6 +74,22 @@ namespace Helix.Crawler.Specifications
                     new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://www.sanity.com/" },
                     new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://192.168.1.2" }
                 }
+            );
+        }
+
+        void IgnoreAnchorTagsWithoutHrefAttribute()
+        {
+            AddTheoryDescription(new HtmlDocument
+                {
+                    Uri = new Uri("http://www.helix.com"),
+                    Text = @"
+                        <html>
+                            <body>
+                                <a></a>
+                            </body>
+                        </html>"
+                },
+                new List<RawResource>()
             );
         }
 

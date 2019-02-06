@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Helix.Core;
 using Helix.Crawler.Abstractions;
 using Helix.Persistence.Abstractions;
 
@@ -19,6 +20,7 @@ namespace Helix.Crawler
         BlockingCollection<IRawResourceVerifier> _rawResourceVerifierPool;
         BlockingCollection<IWebBrowser> _webBrowserPool;
 
+        [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public ServicePool(IMemory memory, ILogger logger)
         {
             _memory = memory;

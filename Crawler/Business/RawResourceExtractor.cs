@@ -8,10 +8,6 @@ namespace Helix.Crawler
 {
     public class RawResourceExtractor : IRawResourceExtractor
     {
-        readonly Func<string, bool> _urlSchemeIsSupported = url => url.StartsWith("http", StringComparison.OrdinalIgnoreCase) ||
-                                                                   url.StartsWith("https", StringComparison.OrdinalIgnoreCase) ||
-                                                                   url.StartsWith("/", StringComparison.OrdinalIgnoreCase);
-
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public RawResourceExtractor() { }
 
@@ -27,29 +23,26 @@ namespace Helix.Crawler
             if (anchorTags == null) return;
             Parallel.ForEach(anchorTags, anchorTag =>
             {
-                var url = anchorTag.Attributes["href"].Value;
-                if (_urlSchemeIsSupported(url))
+                var extractedUrl = anchorTag.Attributes["href"].Value;
+                var absoluteUrl = EnsureAbsolute(extractedUrl, htmlDocument.Uri);
+                if (uriSchemeIsSupported(new Uri(absoluteUrl, UriKind.Absolute)))
                     onRawResourceExtracted.Invoke(new RawResource
                     {
                         ParentUri = htmlDocument.Uri,
-                        Url = EnsureAbsolute(url, htmlDocument.Uri)
+                        Url = absoluteUrl
                     });
             });
 
-            string EnsureAbsolute(string possiblyRelativeUrl, Uri parentUri)
+            string EnsureAbsolute(string relativeOrAbsoluteUrl, Uri parentUri)
             {
-                if (!possiblyRelativeUrl.StartsWith("/")) return possiblyRelativeUrl;
+                var relativeOrAbsoluteUri = new Uri(relativeOrAbsoluteUrl, UriKind.RelativeOrAbsolute);
+                if (relativeOrAbsoluteUri.IsAbsoluteUri) return relativeOrAbsoluteUrl;
                 if (parentUri == null) throw new ArgumentException();
 
-                string baseString;
-                if (possiblyRelativeUrl.StartsWith("//")) baseString = $"{parentUri.Scheme}:";
-                else
-                {
-                    baseString = $"{parentUri.Scheme}://{parentUri.Host}";
-                    if (!parentUri.IsDefaultPort) baseString += $":{parentUri.Port}";
-                }
-                return $"{baseString}{possiblyRelativeUrl}";
+                var absoluteUri = new Uri(parentUri, relativeOrAbsoluteUrl);
+                return relativeOrAbsoluteUrl.EndsWith("/") ? absoluteUri.AbsoluteUri : absoluteUri.AbsoluteUri.TrimEnd('/');
             }
+            bool uriSchemeIsSupported(Uri uri) { return uri.Scheme == "http" || uri.Scheme == "https"; }
         }
     }
 }
