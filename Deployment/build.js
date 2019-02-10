@@ -9,13 +9,16 @@ const yauzl = require("yauzl");
 const rimraf = require("rimraf");
 const asar = require("asar");
 
+const latestStableChromiumVersion = "72.0.3626.96-r612437";
+const latestChromeDriverVersion = "72.0.3626.69";
+
 (async () => {
     const commandLineArguments = process.argv.slice(2);
     const pathToHelixBinaryReleaseDirectory = `${commandLineArguments[commandLineArguments.indexOf("-o") + 1]}`;
 
     await DeployElectronJs(`${pathToHelixBinaryReleaseDirectory}ui`);
-    await DeployChromiumWebBrowser(`${pathToHelixBinaryReleaseDirectory}`, "71.0.3578.98-r599034");
-    await DeployChromeWebDriver(pathToHelixBinaryReleaseDirectory, "2.45");
+    await DeployChromiumWebBrowser(`${pathToHelixBinaryReleaseDirectory}`, latestStableChromiumVersion);
+    await DeployChromeWebDriver(pathToHelixBinaryReleaseDirectory, latestChromeDriverVersion);
 
     console.log("Build process completed!");
 })();
