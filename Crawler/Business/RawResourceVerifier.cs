@@ -51,12 +51,6 @@ namespace Helix.Crawler
 
         public bool TryVerify(RawResource rawResource, out VerificationResult verificationResult)
         {
-            if (!_configurations.VerifyExternalUrls)
-            {
-                verificationResult = null;
-                return false;
-            }
-
             verificationResult = new VerificationResult { RawResource = rawResource };
             if (!_rawResourceProcessor.TryProcessRawResource(rawResource, out var resource))
             {
@@ -66,16 +60,21 @@ namespace Helix.Crawler
                 return true;
             }
 
+            verificationResult.IsInternalResource = _resourceScope.IsInternalResource(resource);
+            if (!verificationResult.IsInternalResource && !_configurations.VerifyExternalUrls)
+            {
+                verificationResult = null;
+                return false;
+            }
+
+            verificationResult.Resource = resource;
+            verificationResult.HttpStatusCode = rawResource.HttpStatusCode;
+            if (verificationResult.HttpStatusCode != 0) return true;
+
             try
             {
-                verificationResult.Resource = resource;
-                verificationResult.IsInternalResource = _resourceScope.IsInternalResource(resource);
-                verificationResult.HttpStatusCode = rawResource.HttpStatusCode;
-                if (verificationResult.HttpStatusCode == 0)
-                {
-                    _sendingGETRequestTask = _httpClient.GetAsync(resource.Uri, _cancellationTokenSource.Token);
-                    verificationResult.HttpStatusCode = (int) _sendingGETRequestTask.Result.StatusCode;
-                }
+                _sendingGETRequestTask = _httpClient.GetAsync(resource.Uri, _cancellationTokenSource.Token);
+                verificationResult.HttpStatusCode = (int) _sendingGETRequestTask.Result.StatusCode;
             }
             catch (AggregateException aggregateException)
             {

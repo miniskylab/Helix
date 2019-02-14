@@ -9,13 +9,13 @@ namespace Helix.Crawler
 {
     public static class CrawlerBot
     {
-        static readonly object _crawlerStateTransitionSyncRoot;
         static ILogger _logger;
         static IMemory _memory;
         static IReportWriter _reportWriter;
         static IScheduler _scheduler;
         static IServicePool _servicePool;
         static readonly List<Task> BackgroundTasks;
+        static readonly object CrawlerStateTransitionSyncRoot;
 
         public static CrawlerState CrawlerState { get; private set; } = CrawlerState.Ready;
 
@@ -30,7 +30,7 @@ namespace Helix.Crawler
         {
             Statistics = new Statistics();
             BackgroundTasks = new List<Task>();
-            _crawlerStateTransitionSyncRoot = new object();
+            CrawlerStateTransitionSyncRoot = new object();
         }
 
         public static void StartWorking(Configurations configurations)
@@ -132,28 +132,28 @@ namespace Helix.Crawler
             switch (crawlerState)
             {
                 case CrawlerState.Ready:
-                    lock (_crawlerStateTransitionSyncRoot)
+                    lock (CrawlerStateTransitionSyncRoot)
                     {
                         if (CrawlerState != CrawlerState.Stopping) return false;
                         CrawlerState = CrawlerState.Ready;
                         return true;
                     }
                 case CrawlerState.Working:
-                    lock (_crawlerStateTransitionSyncRoot)
+                    lock (CrawlerStateTransitionSyncRoot)
                     {
                         if (CrawlerState != CrawlerState.Ready && CrawlerState != CrawlerState.Paused) return false;
                         CrawlerState = CrawlerState.Working;
                         return true;
                     }
                 case CrawlerState.Stopping:
-                    lock (_crawlerStateTransitionSyncRoot)
+                    lock (CrawlerStateTransitionSyncRoot)
                     {
                         if (CrawlerState != CrawlerState.Working && CrawlerState != CrawlerState.Paused) return false;
                         CrawlerState = CrawlerState.Stopping;
                         return true;
                     }
                 case CrawlerState.Paused:
-                    lock (_crawlerStateTransitionSyncRoot)
+                    lock (CrawlerStateTransitionSyncRoot)
                     {
                         if (CrawlerState != CrawlerState.Working) return false;
                         CrawlerState = CrawlerState.Paused;
@@ -179,7 +179,7 @@ namespace Helix.Crawler
                     if (isStartUrl || !isOrphanedUrl)
                     {
                         // TODO: Investigate where those orphaned Uri-s came from.
-                        _reportWriter.WriteReport(verificationResult, _memory.Configurations.ReportBrokenLinksOnly);
+                        _reportWriter.WriteReport(verificationResult);
                         Statistics.VerifiedUrlCount++;
                         if (verificationResult.IsBrokenResource) Statistics.BrokenUrlCount++;
                         else Statistics.ValidUrlCount++;

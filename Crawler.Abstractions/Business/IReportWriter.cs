@@ -4,6 +4,6 @@ namespace Helix.Crawler.Abstractions
 {
     public interface IReportWriter : IDisposable
     {
-        void WriteReport(VerificationResult verificationResult, bool writeBrokenLinksOnly = false);
+        void WriteReport(VerificationResult verificationResult);
     }
 }
