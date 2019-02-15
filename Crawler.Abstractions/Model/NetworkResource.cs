@@ -2,6 +2,6 @@ namespace Helix.Crawler.Abstractions
 {
     public abstract class NetworkResource
     {
-        public int HttpStatusCode { get; set; }
+        public HttpStatusCode HttpStatusCode { get; set; }
     }
 }

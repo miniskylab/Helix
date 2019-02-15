@@ -32,7 +32,7 @@ namespace Helix.Gui
 
             void OnResourceVerified(VerificationResult verificationResult)
             {
-                RedrawGui($"{verificationResult.HttpStatusCode} - {verificationResult.RawResource.Url}");
+                RedrawGui($"{verificationResult.StatusCode:D} - {verificationResult.VerifiedUrl}");
             }
             IpcSocket.On("btn-start-clicked", configurationJsonString =>
             {

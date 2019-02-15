@@ -1,11 +1,9 @@
 using System;
-using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
-using Helix.Core;
 using Helix.Crawler.Abstractions;
 
 namespace Helix.Crawler
@@ -52,10 +50,11 @@ namespace Helix.Crawler
         public bool TryVerify(RawResource rawResource, out VerificationResult verificationResult)
         {
             verificationResult = new VerificationResult { RawResource = rawResource };
-            if (!_rawResourceProcessor.TryProcessRawResource(rawResource, out var resource))
+            var rawResourceProcessingResultCode = _rawResourceProcessor.TryProcessRawResource(rawResource, out var resource);
+            if (rawResourceProcessingResultCode != HttpStatusCode.OK)
             {
                 verificationResult.Resource = null;
-                verificationResult.HttpStatusCode = (int) HttpStatusCode.ExpectationFailed;
+                verificationResult.StatusCode = rawResourceProcessingResultCode;
                 verificationResult.IsInternalResource = false;
                 return true;
             }
@@ -68,26 +67,26 @@ namespace Helix.Crawler
             }
 
             verificationResult.Resource = resource;
-            verificationResult.HttpStatusCode = rawResource.HttpStatusCode;
-            if (verificationResult.HttpStatusCode != 0) return true;
+            verificationResult.StatusCode = rawResource.HttpStatusCode;
+            if (verificationResult.StatusCode != 0) return true;
 
             try
             {
                 _sendingGETRequestTask = _httpClient.GetAsync(resource.Uri, _cancellationTokenSource.Token);
-                verificationResult.HttpStatusCode = (int) _sendingGETRequestTask.Result.StatusCode;
+                verificationResult.StatusCode = (HttpStatusCode) _sendingGETRequestTask.Result.StatusCode;
             }
             catch (AggregateException aggregateException)
             {
                 switch (aggregateException.InnerException)
                 {
                     case TaskCanceledException _:
-                        verificationResult.HttpStatusCode = _cancellationTokenSource.Token.IsCancellationRequested
-                            ? (int) HttpStatusCode.Processing
-                            : (int) HttpStatusCode.RequestTimeout;
+                        verificationResult.StatusCode = _cancellationTokenSource.Token.IsCancellationRequested
+                            ? HttpStatusCode.Processing
+                            : HttpStatusCode.RequestTimeout;
                         break;
                     case HttpRequestException _:
                     case SocketException _:
-                        verificationResult.HttpStatusCode = (int) HttpStatusCode.BadRequest;
+                        verificationResult.StatusCode = HttpStatusCode.BadRequest;
                         break;
                     default:
                         throw;

@@ -11,7 +11,8 @@ namespace Helix.Crawler.Specifications
         {
             ExtractRawResourcesFromHtmlDocument();
             IgnoreAnchorTagsWithoutHrefAttribute();
-            IgnoreAnchorTagsWithEmptyOrWhiteSpaceOnlyHrefAttributeValue();
+            IgnoreAnchorTagsWithHrefAttributeContainingEmptyOrWhiteSpaceCharactersOnly();
+            IgnoreAnchorTagsWithHrefAttributeContainingJavaScriptCode();
             ThrowExceptionIfArgumentNull();
         }
 
@@ -45,7 +46,7 @@ namespace Helix.Crawler.Specifications
             );
         }
 
-        void IgnoreAnchorTagsWithEmptyOrWhiteSpaceOnlyHrefAttributeValue()
+        void IgnoreAnchorTagsWithHrefAttributeContainingEmptyOrWhiteSpaceCharactersOnly()
         {
             AddTheoryDescription(new HtmlDocument
                 {
@@ -55,6 +56,23 @@ namespace Helix.Crawler.Specifications
                             <body>
                                 <a href=""""></a>
                                 <a href="" ""></a>
+                            </body>
+                        </html>"
+                },
+                new List<RawResource>()
+            );
+        }
+
+        void IgnoreAnchorTagsWithHrefAttributeContainingJavaScriptCode()
+        {
+            AddTheoryDescription(new HtmlDocument
+                {
+                    Uri = new Uri("http://www.helix.com"),
+                    Text = @"
+                        <html>
+                            <body>
+                                <a href=""javascript:test()""></a>
+                                <a href=""JavaScript:test()""></a>
                             </body>
                         </html>"
                 },

@@ -17,8 +17,11 @@ namespace Helix.WebBrowser
 {
     class ChromiumWebBrowser : IWebBrowser
     {
+        readonly (int width, int height) _browserWindowSize;
         ChromeDriver _chromeDriver;
         ProxyServer _httpProxyServer;
+        readonly string _pathToChromeDriverExecutable;
+        readonly string _pathToChromiumExecutable;
         readonly List<int> _processIds;
         readonly Stopwatch _stopwatch;
         readonly object _syncRoot;
@@ -30,11 +33,15 @@ namespace Helix.WebBrowser
         public event AsyncEventHandler<SessionEventArgs> BeforeRequest;
         public event AsyncEventHandler<SessionEventArgs> BeforeResponse;
 
-        public ChromiumWebBrowser(bool useIncognitoWebBrowser, bool useHeadlessWebBrowser)
+        public ChromiumWebBrowser(string pathToChromiumExecutable, string pathToChromeDriverExecutable, bool useIncognitoWebBrowser = false,
+            bool useHeadlessWebBrowser = true, (int width, int height) browserWindowSize = default)
         {
             _processIds = new List<int>();
             _syncRoot = new object();
             _stopwatch = new Stopwatch();
+            _pathToChromiumExecutable = pathToChromiumExecutable;
+            _pathToChromeDriverExecutable = pathToChromeDriverExecutable;
+            _browserWindowSize = browserWindowSize == default ? (1024, 630) : browserWindowSize;
             _useIncognitoWebBrowser = useIncognitoWebBrowser;
             _useHeadlessWebBrowser = useHeadlessWebBrowser;
             SetupHttpProxyServer();
@@ -176,12 +183,12 @@ namespace Helix.WebBrowser
             var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
             if (workingDirectory == null) throw new InvalidOperationException();
 
-            var chromeDriverService = ChromeDriverService.CreateDefaultService(workingDirectory);
+            var chromeDriverService = ChromeDriverService.CreateDefaultService(_pathToChromeDriverExecutable);
             chromeDriverService.HideCommandPromptWindow = true;
 
             var chromeOptions = new ChromeOptions
             {
-                BinaryLocation = Path.Combine(workingDirectory, "chromium/chrome.exe"),
+                BinaryLocation = _pathToChromiumExecutable,
                 Proxy = new Proxy
                 {
                     HttpProxy = $"http://{IPAddress.Loopback}:{_httpProxyServer.ProxyEndPoints[0].Port}",
@@ -191,7 +198,7 @@ namespace Helix.WebBrowser
             };
             if (_useIncognitoWebBrowser) chromeOptions.AddArguments("--incognito");
             if (_useHeadlessWebBrowser) chromeOptions.AddArguments("--headless");
-            chromeOptions.AddArguments("--window-size=1920,1080");
+            chromeOptions.AddArguments($"--window-size={_browserWindowSize.width},{_browserWindowSize.height}");
 
             _chromeDriver = new ChromeDriver(chromeDriverService, chromeOptions)
             {

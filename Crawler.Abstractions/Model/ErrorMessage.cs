@@ -1,4 +1,4 @@
-﻿namespace Helix.Core
+﻿namespace Helix.Crawler.Abstractions
 {
     public static class ErrorMessage
     {

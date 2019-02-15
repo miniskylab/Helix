@@ -1,7 +1,6 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Helix.Core;
 using Helix.Crawler.Abstractions;
 using Helix.Persistence.Abstractions;
 

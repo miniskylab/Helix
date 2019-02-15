@@ -2,6 +2,6 @@
 {
     public interface IRawResourceProcessor
     {
-        bool TryProcessRawResource(RawResource rawResource, out Resource resource);
+        HttpStatusCode TryProcessRawResource(RawResource rawResource, out Resource resource);
     }
 }

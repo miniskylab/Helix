@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Helix.Core;
 using Helix.Crawler.Abstractions;
 using HtmlAgilityPackDocument = HtmlAgilityPack.HtmlDocument;
 
@@ -24,12 +23,15 @@ namespace Helix.Crawler
             Parallel.ForEach(anchorTags, anchorTag =>
             {
                 var extractedUrl = anchorTag.Attributes["href"].Value;
-                if (!string.IsNullOrWhiteSpace(extractedUrl))
-                    onRawResourceExtracted.Invoke(new RawResource
-                    {
-                        ParentUri = htmlDocument.Uri,
-                        Url = extractedUrl
-                    });
+                if (IsNullOrWhiteSpace() || IsJavaScriptCode()) return;
+                onRawResourceExtracted.Invoke(new RawResource
+                {
+                    ParentUri = htmlDocument.Uri,
+                    Url = extractedUrl
+                });
+
+                bool IsNullOrWhiteSpace() { return string.IsNullOrWhiteSpace(extractedUrl); }
+                bool IsJavaScriptCode() { return extractedUrl.StartsWith("javascript:", StringComparison.InvariantCultureIgnoreCase); }
             });
         }
     }

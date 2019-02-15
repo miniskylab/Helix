@@ -2,6 +2,7 @@
 {
     public interface IWebBrowserProvider
     {
-        IWebBrowser GetWebBrowser(bool useIncognitoWebBrowser, bool useHeadlessWebBrowser);
+        IWebBrowser GetWebBrowser(string pathToChromiumExecutable, string pathToChromeDriverExecutable, bool useIncognitoWebBrowser = false,
+            bool useHeadlessWebBrowser = true, (int width, int height) browserWindowSize = default);
     }
 }

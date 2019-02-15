@@ -1,5 +1,4 @@
 ﻿using System;
-using Helix.Core;
 using Helix.Crawler.Abstractions;
 
 namespace Helix.Crawler

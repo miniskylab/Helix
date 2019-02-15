@@ -1,7 +1,8 @@
 ﻿using System;
+using System.IO;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using Helix.Core;
 using Helix.Crawler.Abstractions;
 using Helix.WebBrowser.Abstractions;
 using Titanium.Web.Proxy.EventArguments;
@@ -18,10 +19,18 @@ namespace Helix.Crawler
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public HtmlRenderer(Configurations configurations, IWebBrowserProvider webBrowserProvider, IResourceScope resourceScope)
         {
-            _disposalSyncRoot = new object();
-            _webBrowser = webBrowserProvider.GetWebBrowser(configurations.UseIncognitoWebBrowser, configurations.UseHeadlessWebBrowsers);
+            var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
+            var pathToChromiumExecutable = Path.Combine(workingDirectory, "chromium/chrome.exe");
+            _webBrowser = webBrowserProvider.GetWebBrowser(
+                pathToChromiumExecutable,
+                workingDirectory,
+                configurations.UseIncognitoWebBrowser,
+                configurations.UseHeadlessWebBrowsers,
+                (1920, 1080)
+            );
             _webBrowser.BeforeRequest += EnsureInternal;
             _webBrowser.BeforeResponse += CaptureNetworkTraffic;
+            _disposalSyncRoot = new object();
 
             Task EnsureInternal(object _, SessionEventArgs networkTraffic)
             {
@@ -53,7 +62,7 @@ namespace Helix.Crawler
                     {
                         ParentUri = parentUri,
                         Url = request.Url,
-                        HttpStatusCode = response.StatusCode
+                        HttpStatusCode = (HttpStatusCode) response.StatusCode
                     });
                 });
             }

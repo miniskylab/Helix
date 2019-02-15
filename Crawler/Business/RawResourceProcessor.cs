@@ -1,5 +1,4 @@
 ﻿using System;
-using Helix.Core;
 using Helix.Crawler.Abstractions;
 
 namespace Helix.Crawler
@@ -11,18 +10,18 @@ namespace Helix.Crawler
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public RawResourceProcessor(IResourceScope resourceScope) { _resourceScope = resourceScope; }
 
-        public bool TryProcessRawResource(RawResource rawResource, out Resource resource)
+        public HttpStatusCode TryProcessRawResource(RawResource rawResource, out Resource resource)
         {
             if (rawResource == null) throw new ArgumentNullException();
 
             resource = null;
-            if (!TryCreateAbsoluteUri(out var uri)) return false;
-            if (!UriSchemeIsSupported()) return false;
-            if (IsOrphanedUri()) return false;
+            if (!TryCreateAbsoluteUri(out var uri)) return HttpStatusCode.MalformedUri;
+            if (UriSchemeIsNotSupported()) return HttpStatusCode.UriSchemeNotSupported;
+            if (IsOrphanedUri()) return HttpStatusCode.OrphanedUri;
             StripFragment();
 
             resource = new Resource { ParentUri = rawResource.ParentUri, Uri = uri, HttpStatusCode = rawResource.HttpStatusCode };
-            return true;
+            return HttpStatusCode.OK;
 
             bool TryCreateAbsoluteUri(out Uri absoluteUri)
             {
@@ -37,7 +36,7 @@ namespace Helix.Crawler
                 absoluteUri = new Uri(rawResource.ParentUri, rawResource.Url);
                 return true;
             }
-            bool UriSchemeIsSupported() { return uri.Scheme == "http" || uri.Scheme == "https"; }
+            bool UriSchemeIsNotSupported() { return uri.Scheme != "http" && uri.Scheme != "https"; }
             bool IsOrphanedUri()
             {
                 // TODO: Investigate where those orphaned Uri-s came from.

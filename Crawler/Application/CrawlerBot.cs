@@ -168,13 +168,14 @@ namespace Helix.Crawler
 
         static void Verify()
         {
-            var resourceScope = ServiceLocator.Get<IResourceScope>();
             while (!_scheduler.EverythingIsDone && !_scheduler.CancellationToken.IsCancellationRequested)
                 _scheduler.CreateTask((rawResourceVerifier, toBeVerifiedRawResource) =>
                 {
                     if (!rawResourceVerifier.TryVerify(toBeVerifiedRawResource, out var verificationResult)) return;
-                    var isNotStartUri = verificationResult.Resource == null || !resourceScope.IsStartUri(verificationResult.Resource.Uri);
-                    if (verificationResult.IsOrphanedRawResource && isNotStartUri) return;
+                    var isOrphanedUri = verificationResult.StatusCode == HttpStatusCode.OrphanedUri;
+                    var uriSchemeNotSupported = verificationResult.StatusCode == HttpStatusCode.UriSchemeNotSupported;
+                    if (isOrphanedUri || uriSchemeNotSupported) return;
+                    // TODO: We should log these orphaned uri-s somewhere
 
                     _reportWriter.WriteReport(verificationResult);
                     Statistics.VerifiedUrlCount++;

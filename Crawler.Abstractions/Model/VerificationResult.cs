@@ -2,18 +2,27 @@ namespace Helix.Crawler.Abstractions
 {
     public class VerificationResult
     {
-        public int HttpStatusCode { get; set; }
-
         public bool IsInternalResource { get; set; }
 
         public RawResource RawResource { get; set; }
 
         public Resource Resource { get; set; }
 
-        public bool IsBrokenResource => HttpStatusCode < 0 || 400 <= HttpStatusCode;
+        public HttpStatusCode StatusCode { get; set; }
 
-        public bool IsExtractedResource => Resource != null && RawResource?.HttpStatusCode == 0;
+        public bool IsBrokenResource => StatusCode < 0 || 400 <= (int) StatusCode;
 
-        public bool IsOrphanedRawResource => RawResource.ParentUri == null;
+        public bool IsExtractedResource => RawResource?.HttpStatusCode == 0;
+
+        public string ParentUrl => RawResource.ParentUri?.OriginalString;
+
+        public string VerifiedUrl
+        {
+            get
+            {
+                var verifiedUrl = RawResource.Url.EndsWith("/") ? Resource?.Uri.AbsoluteUri : Resource?.Uri.AbsoluteUri.TrimEnd('/');
+                return verifiedUrl ?? RawResource.Url;
+            }
+        }
     }
 }

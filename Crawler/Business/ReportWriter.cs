@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Reflection;
-using Helix.Core;
 using Helix.Crawler.Abstractions;
 using Helix.Persistence.Abstractions;
 
@@ -17,7 +16,7 @@ namespace Helix.Crawler
         {
             var reportFilePath = $@"{Path.GetDirectoryName(Assembly.GetEntryAssembly().Location)}\Report.csv";
             _filePersistence = persistenceProvider.GetFilePersistence(reportFilePath);
-            _filePersistence.WriteLineAsync("HTTP Status Code,Parent Url,Verified Url");
+            _filePersistence.WriteLineAsync("Status Code,Parent Url,Verified Url");
             _configurations = configurations;
         }
 
@@ -26,9 +25,9 @@ namespace Helix.Crawler
         public void WriteReport(VerificationResult verificationResult)
         {
             if (_configurations.ReportBrokenLinksOnly && !verificationResult.IsBrokenResource) return;
-            var parentUri = verificationResult.Resource?.ParentUri;
-            var verifiedUrl = verificationResult.Resource?.Uri.OriginalString ?? verificationResult.RawResource.Url;
-            _filePersistence.WriteLineAsync($"{verificationResult.HttpStatusCode},{parentUri?.OriginalString},{verifiedUrl}");
+            var parentUrl = verificationResult.ParentUrl;
+            var verifiedUrl = verificationResult.VerifiedUrl;
+            _filePersistence.WriteLineAsync($"{verificationResult.StatusCode:D},{parentUrl},{verifiedUrl}");
         }
     }
 }

@@ -1,17 +1,14 @@
-﻿using System;
-using Helix.Core;
-using Helix.WebBrowser.Abstractions;
+﻿using Helix.WebBrowser.Abstractions;
 
 namespace Helix.WebBrowser
 {
     public class WebBrowserProvider : IWebBrowserProvider
     {
-        [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public WebBrowserProvider() { }
-
-        public IWebBrowser GetWebBrowser(bool useIncognitoWebBrowser, bool useHeadlessWebBrowser)
+        public IWebBrowser GetWebBrowser(string pathToChromiumExecutable, string pathToChromeDriverExecutable,
+            bool useIncognitoWebBrowser = false, bool useHeadlessWebBrowser = true, (int width, int height) browserWindowSize = default)
         {
-            return new ChromiumWebBrowser(useIncognitoWebBrowser, useHeadlessWebBrowser);
+            return new ChromiumWebBrowser(pathToChromiumExecutable, pathToChromeDriverExecutable, useIncognitoWebBrowser,
+                useHeadlessWebBrowser, browserWindowSize);
         }
     }
 }
