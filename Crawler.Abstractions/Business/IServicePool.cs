@@ -7,16 +7,16 @@ namespace Helix.Crawler.Abstractions
     {
         void EnsureEnoughResources(CancellationToken cancellationToken);
 
+        IHtmlRenderer GetHtmlRenderer(CancellationToken cancellationToken);
+
         IRawResourceExtractor GetRawResourceExtractor(CancellationToken cancellationToken);
 
         IRawResourceVerifier GetResourceVerifier(CancellationToken cancellationToken);
-
-        IWebBrowser GetWebBrowser(CancellationToken cancellationToken);
 
         void Return(IRawResourceExtractor rawResourceExtractor);
 
         void Return(IRawResourceVerifier rawResourceVerifier);
 
-        void Return(IWebBrowser webBrowser);
+        void Return(IHtmlRenderer htmlRenderer);
     }
 }

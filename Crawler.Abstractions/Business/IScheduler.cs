@@ -15,7 +15,7 @@ namespace Helix.Crawler.Abstractions
 
         void CreateTask(Action<IRawResourceExtractor, HtmlDocument> taskDescription);
 
-        void CreateTask(Action<IWebBrowser, Uri> taskDescription);
+        void CreateTask(Action<IHtmlRenderer, Uri> taskDescription);
 
         void CreateTask(Action<IRawResourceVerifier, RawResource> taskDescription);
     }

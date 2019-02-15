@@ -10,49 +10,9 @@ namespace Helix.Crawler.Specifications
         public RawResourceExtractionDefinition()
         {
             ExtractRawResourcesFromHtmlDocument();
-            ConvertRelativeUrlToAbsoluteUrl();
-            OnlySupportHttpAndHttpsSchemes();
             IgnoreAnchorTagsWithoutHrefAttribute();
+            IgnoreAnchorTagsWithEmptyOrWhiteSpaceOnlyHrefAttributeValue();
             ThrowExceptionIfArgumentNull();
-        }
-
-        void ConvertRelativeUrlToAbsoluteUrl()
-        {
-            const string htmlDocumentText = @"
-                <html>
-                    <body>
-                        <a href=""without-leading-slash""></a>
-                        <a href=""/with-leading-slash""></a>
-                        <a href=""//www.sanity.com""></a>
-                    </body>
-                </html>";
-
-            AddTheoryDescription(
-                new HtmlDocument
-                {
-                    Uri = new Uri("http://www.helix.com"),
-                    Text = htmlDocumentText
-                },
-                new List<RawResource>
-                {
-                    new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://www.helix.com/without-leading-slash" },
-                    new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://www.helix.com/with-leading-slash" },
-                    new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://www.sanity.com" }
-                }
-            );
-            AddTheoryDescription(
-                new HtmlDocument
-                {
-                    Uri = new Uri("https://www.helix.com"),
-                    Text = htmlDocumentText
-                },
-                new List<RawResource>
-                {
-                    new RawResource { ParentUri = new Uri("https://www.helix.com"), Url = "https://www.helix.com/without-leading-slash" },
-                    new RawResource { ParentUri = new Uri("https://www.helix.com"), Url = "https://www.helix.com/with-leading-slash" },
-                    new RawResource { ParentUri = new Uri("https://www.helix.com"), Url = "https://www.sanity.com" }
-                }
-            );
         }
 
         void ExtractRawResourcesFromHtmlDocument()
@@ -64,16 +24,41 @@ namespace Helix.Crawler.Specifications
                     Text = @"
                         <html>
                             <body>
+                                <a href=""//www.sanity.com""></a>
                                 <a href=""http://www.sanity.com/""></a>
+                                <a href=""ftp://www.sanity.com""></a>
+                                <a href=""/with-leading-slash""></a>
+                                <a href=""without-leading-slash""></a>
                                 <a href=""http://192.168.1.2""></a>
                             </body>
                         </html>"
                 },
                 new List<RawResource>
                 {
+                    new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "//www.sanity.com" },
                     new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://www.sanity.com/" },
+                    new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "ftp://www.sanity.com" },
+                    new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "/with-leading-slash" },
+                    new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "without-leading-slash" },
                     new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://192.168.1.2" }
                 }
+            );
+        }
+
+        void IgnoreAnchorTagsWithEmptyOrWhiteSpaceOnlyHrefAttributeValue()
+        {
+            AddTheoryDescription(new HtmlDocument
+                {
+                    Uri = new Uri("http://www.helix.com"),
+                    Text = @"
+                        <html>
+                            <body>
+                                <a href=""""></a>
+                                <a href="" ""></a>
+                            </body>
+                        </html>"
+                },
+                new List<RawResource>()
             );
         }
 
@@ -86,25 +71,6 @@ namespace Helix.Crawler.Specifications
                         <html>
                             <body>
                                 <a></a>
-                            </body>
-                        </html>"
-                },
-                new List<RawResource>()
-            );
-        }
-
-        void OnlySupportHttpAndHttpsSchemes()
-        {
-            AddTheoryDescription(new HtmlDocument
-                {
-                    Uri = new Uri("http://www.helix.com"),
-                    Text = @"
-                        <html>
-                            <body>
-                                <a href=""ftp://www.sanity.com""></a>
-                                <a href=""mailto://www.sanity.com""></a>
-                                <a href=""telnet://www.sanity.com""></a>
-                                <a href=""file://www.sanity.com""></a>
                             </body>
                         </html>"
                 },

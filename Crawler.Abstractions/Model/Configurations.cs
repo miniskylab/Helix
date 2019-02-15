@@ -7,36 +7,36 @@ namespace Helix.Crawler.Abstractions
     {
         public string DomainName { get; }
 
+        public int HtmlRendererCount { get; }
+
         public bool ReportBrokenLinksOnly { get; }
 
         public int RequestTimeoutDuration { get; }
 
-        public bool ShowWebBrowsers { get; }
-
         public Uri StartUri { get; }
+
+        public bool UseHeadlessWebBrowsers { get; }
 
         public bool UseIncognitoWebBrowser { get; }
 
         public bool VerifyExternalUrls { get; }
 
-        public int WebBrowserCount { get; }
-
         public Configurations(string domainName = "", bool reportBrokenLinksOnly = false, int requestTimeoutDuration = 0,
-            bool showWebBrowsers = false, Uri startUri = null, int webBrowserCount = 0)
+            bool useHeadlessWebBrowsers = false, Uri startUri = null, int htmlRendererCount = 0)
         {
             DomainName = domainName;
             ReportBrokenLinksOnly = reportBrokenLinksOnly;
             RequestTimeoutDuration = requestTimeoutDuration;
-            ShowWebBrowsers = showWebBrowsers;
+            UseHeadlessWebBrowsers = useHeadlessWebBrowsers;
             StartUri = startUri;
-            WebBrowserCount = webBrowserCount;
+            HtmlRendererCount = htmlRendererCount;
         }
 
         public Configurations(string configurationJsonString)
         {
             var tokens = JObject.Parse(configurationJsonString);
-            ShowWebBrowsers = (bool) (tokens.SelectToken(nameof(ShowWebBrowsers)) ?? false);
-            WebBrowserCount = (int) (tokens.SelectToken(nameof(WebBrowserCount)) ?? 0);
+            UseHeadlessWebBrowsers = (bool) (tokens.SelectToken(nameof(UseHeadlessWebBrowsers)) ?? false);
+            HtmlRendererCount = (int) (tokens.SelectToken(nameof(HtmlRendererCount)) ?? 0);
             ReportBrokenLinksOnly = (bool) (tokens.SelectToken(nameof(ReportBrokenLinksOnly)) ?? false);
             RequestTimeoutDuration = (int) (tokens.SelectToken(nameof(RequestTimeoutDuration)) ?? 0);
             StartUri = ValidateStartUri((string) tokens.SelectToken(nameof(StartUri)) ?? string.Empty);

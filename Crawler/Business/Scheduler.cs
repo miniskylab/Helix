@@ -86,7 +86,7 @@ namespace Helix.Crawler
                     () =>
                     {
                         try { taskDescription(rawResourceExtractor, toBeExtractedHtmlDocument); }
-                        catch (OperationCanceledException operationCanceledException) { _logger.LogException(operationCanceledException); }
+                        catch (Exception exception) { _logger.LogException(exception); }
                         finally { ReleaseRawResourceExtractor(); }
                     },
                     CancellationToken
@@ -146,25 +146,25 @@ namespace Helix.Crawler
             void ReturnToBeExtractedHtmlDocument() { _memory.Memorize(toBeExtractedHtmlDocument, CancellationToken.None); }
         }
 
-        public void CreateTask(Action<IWebBrowser, Uri> taskDescription)
+        public void CreateTask(Action<IHtmlRenderer, Uri> taskDescription)
         {
-            IWebBrowser webBrowser;
+            IHtmlRenderer htmlRenderer;
             Uri toBeRenderedUri;
             try
             {
-                GetWebBrowserAndToBeRenderedUri();
+                GetHtmlRendererAndToBeRenderedUri();
                 Task.Run(
                     () =>
                     {
-                        try { taskDescription(webBrowser, toBeRenderedUri); }
-                        catch (OperationCanceledException operationCanceledException) { _logger.LogException(operationCanceledException); }
-                        finally { ReleaseWebBrowser(); }
+                        try { taskDescription(htmlRenderer, toBeRenderedUri); }
+                        catch (Exception exception) { _logger.LogException(exception); }
+                        finally { ReleaseHtmlRenderer(); }
                     },
                     CancellationToken
                 ).ContinueWith(
                     _ =>
                     {
-                        ReleaseWebBrowser();
+                        ReleaseHtmlRenderer();
                         ReturnToBeRenderedUri();
                     },
                     TaskContinuationOptions.OnlyOnCanceled | TaskContinuationOptions.ExecuteSynchronously
@@ -176,7 +176,7 @@ namespace Helix.Crawler
                 _logger.LogException(exception);
             }
 
-            void GetWebBrowserAndToBeRenderedUri()
+            void GetHtmlRendererAndToBeRenderedUri()
             {
                 while (!EverythingIsDone && !CancellationToken.IsCancellationRequested)
                 {
@@ -198,7 +198,7 @@ namespace Helix.Crawler
                     }
                     Monitor.Exit(_renderingSyncRoot);
 
-                    try { webBrowser = _servicePool.GetWebBrowser(CancellationToken); }
+                    try { htmlRenderer = _servicePool.GetHtmlRenderer(CancellationToken); }
                     catch (OperationCanceledException)
                     {
                         _pendingRenderingTaskCount--;
@@ -209,10 +209,10 @@ namespace Helix.Crawler
                 CancellationToken.ThrowIfCancellationRequested();
                 throw new EverythingIsDoneException();
             }
-            void ReleaseWebBrowser()
+            void ReleaseHtmlRenderer()
             {
                 lock (_renderingSyncRoot) _pendingRenderingTaskCount--;
-                _servicePool.Return(webBrowser);
+                _servicePool.Return(htmlRenderer);
             }
             void ReturnToBeRenderedUri() { _memory.Memorize(toBeRenderedUri, CancellationToken.None); }
         }
@@ -228,7 +228,7 @@ namespace Helix.Crawler
                     () =>
                     {
                         try { taskDescription(rawResourceVerifier, toBeVerifiedRawResource); }
-                        catch (OperationCanceledException operationCanceledException) { _logger.LogException(operationCanceledException); }
+                        catch (Exception exception) { _logger.LogException(exception); }
                         finally { ReleaseRawResourceVerifier(); }
                     },
                     CancellationToken

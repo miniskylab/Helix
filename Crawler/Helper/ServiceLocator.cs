@@ -1,6 +1,8 @@
 using Helix.Crawler.Abstractions;
 using Helix.Persistence;
 using Helix.Persistence.Abstractions;
+using Helix.WebBrowser;
+using Helix.WebBrowser.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Helix.Crawler
@@ -22,12 +24,13 @@ namespace Helix.Crawler
             if (_serviceProvider?.GetService<Configurations>() != null) return;
             _serviceProvider?.Dispose();
             _serviceProvider = new ServiceCollection()
-                .AddTransient<IWebBrowser, ChromiumWebBrowser>()
+                .AddTransient<IHtmlRenderer, HtmlRenderer>()
                 .AddTransient<IRawResourceExtractor, RawResourceExtractor>()
                 .AddTransient<IRawResourceVerifier, RawResourceVerifier>()
                 .AddTransient<IRawResourceProcessor, RawResourceProcessor>()
                 .AddTransient<IResourceScope, ResourceScope>()
                 .AddSingleton<IPersistenceProvider, PersistenceProvider>()
+                .AddSingleton<IWebBrowserProvider, WebBrowserProvider>()
                 .AddSingleton<IServicePool, ServicePool>()
                 .AddSingleton<ILogger, Logger>()
                 .AddSingleton<IReportWriter, ReportWriter>()

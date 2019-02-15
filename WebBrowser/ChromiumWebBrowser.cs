@@ -25,6 +25,8 @@ namespace Helix.WebBrowser
         readonly bool _useHeadlessWebBrowser;
         readonly bool _useIncognitoWebBrowser;
 
+        public Uri CurrentUri { get; private set; }
+
         public event AsyncEventHandler<SessionEventArgs> BeforeRequest;
         public event AsyncEventHandler<SessionEventArgs> BeforeResponse;
 
@@ -49,9 +51,9 @@ namespace Helix.WebBrowser
         }
 
         public bool TryRender(Uri uri, Action<Exception> onFailed, CancellationToken cancellationToken, out string html,
-            out long? pageLoadTime)
+            out long? pageLoadTime, int attemptCount = 3)
         {
-            if (uri == null) throw new ArgumentNullException(nameof(uri));
+            CurrentUri = uri ?? throw new ArgumentNullException(nameof(uri));
             if (onFailed == null) throw new ArgumentNullException(nameof(onFailed));
 
             html = null;
@@ -61,7 +63,7 @@ namespace Helix.WebBrowser
             {
                 try
                 {
-                    if (!TryGoToUri(3))
+                    if (!TryGoToUri())
                     {
                         onFailed.Invoke(new TimeoutException(renderingFailedErrorMessage));
                         return false;
@@ -93,7 +95,7 @@ namespace Helix.WebBrowser
                     }
                     return true;
                 }
-                bool TryGoToUri(int attemptCount)
+                bool TryGoToUri()
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     EnableNetwork();

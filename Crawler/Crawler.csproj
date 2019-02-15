@@ -16,6 +16,7 @@
     <ItemGroup>
         <ProjectReference Include="..\Crawler.Abstractions\Crawler.Abstractions.csproj" />
         <ProjectReference Include="..\Persistence\Persistence.csproj" />
+        <ProjectReference Include="..\WebBrowser\WebBrowser.csproj" />
     </ItemGroup>
 
 </Project>

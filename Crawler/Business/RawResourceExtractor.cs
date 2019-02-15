@@ -24,25 +24,13 @@ namespace Helix.Crawler
             Parallel.ForEach(anchorTags, anchorTag =>
             {
                 var extractedUrl = anchorTag.Attributes["href"].Value;
-                var absoluteUrl = EnsureAbsolute(extractedUrl, htmlDocument.Uri);
-                if (uriSchemeIsSupported(new Uri(absoluteUrl, UriKind.Absolute)))
+                if (!string.IsNullOrWhiteSpace(extractedUrl))
                     onRawResourceExtracted.Invoke(new RawResource
                     {
                         ParentUri = htmlDocument.Uri,
-                        Url = absoluteUrl
+                        Url = extractedUrl
                     });
             });
-
-            string EnsureAbsolute(string relativeOrAbsoluteUrl, Uri parentUri)
-            {
-                var relativeOrAbsoluteUri = new Uri(relativeOrAbsoluteUrl, UriKind.RelativeOrAbsolute);
-                if (relativeOrAbsoluteUri.IsAbsoluteUri) return relativeOrAbsoluteUrl;
-                if (parentUri == null) throw new ArgumentException();
-
-                var absoluteUri = new Uri(parentUri, relativeOrAbsoluteUrl);
-                return relativeOrAbsoluteUrl.EndsWith("/") ? absoluteUri.AbsoluteUri : absoluteUri.AbsoluteUri.TrimEnd('/');
-            }
-            bool uriSchemeIsSupported(Uri uri) { return uri.Scheme == "http" || uri.Scheme == "https"; }
         }
     }
 }

@@ -98,10 +98,10 @@ namespace Helix.Crawler
         static void Render()
         {
             while (!_scheduler.EverythingIsDone && !_scheduler.CancellationToken.IsCancellationRequested)
-                _scheduler.CreateTask((webBrowser, toBeRenderedUri) =>
+                _scheduler.CreateTask((htmlRenderer, toBeRenderedUri) =>
                 {
                     Action<Exception> onFailed = _logger.LogException;
-                    if (!webBrowser.TryRender(toBeRenderedUri, onFailed, _scheduler.CancellationToken, out var htmlText,
+                    if (!htmlRenderer.TryRender(toBeRenderedUri, onFailed, _scheduler.CancellationToken, out var htmlText,
                         out var pageLoadTime)) return;
 
                     if (pageLoadTime.HasValue)
@@ -173,25 +173,21 @@ namespace Helix.Crawler
                 _scheduler.CreateTask((rawResourceVerifier, toBeVerifiedRawResource) =>
                 {
                     if (!rawResourceVerifier.TryVerify(toBeVerifiedRawResource, out var verificationResult)) return;
-                    var verifiedResource = verificationResult.Resource;
-                    var isStartUrl = verifiedResource != null && resourceScope.IsStartUri(verifiedResource.Uri);
-                    var isOrphanedUrl = verificationResult.RawResource.ParentUri == null;
-                    if (isStartUrl || !isOrphanedUrl)
-                    {
-                        // TODO: Investigate where those orphaned Uri-s came from.
-                        _reportWriter.WriteReport(verificationResult);
-                        Statistics.VerifiedUrlCount++;
-                        if (verificationResult.IsBrokenResource) Statistics.BrokenUrlCount++;
-                        else Statistics.ValidUrlCount++;
-                        OnResourceVerified?.Invoke(verificationResult);
-                    }
+                    var isNotStartUri = verificationResult.Resource == null || !resourceScope.IsStartUri(verificationResult.Resource.Uri);
+                    if (verificationResult.IsOrphanedRawResource && isNotStartUri) return;
 
-                    var resourceExists = verifiedResource != null;
+                    _reportWriter.WriteReport(verificationResult);
+                    Statistics.VerifiedUrlCount++;
+                    if (verificationResult.IsBrokenResource) Statistics.BrokenUrlCount++;
+                    else Statistics.ValidUrlCount++;
+                    OnResourceVerified?.Invoke(verificationResult);
+
+                    var resourceExists = verificationResult.Resource != null;
                     var isExtracted = verificationResult.IsExtractedResource;
                     var isNotBroken = !verificationResult.IsBrokenResource;
                     var isInternal = verificationResult.IsInternalResource;
                     if (resourceExists && isExtracted && isNotBroken && isInternal)
-                        _memory.Memorize(verifiedResource.Uri, _scheduler.CancellationToken);
+                        _memory.Memorize(verificationResult.Resource.Uri, _scheduler.CancellationToken);
                 });
         }
     }

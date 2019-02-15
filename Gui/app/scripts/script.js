@@ -5,7 +5,7 @@ socket.connect(18880, "127.0.0.1", () => {
     const btnMain = document.getElementById("btn-main");
     const txtStartUri = document.getElementById("txt-start-uri");
     const txtDomainName = document.getElementById("txt-domain-name");
-    const txtWebBrowserCount = document.getElementById("txt-web-browser-count");
+    const txtHtmlRendererCount = document.getElementById("txt-html-renderer-count");
     const txtRequestTimeoutDuration = document.getElementById("txt-request-timeout-duration");
     const ckbReportBrokenLinksOnly = document.getElementById("ckb-report-broken-links-only");
     const ckbShowWebBrowsers = document.getElementById("ckb-show-web-browsers");
@@ -16,10 +16,10 @@ socket.connect(18880, "127.0.0.1", () => {
             payload: JSON.stringify({
                 StartUri: txtStartUri.value,
                 DomainName: txtDomainName.value,
-                WebBrowserCount: txtWebBrowserCount.value,
+                HtmlRendererCount: txtHtmlRendererCount.value,
                 RequestTimeoutDuration: txtRequestTimeoutDuration.value,
                 ReportBrokenLinksOnly: ckbReportBrokenLinksOnly.checked,
-                ShowWebBrowsers: ckbShowWebBrowsers.checked,
+                UseHeadlessWebBrowsers: !ckbShowWebBrowsers.checked,
                 UserAgent: "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36"
             })
         }));

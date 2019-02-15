@@ -14,11 +14,11 @@ namespace Helix.Crawler
         const int RawResourceExtractorCount = 300;
         const int RawResourceVerifierCount = 2500;
         readonly object _disposalSyncRoot;
+        BlockingCollection<IHtmlRenderer> _htmlRendererPool;
         readonly ILogger _logger;
         readonly IMemory _memory;
         BlockingCollection<IRawResourceExtractor> _rawResourceExtractorPool;
         BlockingCollection<IRawResourceVerifier> _rawResourceVerifierPool;
-        BlockingCollection<IWebBrowser> _webBrowserPool;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public ServicePool(IMemory memory, ILogger logger)
@@ -28,7 +28,7 @@ namespace Helix.Crawler
             _disposalSyncRoot = new object();
             _rawResourceExtractorPool = new BlockingCollection<IRawResourceExtractor>();
             _rawResourceVerifierPool = new BlockingCollection<IRawResourceVerifier>();
-            _webBrowserPool = new BlockingCollection<IWebBrowser>();
+            _htmlRendererPool = new BlockingCollection<IHtmlRenderer>();
         }
 
         public void Dispose()
@@ -44,7 +44,7 @@ namespace Helix.Crawler
         {
             InitializeRawResourceExtractorPool();
             InitializeRawResourceVerifierPool();
-            InitializeWebBrowserPool();
+            InitializeHtmlRendererPool();
 
             void InitializeRawResourceExtractorPool()
             {
@@ -64,17 +64,19 @@ namespace Helix.Crawler
                     _rawResourceVerifierPool.Add(rawResourceVerifier, cancellationToken);
                 }
             }
-            void InitializeWebBrowserPool()
+            void InitializeHtmlRendererPool()
             {
-                Parallel.For(0, _memory.Configurations.WebBrowserCount, webBrowserId =>
+                Parallel.For(0, _memory.Configurations.HtmlRendererCount, htmlRendererId =>
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var webBrowser = ServiceLocator.Get<IWebBrowser>();
-                    webBrowser.OnRawResourceCaptured += rawResource => _memory.Memorize(rawResource, CancellationToken.None);
-                    _webBrowserPool.Add(webBrowser, cancellationToken);
+                    var htmlRenderer = ServiceLocator.Get<IHtmlRenderer>();
+                    htmlRenderer.OnRawResourceCaptured += rawResource => _memory.Memorize(rawResource, CancellationToken.None);
+                    _htmlRendererPool.Add(htmlRenderer, cancellationToken);
                 });
             }
         }
+
+        public IHtmlRenderer GetHtmlRenderer(CancellationToken cancellationToken) { return _htmlRendererPool.Take(cancellationToken); }
 
         public IRawResourceExtractor GetRawResourceExtractor(CancellationToken cancellationToken)
         {
@@ -86,30 +88,28 @@ namespace Helix.Crawler
             return _rawResourceVerifierPool.Take(cancellationToken);
         }
 
-        public IWebBrowser GetWebBrowser(CancellationToken cancellationToken) { return _webBrowserPool.Take(cancellationToken); }
-
         public void Return(IRawResourceExtractor rawResourceExtractor) { _rawResourceExtractorPool.Add(rawResourceExtractor); }
 
         public void Return(IRawResourceVerifier rawResourceVerifier) { _rawResourceVerifierPool.Add(rawResourceVerifier); }
 
-        public void Return(IWebBrowser webBrowser) { _webBrowserPool.Add(webBrowser); }
+        public void Return(IHtmlRenderer htmlRenderer) { _htmlRendererPool.Add(htmlRenderer); }
 
         void ReleaseUnmanagedResources()
         {
             var disposedRawResourceExtractorCount = 0;
             var disposedRawResourceVerifierCount = 0;
-            var disposedWebBrowserCount = 0;
+            var disposedHtmlRendererCount = 0;
             DisposeRawResourceExtractorPool();
             DisposeRawResourceVerifierPool();
-            DisposeWebBrowserPool();
+            DisposeHtmlRendererPool();
 
             _rawResourceExtractorPool?.Dispose();
             _rawResourceVerifierPool?.Dispose();
-            _webBrowserPool?.Dispose();
+            _htmlRendererPool?.Dispose();
 
             _rawResourceExtractorPool = null;
             _rawResourceVerifierPool = null;
-            _webBrowserPool = null;
+            _htmlRendererPool = null;
 
             CheckForOrphanedResources();
 
@@ -129,12 +129,12 @@ namespace Helix.Crawler
                     disposedRawResourceVerifierCount++;
                 }
             }
-            void DisposeWebBrowserPool()
+            void DisposeHtmlRendererPool()
             {
-                while (_webBrowserPool?.Any() ?? false)
+                while (_htmlRendererPool?.Any() ?? false)
                 {
-                    _webBrowserPool.Take().Dispose();
-                    disposedWebBrowserCount++;
+                    _htmlRendererPool.Take().Dispose();
+                    disposedHtmlRendererCount++;
                 }
             }
             void CheckForOrphanedResources()
@@ -154,11 +154,11 @@ namespace Helix.Crawler
                         disposedRawResourceVerifierCount
                     );
 
-                if (disposedWebBrowserCount != _memory.Configurations.WebBrowserCount)
+                if (disposedHtmlRendererCount != _memory.Configurations.HtmlRendererCount)
                     orphanedResourceErrorMessage += GetErrorMessage(
-                        _memory.Configurations.WebBrowserCount,
-                        nameof(ChromiumWebBrowser),
-                        disposedWebBrowserCount
+                        _memory.Configurations.HtmlRendererCount,
+                        nameof(HtmlRenderer),
+                        disposedHtmlRendererCount
                     );
 
                 if (string.IsNullOrEmpty(orphanedResourceErrorMessage)) return;
