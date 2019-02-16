@@ -1,8 +1,10 @@
+using System;
 using System.Threading;
+using Helix.Crawler.Abstractions;
 
-namespace Helix.Crawler.Abstractions
+namespace Helix.Crawler
 {
-    public class Statistics
+    public class Statistics : IStatistics
     {
         readonly object _averagePageLoadTimeCalculationSync = new object();
         int _brokenUrlCount;
@@ -57,5 +59,8 @@ namespace Helix.Crawler.Abstractions
             get => Interlocked.CompareExchange(ref _verifiedUrlCount, 0, 0);
             set => Interlocked.Exchange(ref _verifiedUrlCount, value);
         }
+
+        [Obsolete(ErrorMessage.UseDependencyInjection, true)]
+        public Statistics() { }
     }
 }

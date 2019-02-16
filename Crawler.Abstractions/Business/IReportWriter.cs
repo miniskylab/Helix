@@ -1,8 +1,6 @@
-using System;
-
 namespace Helix.Crawler.Abstractions
 {
-    public interface IReportWriter : IDisposable
+    public interface IReportWriter
     {
         void WriteReport(VerificationResult verificationResult);
     }

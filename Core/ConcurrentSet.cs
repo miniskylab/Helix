@@ -13,7 +13,7 @@ namespace Helix.Core
 
         public bool IsReadOnly => false;
 
-        public ConcurrentSet() { _concurrentDictionary = new ConcurrentDictionary<T, bool>(Environment.ProcessorCount * 4, 10000); }
+        public ConcurrentSet() { _concurrentDictionary = new ConcurrentDictionary<T, bool>(); }
 
         public void Add(T item)
         {

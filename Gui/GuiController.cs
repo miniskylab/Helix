@@ -78,10 +78,10 @@ namespace Helix.Gui
                 Payload = JsonConvert.SerializeObject(new Frame
                 {
                     CrawlerState = CrawlerBot.CrawlerState,
-                    VerifiedUrlCount = CrawlerBot.Statistics.VerifiedUrlCount,
-                    ValidUrlCount = CrawlerBot.Statistics.ValidUrlCount,
-                    BrokenUrlCount = CrawlerBot.Statistics.BrokenUrlCount,
-                    AveragePageLoadTime = CrawlerBot.Statistics.AveragePageLoadTime,
+                    VerifiedUrlCount = CrawlerBot.Statistics?.VerifiedUrlCount,
+                    ValidUrlCount = CrawlerBot.Statistics?.ValidUrlCount,
+                    BrokenUrlCount = CrawlerBot.Statistics?.BrokenUrlCount,
+                    AveragePageLoadTime = CrawlerBot.Statistics?.AveragePageLoadTime,
                     RemainingUrlCount = CrawlerBot.RemainingUrlCount,
                     ElapsedTime = Stopwatch.Elapsed.ToString("hh' : 'mm' : 'ss"),
                     StatusText = statusText

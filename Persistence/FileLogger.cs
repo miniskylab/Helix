@@ -5,7 +5,7 @@ namespace Helix.Persistence
 {
     public class FileLogger : ILogger
     {
-        readonly FilePersistence _filePersistence;
+        readonly IFilePersistence _filePersistence;
 
         public FileLogger(string filePath) { _filePersistence = new FilePersistence(filePath); }
 

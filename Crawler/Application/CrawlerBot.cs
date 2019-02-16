@@ -19,7 +19,7 @@ namespace Helix.Crawler
 
         public static CrawlerState CrawlerState { get; private set; } = CrawlerState.Ready;
 
-        public static Statistics Statistics { get; }
+        public static IStatistics Statistics { get; private set; }
 
         public static int RemainingUrlCount => _scheduler?.RemainingUrlCount ?? 0;
 
@@ -28,7 +28,6 @@ namespace Helix.Crawler
 
         static CrawlerBot()
         {
-            Statistics = new Statistics();
             BackgroundTasks = new List<Task>();
             CrawlerStateTransitionSyncRoot = new object();
         }
@@ -36,6 +35,7 @@ namespace Helix.Crawler
         public static void StartWorking(Configurations configurations)
         {
             ServiceLocator.RegisterServices(configurations);
+            Statistics = ServiceLocator.Get<IStatistics>();
             _scheduler = ServiceLocator.Get<IScheduler>();
             _servicePool = ServiceLocator.Get<IServicePool>();
             _memory = ServiceLocator.Get<IMemory>();
