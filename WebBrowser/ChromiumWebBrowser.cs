@@ -227,8 +227,8 @@ namespace Helix.WebBrowser
             _httpProxyServer = new ProxyServer();
             _httpProxyServer.AddEndPoint(new ExplicitProxyEndPoint(IPAddress.Loopback, 0));
             _httpProxyServer.Start();
-            _httpProxyServer.BeforeRequest += BeforeRequest;
-            _httpProxyServer.BeforeResponse += BeforeResponse;
+            _httpProxyServer.BeforeRequest += (sender, networkTraffic) => BeforeRequest?.Invoke(sender, networkTraffic);
+            _httpProxyServer.BeforeResponse += (sender, networkTraffic) => BeforeResponse?.Invoke(sender, networkTraffic);
         }
 
         static bool TimeoutExceptionOccurred(Exception exception)
