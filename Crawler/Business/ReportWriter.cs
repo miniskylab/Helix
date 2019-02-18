@@ -10,13 +10,24 @@ namespace Helix.Crawler
     public sealed class ReportWriter : IReportWriter
     {
         readonly Configurations _configurations;
-        readonly ISQLitePersistence<VerificationResultDto> _sqLitePersistence;
+        readonly object _disposalSync;
+        ISQLitePersistence<VerificationResultDto> _sqLitePersistence;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public ReportWriter(Configurations configurations, IPersistenceProvider persistenceProvider)
         {
+            _disposalSync = new object();
             _configurations = configurations;
             _sqLitePersistence = persistenceProvider.GetSQLitePersistence<VerificationResultDto>("report.db");
+        }
+
+        public void Dispose()
+        {
+            lock (_disposalSync)
+            {
+                ReleaseUnmanagedResources();
+                GC.SuppressFinalize(this);
+            }
         }
 
         public void WriteReport(VerificationResult verificationResult)
@@ -31,6 +42,12 @@ namespace Helix.Crawler
                 IsExtractedResource = verificationResult.IsExtractedResource,
                 IsInternalResource = verificationResult.IsInternalResource
             });
+        }
+
+        void ReleaseUnmanagedResources()
+        {
+            _sqLitePersistence?.Dispose();
+            _sqLitePersistence = null;
         }
 
         class VerificationResultDto
@@ -57,5 +74,7 @@ namespace Helix.Crawler
             [Required]
             public string VerifiedUrl { [UsedImplicitly] get; set; }
         }
+
+        ~ReportWriter() { Dispose(); }
     }
 }
