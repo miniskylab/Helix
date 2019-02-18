@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using Helix.Persistence.Abstractions;
 using JetBrains.Annotations;
 using Microsoft.Data.Sqlite;
@@ -5,14 +7,19 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Helix.Persistence
 {
-    // TODO: Add buffer to boost performance, avoid hitting disk too often.
     class SQLitePersistence<TDto> : ISQLitePersistence<TDto> where TDto : class
     {
+        readonly object _addToBufferSync;
+        readonly object _flushToDiskSync;
+        IList<TDto> _memoryBuffer;
         readonly string _pathToDatabaseFile;
 
         public SQLitePersistence(string pathToDatabaseFile)
         {
             _pathToDatabaseFile = pathToDatabaseFile;
+            _memoryBuffer = new List<TDto>();
+            _addToBufferSync = new object();
+            _flushToDiskSync = new object();
             EnsureDatabaseIsRecreated();
 
             void EnsureDatabaseIsRecreated()
@@ -27,10 +34,30 @@ namespace Helix.Persistence
 
         public void Save(TDto dto)
         {
-            using (var sqLiteDbContext = new SQLiteDbContext(_pathToDatabaseFile))
+            lock (_addToBufferSync)
             {
-                sqLiteDbContext.DTOs.Add(dto);
-                sqLiteDbContext.SaveChanges();
+                if (_memoryBuffer.Count < 300) _memoryBuffer.Add(dto);
+                else
+                {
+                    FlushToDatabaseFileOnDisk();
+                    _memoryBuffer = new List<TDto> { dto };
+                }
+            }
+
+            void FlushToDatabaseFileOnDisk()
+            {
+                var memoryBuffer = _memoryBuffer;
+                Task.Run(() =>
+                {
+                    lock (_flushToDiskSync)
+                    {
+                        using (var sqLiteDbContext = new SQLiteDbContext(_pathToDatabaseFile))
+                        {
+                            sqLiteDbContext.DTOs.AddRange(memoryBuffer);
+                            sqLiteDbContext.SaveChanges();
+                        }
+                    }
+                });
             }
         }
 
