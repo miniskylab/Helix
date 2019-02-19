@@ -6,7 +6,7 @@ namespace Helix.Crawler
 {
     public class Statistics : IStatistics
     {
-        readonly object _averagePageLoadTimeCalculationSync = new object();
+        readonly object _averagePageLoadTimeCalculationLock = new object();
         int _brokenUrlCount;
         int _successfullyRenderedPageCount;
         double _totalPageLoadTime;
@@ -17,7 +17,7 @@ namespace Helix.Crawler
         {
             get
             {
-                lock (_averagePageLoadTimeCalculationSync)
+                lock (_averagePageLoadTimeCalculationLock)
                 {
                     return SuccessfullyRenderedPageCount == 0 ? 0 : TotalPageLoadTime / SuccessfullyRenderedPageCount;
                 }
@@ -35,7 +35,7 @@ namespace Helix.Crawler
             get => Interlocked.CompareExchange(ref _successfullyRenderedPageCount, 0, 0);
             set
             {
-                lock (_averagePageLoadTimeCalculationSync) Interlocked.Exchange(ref _successfullyRenderedPageCount, value);
+                lock (_averagePageLoadTimeCalculationLock) Interlocked.Exchange(ref _successfullyRenderedPageCount, value);
             }
         }
 
@@ -44,7 +44,7 @@ namespace Helix.Crawler
             get => Interlocked.CompareExchange(ref _totalPageLoadTime, 0, 0);
             set
             {
-                lock (_averagePageLoadTimeCalculationSync) Interlocked.Exchange(ref _totalPageLoadTime, value);
+                lock (_averagePageLoadTimeCalculationLock) Interlocked.Exchange(ref _totalPageLoadTime, value);
             }
         }
 

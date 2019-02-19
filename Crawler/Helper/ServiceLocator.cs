@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
 using Helix.Crawler.Abstractions;
 using Helix.Persistence;
 using Helix.Persistence.Abstractions;
@@ -9,36 +12,69 @@ namespace Helix.Crawler
 {
     static class ServiceLocator
     {
+        static bool _objectDisposed;
         static ServiceProvider _serviceProvider;
+        static readonly Dictionary<string, object> LockMap;
+
+        static ServiceLocator()
+        {
+            _objectDisposed = false;
+            LockMap = new Dictionary<string, object>
+            {
+                { $"{nameof(Get)}", new object() },
+                { $"{nameof(AddSingleton)}", new object() }
+            };
+        }
+
+        public static void AddSingleton(Configurations configurations)
+        {
+            lock (LockMap[nameof(AddSingleton)])
+            {
+                if (_objectDisposed) throw new ObjectDisposedException(nameof(ServiceLocator));
+                if (_serviceProvider?.GetService<Configurations>() != null) return;
+                _serviceProvider?.Dispose();
+                _serviceProvider = new ServiceCollection()
+                    .AddTransient<IHtmlRenderer, HtmlRenderer>()
+                    .AddTransient<IRawResourceExtractor, RawResourceExtractor>()
+                    .AddTransient<IRawResourceVerifier, RawResourceVerifier>()
+                    .AddTransient<IRawResourceProcessor, RawResourceProcessor>()
+                    .AddTransient<IResourceScope, ResourceScope>()
+                    .AddSingleton<IStatistics, Statistics>()
+                    .AddSingleton<IPersistenceProvider, PersistenceProvider>()
+                    .AddSingleton<IWebBrowserProvider, WebBrowserProvider>()
+                    .AddSingleton<IServicePool, ServicePool>()
+                    .AddSingleton<ILogger, Logger>()
+                    .AddSingleton<IReportWriter, ReportWriter>()
+                    .AddSingleton<IMemory, Memory>()
+                    .AddSingleton<IScheduler, Scheduler>()
+                    .AddSingleton(configurations)
+                    .BuildServiceProvider();
+            }
+        }
 
         public static void Dispose()
         {
-            _serviceProvider?.Dispose();
-            _serviceProvider = null;
+            try
+            {
+                foreach (var lockObject in LockMap.Values) Monitor.Enter(lockObject);
+                if (_objectDisposed) return;
+                _serviceProvider?.Dispose();
+                _serviceProvider = null;
+                _objectDisposed = true;
+            }
+            finally
+            {
+                foreach (var lockObject in LockMap.Values) Monitor.Exit(lockObject);
+            }
         }
 
-        public static TService Get<TService>() { return _serviceProvider.GetService<TService>(); }
-
-        public static void RegisterServices(Configurations configurations)
+        public static TService Get<TService>()
         {
-            if (_serviceProvider?.GetService<Configurations>() != null) return;
-            _serviceProvider?.Dispose();
-            _serviceProvider = new ServiceCollection()
-                .AddTransient<IHtmlRenderer, HtmlRenderer>()
-                .AddTransient<IRawResourceExtractor, RawResourceExtractor>()
-                .AddTransient<IRawResourceVerifier, RawResourceVerifier>()
-                .AddTransient<IRawResourceProcessor, RawResourceProcessor>()
-                .AddTransient<IResourceScope, ResourceScope>()
-                .AddSingleton<IStatistics, Statistics>()
-                .AddSingleton<IPersistenceProvider, PersistenceProvider>()
-                .AddSingleton<IWebBrowserProvider, WebBrowserProvider>()
-                .AddSingleton<IServicePool, ServicePool>()
-                .AddSingleton<ILogger, Logger>()
-                .AddSingleton<IReportWriter, ReportWriter>()
-                .AddSingleton<IMemory, Memory>()
-                .AddSingleton<IScheduler, Scheduler>()
-                .AddSingleton(configurations)
-                .BuildServiceProvider();
+            lock (LockMap[nameof(Get)])
+            {
+                if (_objectDisposed) throw new ObjectDisposedException(nameof(ServiceLocator));
+                return _serviceProvider.GetService<TService>();
+            }
         }
     }
 }

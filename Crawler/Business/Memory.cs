@@ -10,7 +10,7 @@ namespace Helix.Crawler
     public sealed class Memory : IMemory
     {
         readonly ConcurrentSet<string> _alreadyVerifiedUrls;
-        readonly object _syncRoot;
+        readonly object _memorizationLock;
         readonly BlockingCollection<HtmlDocument> _toBeExtractedHtmlDocuments;
         readonly BlockingCollection<Uri> _toBeRenderedUris;
         readonly BlockingCollection<RawResource> _toBeVerifiedRawResources;
@@ -27,7 +27,7 @@ namespace Helix.Crawler
         public Memory(Configurations configurations)
         {
             Configurations = configurations;
-            _syncRoot = new object();
+            _memorizationLock = new object();
             _toBeExtractedHtmlDocuments = new BlockingCollection<HtmlDocument>();
             _toBeRenderedUris = new BlockingCollection<Uri>();
             _alreadyVerifiedUrls = new ConcurrentSet<string> { Configurations.StartUri.AbsoluteUri };
@@ -39,7 +39,7 @@ namespace Helix.Crawler
 
         public void Clear()
         {
-            lock (_syncRoot)
+            lock (_memorizationLock)
             {
                 _alreadyVerifiedUrls.Clear();
                 while (_toBeVerifiedRawResources.Any()) _toBeVerifiedRawResources.Take();
@@ -50,7 +50,7 @@ namespace Helix.Crawler
 
         public void Memorize(RawResource toBeVerifiedRawResource, CancellationToken cancellationToken)
         {
-            lock (_syncRoot)
+            lock (_memorizationLock)
             {
                 if (_alreadyVerifiedUrls.Contains(toBeVerifiedRawResource.Url.StripFragment())) return;
                 _alreadyVerifiedUrls.Add(toBeVerifiedRawResource.Url.StripFragment());

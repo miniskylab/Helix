@@ -20,11 +20,12 @@ namespace Helix.WebBrowser
         readonly (int width, int height) _browserWindowSize;
         ChromeDriver _chromeDriver;
         ProxyServer _httpProxyServer;
+        bool _objectDisposed;
         readonly string _pathToChromeDriverExecutable;
         readonly string _pathToChromiumExecutable;
         readonly List<int> _processIds;
+        readonly Dictionary<string, object> _publicApiLockMap;
         readonly Stopwatch _stopwatch;
-        readonly object _syncRoot;
         readonly bool _useHeadlessWebBrowser;
         readonly bool _useIncognitoWebBrowser;
 
@@ -36,24 +37,32 @@ namespace Helix.WebBrowser
         public ChromiumWebBrowser(string pathToChromiumExecutable, string pathToChromeDriverExecutable, bool useIncognitoWebBrowser = false,
             bool useHeadlessWebBrowser = true, (int width, int height) browserWindowSize = default)
         {
+            _objectDisposed = false;
             _processIds = new List<int>();
-            _syncRoot = new object();
             _stopwatch = new Stopwatch();
             _pathToChromiumExecutable = pathToChromiumExecutable;
             _pathToChromeDriverExecutable = pathToChromeDriverExecutable;
             _browserWindowSize = browserWindowSize == default ? (1024, 630) : browserWindowSize;
             _useIncognitoWebBrowser = useIncognitoWebBrowser;
             _useHeadlessWebBrowser = useHeadlessWebBrowser;
+            _publicApiLockMap = new Dictionary<string, object> { { $"{nameof(TryRender)}", new object() } };
             SetupHttpProxyServer();
             Restart();
         }
 
         public void Dispose()
         {
-            lock (_syncRoot)
+            try
             {
+                foreach (var lockObject in _publicApiLockMap.Values) Monitor.Enter(lockObject);
+                if (_objectDisposed) return;
                 ReleaseUnmanagedResources();
                 GC.SuppressFinalize(this);
+                _objectDisposed = true;
+            }
+            finally
+            {
+                foreach (var lockObject in _publicApiLockMap.Values) Monitor.Exit(lockObject);
             }
         }
 
@@ -66,8 +75,9 @@ namespace Helix.WebBrowser
             html = null;
             pageLoadTime = null;
             var renderingFailedErrorMessage = $"Chromium web browser failed to render the URI: {uri}";
-            lock (_syncRoot)
+            lock (_publicApiLockMap[nameof(TryRender)])
             {
+                if (_objectDisposed) throw new ObjectDisposedException(nameof(ChromiumWebBrowser));
                 try
                 {
                     if (!TryGoToUri())

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Sockets;
@@ -12,8 +13,9 @@ namespace Helix.Crawler
     {
         CancellationTokenSource _cancellationTokenSource;
         readonly Configurations _configurations;
-        readonly object _disposalSyncRoot;
         HttpClient _httpClient;
+        bool _objectDisposed;
+        readonly Dictionary<string, object> _publicApiLockMap;
         readonly IRawResourceProcessor _rawResourceProcessor;
         readonly IResourceScope _resourceScope;
         Task<HttpResponseMessage> _sendingGETRequestTask;
@@ -25,7 +27,8 @@ namespace Helix.Crawler
             _rawResourceProcessor = rawResourceProcessor;
             _resourceScope = resourceScope;
             _cancellationTokenSource = new CancellationTokenSource();
-            _disposalSyncRoot = new object();
+            _objectDisposed = false;
+            _publicApiLockMap = new Dictionary<string, object> { { $"{nameof(TryVerify)}", new object() } };
 
             _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(configurations.RequestTimeoutDuration) };
             _httpClient.DefaultRequestHeaders.Accept.ParseAdd("*/*");
@@ -40,59 +43,70 @@ namespace Helix.Crawler
 
         public void Dispose()
         {
-            lock (_disposalSyncRoot)
+            try
             {
+                foreach (var lockObject in _publicApiLockMap.Values) Monitor.Enter(lockObject);
+                if (_objectDisposed) return;
                 ReleaseUnmanagedResources();
                 GC.SuppressFinalize(this);
+                _objectDisposed = true;
+            }
+            finally
+            {
+                foreach (var lockObject in _publicApiLockMap.Values) Monitor.Exit(lockObject);
             }
         }
 
         public bool TryVerify(RawResource rawResource, out VerificationResult verificationResult)
         {
-            verificationResult = new VerificationResult { RawResource = rawResource };
-            var rawResourceProcessingResultCode = _rawResourceProcessor.TryProcessRawResource(rawResource, out var resource);
-            if (rawResourceProcessingResultCode != HttpStatusCode.OK)
+            lock (_publicApiLockMap[nameof(TryVerify)])
             {
-                verificationResult.Resource = null;
-                verificationResult.StatusCode = rawResourceProcessingResultCode;
-                verificationResult.IsInternalResource = false;
+                if (_objectDisposed) throw new ObjectDisposedException(nameof(RawResourceVerifier));
+                verificationResult = new VerificationResult { RawResource = rawResource };
+                var rawResourceProcessingResultCode = _rawResourceProcessor.TryProcessRawResource(rawResource, out var resource);
+                if (rawResourceProcessingResultCode != HttpStatusCode.OK)
+                {
+                    verificationResult.Resource = null;
+                    verificationResult.StatusCode = rawResourceProcessingResultCode;
+                    verificationResult.IsInternalResource = false;
+                    return true;
+                }
+
+                verificationResult.IsInternalResource = _resourceScope.IsInternalResource(resource);
+                if (!verificationResult.IsInternalResource && !_configurations.VerifyExternalUrls)
+                {
+                    verificationResult = null;
+                    return false;
+                }
+
+                verificationResult.Resource = resource;
+                verificationResult.StatusCode = rawResource.HttpStatusCode;
+                if (verificationResult.StatusCode != 0) return true;
+
+                try
+                {
+                    _sendingGETRequestTask = _httpClient.GetAsync(resource.Uri, _cancellationTokenSource.Token);
+                    verificationResult.StatusCode = (HttpStatusCode) _sendingGETRequestTask.Result.StatusCode;
+                }
+                catch (AggregateException aggregateException)
+                {
+                    switch (aggregateException.InnerException)
+                    {
+                        case TaskCanceledException _:
+                            verificationResult.StatusCode = _cancellationTokenSource.Token.IsCancellationRequested
+                                ? HttpStatusCode.Processing
+                                : HttpStatusCode.RequestTimeout;
+                            break;
+                        case HttpRequestException _:
+                        case SocketException _:
+                            verificationResult.StatusCode = HttpStatusCode.BadRequest;
+                            break;
+                        default:
+                            throw;
+                    }
+                }
                 return true;
             }
-
-            verificationResult.IsInternalResource = _resourceScope.IsInternalResource(resource);
-            if (!verificationResult.IsInternalResource && !_configurations.VerifyExternalUrls)
-            {
-                verificationResult = null;
-                return false;
-            }
-
-            verificationResult.Resource = resource;
-            verificationResult.StatusCode = rawResource.HttpStatusCode;
-            if (verificationResult.StatusCode != 0) return true;
-
-            try
-            {
-                _sendingGETRequestTask = _httpClient.GetAsync(resource.Uri, _cancellationTokenSource.Token);
-                verificationResult.StatusCode = (HttpStatusCode) _sendingGETRequestTask.Result.StatusCode;
-            }
-            catch (AggregateException aggregateException)
-            {
-                switch (aggregateException.InnerException)
-                {
-                    case TaskCanceledException _:
-                        verificationResult.StatusCode = _cancellationTokenSource.Token.IsCancellationRequested
-                            ? HttpStatusCode.Processing
-                            : HttpStatusCode.RequestTimeout;
-                        break;
-                    case HttpRequestException _:
-                    case SocketException _:
-                        verificationResult.StatusCode = HttpStatusCode.BadRequest;
-                        break;
-                    default:
-                        throw;
-                }
-            }
-            return true;
         }
 
         void ReleaseUnmanagedResources()

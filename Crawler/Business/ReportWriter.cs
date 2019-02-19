@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Threading;
 using Helix.Crawler.Abstractions;
 using Helix.Persistence.Abstractions;
 using JetBrains.Annotations;
@@ -10,38 +12,51 @@ namespace Helix.Crawler
     public sealed class ReportWriter : IReportWriter
     {
         readonly Configurations _configurations;
-        readonly object _disposalSync;
+        bool _objectDisposed;
+        readonly Dictionary<string, object> _publicApiLockMap;
         ISQLitePersistence<VerificationResultDto> _sqLitePersistence;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public ReportWriter(Configurations configurations, IPersistenceProvider persistenceProvider)
         {
-            _disposalSync = new object();
+            _objectDisposed = false;
             _configurations = configurations;
             _sqLitePersistence = persistenceProvider.GetSQLitePersistence<VerificationResultDto>("report.db");
+            _publicApiLockMap = new Dictionary<string, object> { { $"{nameof(WriteReport)}", new object() } };
         }
 
         public void Dispose()
         {
-            lock (_disposalSync)
+            try
             {
+                foreach (var lockObject in _publicApiLockMap.Values) Monitor.Enter(lockObject);
+                if (_objectDisposed) return;
                 ReleaseUnmanagedResources();
                 GC.SuppressFinalize(this);
+                _objectDisposed = true;
+            }
+            finally
+            {
+                foreach (var lockObject in _publicApiLockMap.Values) Monitor.Exit(lockObject);
             }
         }
 
         public void WriteReport(VerificationResult verificationResult)
         {
-            if (_configurations.ReportBrokenLinksOnly && !verificationResult.IsBrokenResource) return;
-            _sqLitePersistence.Save(new VerificationResultDto
+            lock (_publicApiLockMap[nameof(WriteReport)])
             {
-                StatusCode = verificationResult.StatusCode,
-                VerifiedUrl = verificationResult.VerifiedUrl,
-                ParentUrl = verificationResult.ParentUrl,
-                IsBrokenResource = verificationResult.IsBrokenResource,
-                IsExtractedResource = verificationResult.IsExtractedResource,
-                IsInternalResource = verificationResult.IsInternalResource
-            });
+                if (_objectDisposed) throw new ObjectDisposedException(nameof(ReportWriter));
+                if (_configurations.ReportBrokenLinksOnly && !verificationResult.IsBrokenResource) return;
+                _sqLitePersistence.Save(new VerificationResultDto
+                {
+                    StatusCode = verificationResult.StatusCode,
+                    VerifiedUrl = verificationResult.VerifiedUrl,
+                    ParentUrl = verificationResult.ParentUrl,
+                    IsBrokenResource = verificationResult.IsBrokenResource,
+                    IsExtractedResource = verificationResult.IsExtractedResource,
+                    IsInternalResource = verificationResult.IsInternalResource
+                });
+            }
         }
 
         void ReleaseUnmanagedResources()

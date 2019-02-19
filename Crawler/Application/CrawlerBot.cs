@@ -15,13 +15,20 @@ namespace Helix.Crawler
         static IScheduler _scheduler;
         static IServicePool _servicePool;
         static readonly List<Task> BackgroundTasks;
-        static readonly object CrawlerStateTransitionSyncRoot;
+        static readonly object CrawlerStateTransitionLock;
 
         public static CrawlerState CrawlerState { get; private set; } = CrawlerState.Ready;
 
         public static IStatistics Statistics { get; private set; }
 
-        public static int RemainingUrlCount => _scheduler?.RemainingUrlCount ?? 0;
+        public static int RemainingUrlCount
+        {
+            get
+            {
+                try { return _scheduler?.RemainingUrlCount ?? 0; }
+                catch (ObjectDisposedException) { return 0; }
+            }
+        }
 
         public static event Action<VerificationResult> OnResourceVerified;
         public static event Action<bool> OnStopped;
@@ -29,12 +36,12 @@ namespace Helix.Crawler
         static CrawlerBot()
         {
             BackgroundTasks = new List<Task>();
-            CrawlerStateTransitionSyncRoot = new object();
+            CrawlerStateTransitionLock = new object();
         }
 
         public static void StartWorking(Configurations configurations)
         {
-            ServiceLocator.RegisterServices(configurations);
+            ServiceLocator.AddSingleton(configurations);
             Statistics = ServiceLocator.Get<IStatistics>();
             _scheduler = ServiceLocator.Get<IScheduler>();
             _servicePool = ServiceLocator.Get<IServicePool>();
@@ -132,28 +139,28 @@ namespace Helix.Crawler
             switch (crawlerState)
             {
                 case CrawlerState.Ready:
-                    lock (CrawlerStateTransitionSyncRoot)
+                    lock (CrawlerStateTransitionLock)
                     {
                         if (CrawlerState != CrawlerState.Stopping) return false;
                         CrawlerState = CrawlerState.Ready;
                         return true;
                     }
                 case CrawlerState.Working:
-                    lock (CrawlerStateTransitionSyncRoot)
+                    lock (CrawlerStateTransitionLock)
                     {
                         if (CrawlerState != CrawlerState.Ready && CrawlerState != CrawlerState.Paused) return false;
                         CrawlerState = CrawlerState.Working;
                         return true;
                     }
                 case CrawlerState.Stopping:
-                    lock (CrawlerStateTransitionSyncRoot)
+                    lock (CrawlerStateTransitionLock)
                     {
                         if (CrawlerState != CrawlerState.Working && CrawlerState != CrawlerState.Paused) return false;
                         CrawlerState = CrawlerState.Stopping;
                         return true;
                     }
                 case CrawlerState.Paused:
-                    lock (CrawlerStateTransitionSyncRoot)
+                    lock (CrawlerStateTransitionLock)
                     {
                         if (CrawlerState != CrawlerState.Working) return false;
                         CrawlerState = CrawlerState.Paused;

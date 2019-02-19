@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Threading;
@@ -11,7 +12,8 @@ namespace Helix.Crawler
 {
     public class HtmlRenderer : IHtmlRenderer
     {
-        readonly object _disposalSyncRoot;
+        bool _objectDisposed;
+        readonly Dictionary<string, object> _publicApiLockMap;
         IWebBrowser _webBrowser;
 
         public event Action<RawResource> OnRawResourceCaptured;
@@ -30,7 +32,8 @@ namespace Helix.Crawler
             );
             _webBrowser.BeforeRequest += EnsureInternal;
             _webBrowser.BeforeResponse += CaptureNetworkTraffic;
-            _disposalSyncRoot = new object();
+            _objectDisposed = false;
+            _publicApiLockMap = new Dictionary<string, object> { { $"{nameof(TryRender)}", new object() } };
 
             Task EnsureInternal(object _, SessionEventArgs networkTraffic)
             {
@@ -70,17 +73,28 @@ namespace Helix.Crawler
 
         public void Dispose()
         {
-            lock (_disposalSyncRoot)
+            try
             {
+                foreach (var lockObject in _publicApiLockMap.Values) Monitor.Enter(lockObject);
+                if (_objectDisposed) return;
                 ReleaseUnmanagedResources();
                 GC.SuppressFinalize(this);
+                _objectDisposed = true;
+            }
+            finally
+            {
+                foreach (var lockObject in _publicApiLockMap.Values) Monitor.Exit(lockObject);
             }
         }
 
         public bool TryRender(Uri uri, Action<Exception> onFailed, CancellationToken cancellationToken, out string html,
             out long? pageLoadTime, int attemptCount = 3)
         {
-            return _webBrowser.TryRender(uri, onFailed, cancellationToken, out html, out pageLoadTime, attemptCount);
+            lock (_publicApiLockMap[nameof(TryRender)])
+            {
+                if (_objectDisposed) throw new ObjectDisposedException(nameof(HtmlRenderer));
+                return _webBrowser.TryRender(uri, onFailed, cancellationToken, out html, out pageLoadTime, attemptCount);
+            }
         }
 
         void ReleaseUnmanagedResources()

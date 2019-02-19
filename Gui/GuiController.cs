@@ -57,9 +57,15 @@ namespace Helix.Gui
                     RedrawGui("Shutting down ...");
                     CrawlerBot.StopWorking();
                     if (!Task.WhenAll(BackgroundTasks).Wait(TimeSpan.FromMinutes(1)))
-                        File.AppendAllText("debug.log", "");
+                        File.AppendAllText(
+                            "debug.log",
+                            $"\r\n[{DateTime.Now:yyyy/MM/dd HH:mm:ss}] Waiting for background tasks to complete timed out after 60 seconds."
+                        );
                 }
-                catch (Exception exception) { File.AppendAllText("debug.log", exception.ToString()); }
+                catch (Exception exception)
+                {
+                    File.AppendAllText("debug.log", $"\r\n[{DateTime.Now:yyyy/MM/dd HH:mm:ss}] {exception}");
+                }
                 finally { ManualResetEvent.Set(); }
             });
             GuiProcess.Start();
@@ -75,17 +81,21 @@ namespace Helix.Gui
             IpcSocket.Send(new IpcMessage
             {
                 Text = "redraw",
-                Payload = JsonConvert.SerializeObject(new Frame
-                {
-                    CrawlerState = CrawlerBot.CrawlerState,
-                    VerifiedUrlCount = CrawlerBot.Statistics?.VerifiedUrlCount,
-                    ValidUrlCount = CrawlerBot.Statistics?.ValidUrlCount,
-                    BrokenUrlCount = CrawlerBot.Statistics?.BrokenUrlCount,
-                    AveragePageLoadTime = CrawlerBot.Statistics?.AveragePageLoadTime,
-                    RemainingUrlCount = CrawlerBot.RemainingUrlCount,
-                    ElapsedTime = Stopwatch.Elapsed.ToString("hh' : 'mm' : 'ss"),
-                    StatusText = statusText
-                })
+                Payload = JsonConvert.SerializeObject(
+                    CrawlerBot.CrawlerState == CrawlerState.Ready
+                        ? new Frame { StatusText = statusText }
+                        : new Frame
+                        {
+                            CrawlerState = CrawlerBot.CrawlerState,
+                            VerifiedUrlCount = CrawlerBot.Statistics?.VerifiedUrlCount,
+                            ValidUrlCount = CrawlerBot.Statistics?.ValidUrlCount,
+                            BrokenUrlCount = CrawlerBot.Statistics?.BrokenUrlCount,
+                            AveragePageLoadTime = CrawlerBot.Statistics?.AveragePageLoadTime,
+                            RemainingUrlCount = CrawlerBot.RemainingUrlCount,
+                            ElapsedTime = Stopwatch.Elapsed.ToString("hh' : 'mm' : 'ss"),
+                            StatusText = statusText
+                        }
+                )
             });
         }
 

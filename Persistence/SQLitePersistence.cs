@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Helix.Persistence.Abstractions;
 using JetBrains.Annotations;
@@ -10,21 +11,19 @@ namespace Helix.Persistence
 {
     class SQLitePersistence<TDto> : ISQLitePersistence<TDto> where TDto : class
     {
-        readonly object _addToBufferSync;
-        readonly object _disposalSync;
-        readonly object _flushToDiskSync;
+        readonly object _flushToDatabaseFileOnDiskLock;
         IList<TDto> _memoryBuffer;
         bool _objectDisposed;
         readonly string _pathToDatabaseFile;
+        readonly Dictionary<string, object> _publicApiLockMap;
 
         public SQLitePersistence(string pathToDatabaseFile)
         {
             _memoryBuffer = new List<TDto>();
-            _addToBufferSync = new object();
-            _disposalSync = new object();
-            _flushToDiskSync = new object();
             _objectDisposed = false;
             _pathToDatabaseFile = pathToDatabaseFile;
+            _flushToDatabaseFileOnDiskLock = new object();
+            _publicApiLockMap = new Dictionary<string, object> { { $"{nameof(Save)}", new object() } };
             EnsureDatabaseIsRecreated();
 
             void EnsureDatabaseIsRecreated()
@@ -39,18 +38,22 @@ namespace Helix.Persistence
 
         public void Dispose()
         {
-            lock (_disposalSync)
+            try
             {
+                foreach (var lockObject in _publicApiLockMap.Values) Monitor.Enter(lockObject);
                 if (_objectDisposed) return;
                 FlushToDatabaseFileOnDisk();
                 _objectDisposed = true;
+            }
+            finally
+            {
+                foreach (var lockObject in _publicApiLockMap.Values) Monitor.Exit(lockObject);
             }
         }
 
         public void Save(TDto dto)
         {
-            lock (_disposalSync)
-            lock (_addToBufferSync)
+            lock (_publicApiLockMap[nameof(Save)])
             {
                 if (_objectDisposed) throw new ObjectDisposedException(nameof(SQLitePersistence<TDto>));
                 if (_memoryBuffer.Count >= 300) FlushToDatabaseFileOnDisk();
@@ -63,7 +66,7 @@ namespace Helix.Persistence
             var memoryBuffer = _memoryBuffer;
             Task.Run(() =>
             {
-                lock (_flushToDiskSync)
+                lock (_flushToDatabaseFileOnDiskLock)
                 {
                     using (var sqLiteDbContext = new SQLiteDbContext(_pathToDatabaseFile))
                     {
