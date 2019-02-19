@@ -11,16 +11,14 @@ namespace Helix.Crawler
 {
     public sealed class ReportWriter : IReportWriter
     {
-        readonly Configurations _configurations;
         bool _objectDisposed;
         readonly Dictionary<string, object> _publicApiLockMap;
         ISQLitePersistence<VerificationResultDto> _sqLitePersistence;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public ReportWriter(Configurations configurations, IPersistenceProvider persistenceProvider)
+        public ReportWriter(IPersistenceProvider persistenceProvider)
         {
             _objectDisposed = false;
-            _configurations = configurations;
             _sqLitePersistence = persistenceProvider.GetSQLitePersistence<VerificationResultDto>("report.db");
             _publicApiLockMap = new Dictionary<string, object> { { $"{nameof(WriteReport)}", new object() } };
         }
@@ -46,7 +44,6 @@ namespace Helix.Crawler
             lock (_publicApiLockMap[nameof(WriteReport)])
             {
                 if (_objectDisposed) throw new ObjectDisposedException(nameof(ReportWriter));
-                if (_configurations.ReportBrokenLinksOnly && !verificationResult.IsBrokenResource) return;
                 _sqLitePersistence.Save(new VerificationResultDto
                 {
                     StatusCode = verificationResult.StatusCode,

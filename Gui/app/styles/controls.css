@@ -8,7 +8,7 @@
 
 .controls__bar {
     position: relative;
-    width: 410px;
+    width: 390px;
     height: 65px;
     background-color: #323232;
     border-radius: 100px;
@@ -37,10 +37,10 @@
 }
 
 .controls__button--first { left: 15px; }
-.controls__button--second { left: 69px; }
-.controls__button--third { left: 115px; }
-.controls__button--fourth { right: 115px; }
-.controls__button--fifth { right: 61px; }
+.controls__button--second { left: 65px; }
+.controls__button--third { left: 105px; }
+.controls__button--fourth { right: 105px; }
+.controls__button--fifth { right: 55px; }
 .controls__button--sixth { right: 15px; }
 
 .controls__button:hover {
@@ -108,8 +108,8 @@
     background-color: #1E1E1E;
 }
 
-.controls__vertical-separator--left { left: 61px; }
-.controls__vertical-separator--right { right: 107px; }
+.controls__vertical-separator--left { left: 59px; }
+.controls__vertical-separator--right { right: 99px; }
 
 .controls__play-icon {
     width: 24px;

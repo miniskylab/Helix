@@ -6,8 +6,7 @@ socket.connect(18880, "127.0.0.1", () => {
     const txtStartUri = document.getElementById("txt-start-uri");
     const txtDomainName = document.getElementById("txt-domain-name");
     const txtHtmlRendererCount = document.getElementById("txt-html-renderer-count");
-    const txtRequestTimeoutDuration = document.getElementById("txt-request-timeout-duration");
-    const ckbReportBrokenLinksOnly = document.getElementById("ckb-report-broken-links-only");
+    const ckbVerifyExternalUrls = document.getElementById("ckb-verify-external-urls");
     const ckbShowWebBrowsers = document.getElementById("ckb-show-web-browsers");
     btnMain.addEventListener("click", () => {
         if (!btnMain.hasAttribute("disabled")) btnMain.setAttribute("disabled", "");
@@ -17,8 +16,7 @@ socket.connect(18880, "127.0.0.1", () => {
                 StartUri: txtStartUri.value,
                 DomainName: txtDomainName.value,
                 HtmlRendererCount: txtHtmlRendererCount.value,
-                RequestTimeoutDuration: txtRequestTimeoutDuration.value,
-                ReportBrokenLinksOnly: ckbReportBrokenLinksOnly.checked,
+                VerifyExternalUrls: ckbVerifyExternalUrls.checked,
                 UseHeadlessWebBrowsers: !ckbShowWebBrowsers.checked,
                 UserAgent: "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36"
             })

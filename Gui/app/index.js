@@ -1,9 +1,9 @@
-﻿const { app, BrowserWindow, ipcMain } = require("electron");
+﻿const {app, BrowserWindow, ipcMain} = require("electron");
 
 app.on("ready", () => {
     const mainWindow = new BrowserWindow({
-        width: 500,
-        height: 695,
+        width: 450,
+        height: 555,
         show: false,
         center: true,
         fullscreenable: false,

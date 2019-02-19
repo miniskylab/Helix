@@ -15,66 +15,28 @@
         <div id="configuration-panel">
             <div class="field-group">
                 <div class="field">
-                    <div class="input-field-label">Start URI</div>
+                    <div class="input-field-label">Start URL</div>
                     <input id="txt-start-uri" class="input-field" type="text" />
                 </div>
             </div>
             <div class="field-group">
-                <div class="field">
+                <div class="field field--one-half">
                     <div class="input-field-label">Domain Name</div>
                     <input id="txt-domain-name" class="input-field" type="text" />
                 </div>
-            </div>
-            <div class="field-group">
                 <div class="field field--one-half">
                     <div class="input-field-label">Web Browser Count</div>
-                    <input id="txt-html-renderer-count" class="input-field" type="text" value="6" />
-                </div>
-                <div class="field field--one-half">
-                    <div class="input-field-label">Request Timeout Duration</div>
-                    <input id="txt-request-timeout-duration" class="input-field" type="text" value="30" />
-                </div>
-            </div>
-            <div class="field-group">
-                <div class="field field--one-third">
-                    <div class="input-field-label">Report Formats</div>
-                    <div class="checkbox checkbox--chelsea-cucumber" style="pointer-events: none">
-                        <input type="checkbox" checked />
-                        <div class="checkbox__content">
-                            <div class="checkbox__check-mark-icon"></div>
-                            <div class="checkbox__text">CSV</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="field field--one-third">
-                    <div class="input-field-label"></div>
-                    <div class="checkbox checkbox--purple" disabled>
-                        <input type="checkbox" />
-                        <div class="checkbox__content">
-                            <div class="checkbox__check-mark-icon"></div>
-                            <div class="checkbox__text">HTML</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="field field--one-third">
-                    <div class="input-field-label"></div>
-                    <div class="checkbox" disabled>
-                        <input type="checkbox" />
-                        <div class="checkbox__content">
-                            <div class="checkbox__check-mark-icon"></div>
-                            <div class="checkbox__text">CGI</div>
-                        </div>
-                    </div>
+                    <input id="txt-html-renderer-count" class="input-field" type="text" value="4" />
                 </div>
             </div>
             <div class="field-group">
                 <div class="field field--one-half">
                     <div class="input-field-label">Miscellaneous</div>
                     <div class="checkbox">
-                        <input type="checkbox" id="ckb-report-broken-links-only" />
+                        <input type="checkbox" id="ckb-verify-external-urls" checked/>
                         <div class="checkbox__content">
                             <div class="checkbox__check-mark-icon"></div>
-                            <div class="checkbox__text">Report Broken Links Only</div>
+                            <div class="checkbox__text">Verify External Links</div>
                         </div>
                     </div>
                 </div>

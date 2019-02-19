@@ -9,8 +9,6 @@ namespace Helix.Crawler.Abstractions
 
         public int HtmlRendererCount { get; }
 
-        public bool ReportBrokenLinksOnly { get; }
-
         public int RequestTimeoutDuration { get; }
 
         public Uri StartUri { get; }
@@ -21,15 +19,15 @@ namespace Helix.Crawler.Abstractions
 
         public bool VerifyExternalUrls { get; }
 
-        public Configurations(string domainName = "", bool reportBrokenLinksOnly = false, int requestTimeoutDuration = 0,
-            bool useHeadlessWebBrowsers = false, Uri startUri = null, int htmlRendererCount = 0)
+        public Configurations(Uri startUri = null, string domainName = "", bool verifyExternalUrls = true, int htmlRendererCount = 4,
+            int requestTimeoutDuration = 30, bool useHeadlessWebBrowsers = true)
         {
+            StartUri = startUri;
             DomainName = domainName;
-            ReportBrokenLinksOnly = reportBrokenLinksOnly;
+            HtmlRendererCount = htmlRendererCount;
+            VerifyExternalUrls = verifyExternalUrls;
             RequestTimeoutDuration = requestTimeoutDuration;
             UseHeadlessWebBrowsers = useHeadlessWebBrowsers;
-            StartUri = startUri;
-            HtmlRendererCount = htmlRendererCount;
         }
 
         public Configurations(string configurationJsonString)
@@ -37,11 +35,10 @@ namespace Helix.Crawler.Abstractions
             var tokens = JObject.Parse(configurationJsonString);
             UseHeadlessWebBrowsers = (bool) (tokens.SelectToken(nameof(UseHeadlessWebBrowsers)) ?? false);
             HtmlRendererCount = (int) (tokens.SelectToken(nameof(HtmlRendererCount)) ?? 0);
-            ReportBrokenLinksOnly = (bool) (tokens.SelectToken(nameof(ReportBrokenLinksOnly)) ?? false);
-            RequestTimeoutDuration = (int) (tokens.SelectToken(nameof(RequestTimeoutDuration)) ?? 0);
+            VerifyExternalUrls = (bool) (tokens.SelectToken(nameof(VerifyExternalUrls)) ?? false);
             StartUri = ValidateStartUri((string) tokens.SelectToken(nameof(StartUri)) ?? string.Empty);
             UseIncognitoWebBrowser = true;
-            VerifyExternalUrls = true;
+            RequestTimeoutDuration = 30;
 
             DomainName = ((string) tokens.SelectToken(nameof(DomainName)) ?? string.Empty).ToLower();
             if (string.IsNullOrWhiteSpace(DomainName)) DomainName = "_";
