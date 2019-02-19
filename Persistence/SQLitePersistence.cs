@@ -53,12 +53,8 @@ namespace Helix.Persistence
             lock (_addToBufferSync)
             {
                 if (_objectDisposed) throw new ObjectDisposedException(nameof(SQLitePersistence<TDto>));
-                if (_memoryBuffer.Count < 300) _memoryBuffer.Add(dto);
-                else
-                {
-                    FlushToDatabaseFileOnDisk();
-                    _memoryBuffer.Add(dto);
-                }
+                if (_memoryBuffer.Count >= 300) FlushToDatabaseFileOnDisk();
+                _memoryBuffer.Add(dto);
             }
         }
 
