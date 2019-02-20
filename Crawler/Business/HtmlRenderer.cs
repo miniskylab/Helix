@@ -14,7 +14,6 @@ namespace Helix.Crawler
     {
         bool _objectDisposed;
         readonly Dictionary<string, object> _publicApiLockMap;
-        readonly IReportWriter _reportWriter;
         Resource _resourceBeingRendered;
         IWebBrowser _webBrowser;
 
@@ -35,7 +34,6 @@ namespace Helix.Crawler
             );
             _webBrowser.BeforeRequest += EnsureInternal;
             _webBrowser.BeforeResponse += CaptureNetworkTraffic;
-            _reportWriter = reportWriter;
             _objectDisposed = false;
             _publicApiLockMap = new Dictionary<string, object> { { $"{nameof(TryRender)}", new object() } };
 
@@ -60,7 +58,7 @@ namespace Helix.Crawler
                                                             response.StatusCode != (int) _resourceBeingRendered.HttpStatusCode;
                     if (responseHttpStatusCodesDoNotMatch)
                     {
-                        _reportWriter.UpdateStatusCode(_resourceBeingRendered.Id, (HttpStatusCode) response.StatusCode);
+                        reportWriter.UpdateStatusCode(_resourceBeingRendered.Id, (HttpStatusCode) response.StatusCode);
                         return;
                     }
 

@@ -21,6 +21,7 @@ namespace Helix.Crawler
         public ReportWriter(IPersistenceProvider persistenceProvider)
         {
             _objectDisposed = false;
+            _verificationResultDataTransferObjects = new List<VerificationResultDataTransferObject>();
             _sqLitePersistence = persistenceProvider.GetSQLitePersistence<VerificationResultDataTransferObject>("report.db");
             _publicApiLockMap = new Dictionary<string, object>
             {
@@ -50,12 +51,17 @@ namespace Helix.Crawler
             lock (_publicApiLockMap[nameof(UpdateStatusCode)])
             {
                 if (_objectDisposed) throw new ObjectDisposedException(nameof(ReportWriter));
-                var dataTransferObject = _verificationResultDataTransferObjects.FirstOrDefault(dto => dto.Id == resourceId) ??
-                                         _sqLitePersistence.GetByPrimaryKey(resourceId) ??
-                                         throw new KeyNotFoundException();
+                var dataTransferObject = _sqLitePersistence.GetByPrimaryKey(resourceId);
+                if (dataTransferObject != null)
+                {
+                    dataTransferObject.StatusCode = newStatusCode;
+                    _sqLitePersistence.Update(dataTransferObject);
+                    return;
+                }
 
+                dataTransferObject = _verificationResultDataTransferObjects.FirstOrDefault(dto => dto.Id == resourceId);
+                if (dataTransferObject == null) throw new KeyNotFoundException();
                 dataTransferObject.StatusCode = newStatusCode;
-                _sqLitePersistence.Update(dataTransferObject);
             }
         }
 
@@ -79,8 +85,8 @@ namespace Helix.Crawler
 
         void FlushMemoryBufferToDisk()
         {
-            var memoryBuffer = _verificationResultDataTransferObjects;
-            Task.Run(() => { _sqLitePersistence.Save(memoryBuffer.ToArray()); });
+            var verificationResultDataTransferObjects = _verificationResultDataTransferObjects;
+            Task.Run(() => { _sqLitePersistence.Save(verificationResultDataTransferObjects.ToArray()); });
             _verificationResultDataTransferObjects = new List<VerificationResultDataTransferObject>();
         }
 
