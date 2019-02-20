@@ -7,10 +7,6 @@ namespace Helix.Crawler
     {
         int _currentId;
 
-        public int GetNext()
-        {
-            Interlocked.Increment(ref _currentId);
-            return _currentId;
-        }
+        public int GetNext() { return Interlocked.Increment(ref _currentId); }
     }
 }
