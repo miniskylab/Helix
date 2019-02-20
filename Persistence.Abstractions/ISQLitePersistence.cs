@@ -1,9 +1,11 @@
-using System;
-
 namespace Helix.Persistence.Abstractions
 {
-    public interface ISQLitePersistence<in TDto> : IDisposable where TDto : class
+    public interface ISQLitePersistence<TDataTransferObject> where TDataTransferObject : class
     {
-        void Save(TDto dto);
+        TDataTransferObject GetByPrimaryKey(params object[] primaryKeyValues);
+
+        void Save(params TDataTransferObject[] dataTransferObjects);
+
+        void Update(params TDataTransferObject[] dataTransferObjects);
     }
 }

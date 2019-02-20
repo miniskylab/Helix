@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Helix.Crawler.Abstractions;
 using Helix.Persistence.Abstractions;
 using JetBrains.Annotations;
@@ -13,14 +14,19 @@ namespace Helix.Crawler
     {
         bool _objectDisposed;
         readonly Dictionary<string, object> _publicApiLockMap;
-        ISQLitePersistence<VerificationResultDto> _sqLitePersistence;
+        readonly ISQLitePersistence<VerificationResultDataTransferObject> _sqLitePersistence;
+        IList<VerificationResultDataTransferObject> _verificationResultDataTransferObjects;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public ReportWriter(IPersistenceProvider persistenceProvider)
         {
             _objectDisposed = false;
-            _sqLitePersistence = persistenceProvider.GetSQLitePersistence<VerificationResultDto>("report.db");
-            _publicApiLockMap = new Dictionary<string, object> { { $"{nameof(WriteReport)}", new object() } };
+            _sqLitePersistence = persistenceProvider.GetSQLitePersistence<VerificationResultDataTransferObject>("report.db");
+            _publicApiLockMap = new Dictionary<string, object>
+            {
+                { $"{nameof(WriteReport)}", new object() },
+                { $"{nameof(UpdateStatusCode)}", new object() }
+            };
         }
 
         public void Dispose()
@@ -29,7 +35,7 @@ namespace Helix.Crawler
             {
                 foreach (var lockObject in _publicApiLockMap.Values) Monitor.Enter(lockObject);
                 if (_objectDisposed) return;
-                ReleaseUnmanagedResources();
+                FlushMemoryBufferToDisk();
                 GC.SuppressFinalize(this);
                 _objectDisposed = true;
             }
@@ -39,38 +45,49 @@ namespace Helix.Crawler
             }
         }
 
+        public void UpdateStatusCode(int resourceId, HttpStatusCode newStatusCode)
+        {
+            lock (_publicApiLockMap[nameof(UpdateStatusCode)])
+            {
+                if (_objectDisposed) throw new ObjectDisposedException(nameof(ReportWriter));
+                var dataTransferObject = _verificationResultDataTransferObjects.FirstOrDefault(dto => dto.Id == resourceId) ??
+                                         _sqLitePersistence.GetByPrimaryKey(resourceId) ??
+                                         throw new KeyNotFoundException();
+
+                dataTransferObject.StatusCode = newStatusCode;
+                _sqLitePersistence.Update(dataTransferObject);
+            }
+        }
+
         public void WriteReport(VerificationResult verificationResult)
         {
             lock (_publicApiLockMap[nameof(WriteReport)])
             {
                 if (_objectDisposed) throw new ObjectDisposedException(nameof(ReportWriter));
-                _sqLitePersistence.Save(new VerificationResultDto
+                if (_verificationResultDataTransferObjects.Count >= 300) FlushMemoryBufferToDisk();
+                _verificationResultDataTransferObjects.Add(new VerificationResultDataTransferObject
                 {
+                    Id = verificationResult.Resource.Id,
                     StatusCode = verificationResult.StatusCode,
                     VerifiedUrl = verificationResult.VerifiedUrl,
                     ParentUrl = verificationResult.ParentUrl,
-                    IsBrokenResource = verificationResult.IsBrokenResource,
                     IsExtractedResource = verificationResult.IsExtractedResource,
                     IsInternalResource = verificationResult.IsInternalResource
                 });
             }
         }
 
-        void ReleaseUnmanagedResources()
+        void FlushMemoryBufferToDisk()
         {
-            _sqLitePersistence?.Dispose();
-            _sqLitePersistence = null;
+            var memoryBuffer = _verificationResultDataTransferObjects;
+            Task.Run(() => { _sqLitePersistence.Save(memoryBuffer.ToArray()); });
+            _verificationResultDataTransferObjects = new List<VerificationResultDataTransferObject>();
         }
 
-        class VerificationResultDto
+        class VerificationResultDataTransferObject
         {
             [Key]
-            [UsedImplicitly]
-            [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-            public int Id { get; set; }
-
-            [Required]
-            public bool IsBrokenResource { [UsedImplicitly] get; set; }
+            public int Id { [UsedImplicitly] get; set; }
 
             [Required]
             public bool IsExtractedResource { [UsedImplicitly] get; set; }

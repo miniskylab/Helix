@@ -14,12 +14,15 @@ namespace Helix.Crawler
     {
         bool _objectDisposed;
         readonly Dictionary<string, object> _publicApiLockMap;
+        readonly IReportWriter _reportWriter;
+        Resource _resourceBeingRendered;
         IWebBrowser _webBrowser;
 
         public event Action<RawResource> OnRawResourceCaptured;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public HtmlRenderer(Configurations configurations, IWebBrowserProvider webBrowserProvider, IResourceScope resourceScope)
+        public HtmlRenderer(Configurations configurations, IWebBrowserProvider webBrowserProvider, IResourceScope resourceScope,
+            IReportWriter reportWriter)
         {
             var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
             var pathToChromiumExecutable = Path.Combine(workingDirectory, "chromium/chrome.exe");
@@ -32,6 +35,7 @@ namespace Helix.Crawler
             );
             _webBrowser.BeforeRequest += EnsureInternal;
             _webBrowser.BeforeResponse += CaptureNetworkTraffic;
+            _reportWriter = reportWriter;
             _objectDisposed = false;
             _publicApiLockMap = new Dictionary<string, object> { { $"{nameof(TryRender)}", new object() } };
 
@@ -52,6 +56,14 @@ namespace Helix.Crawler
                     if (response.ContentType == null) return;
 
                     var request = networkTraffic.WebSession.Request;
+                    var responseHttpStatusCodesDoNotMatch = request.RequestUri.Equals(_resourceBeingRendered.Uri) &&
+                                                            response.StatusCode != (int) _resourceBeingRendered.HttpStatusCode;
+                    if (responseHttpStatusCodesDoNotMatch)
+                    {
+                        _reportWriter.UpdateStatusCode(_resourceBeingRendered.Id, (HttpStatusCode) response.StatusCode);
+                        return;
+                    }
+
                     var isNotGETRequest = request.Method.ToUpperInvariant() != "GET";
                     var isNotCss = !response.ContentType.StartsWith("text/css", StringComparison.OrdinalIgnoreCase);
                     var isNotImage = !response.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
@@ -93,6 +105,7 @@ namespace Helix.Crawler
             lock (_publicApiLockMap[nameof(TryRender)])
             {
                 if (_objectDisposed) throw new ObjectDisposedException(nameof(HtmlRenderer));
+                _resourceBeingRendered = resource;
                 return _webBrowser.TryRender(resource.Uri, onFailed, cancellationToken, out html, out pageLoadTime, attemptCount);
             }
         }

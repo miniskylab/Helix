@@ -4,7 +4,7 @@ using Helix.Specifications;
 
 namespace Helix.Crawler.Specifications
 {
-    class RawResourceProcessingDefinition : TheoryDescription<RawResource, Resource, HttpStatusCode, Type>
+    class RawResourceProcessingDefinition : TheoryDescription<RawResource, Resource, Type>
     {
         public RawResourceProcessingDefinition()
         {
@@ -20,18 +20,15 @@ namespace Helix.Crawler.Specifications
         {
             AddTheoryDescription(
                 new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "without-leading-slash" },
-                new Resource { ParentUri = new Uri("http://www.helix.com"), Uri = new Uri("http://www.helix.com/without-leading-slash") },
-                HttpStatusCode.OK
+                new Resource { ParentUri = new Uri("http://www.helix.com"), Uri = new Uri("http://www.helix.com/without-leading-slash") }
             );
             AddTheoryDescription(
                 new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "/with-leading-slash" },
-                new Resource { ParentUri = new Uri("http://www.helix.com"), Uri = new Uri("http://www.helix.com/with-leading-slash") },
-                HttpStatusCode.OK
+                new Resource { ParentUri = new Uri("http://www.helix.com"), Uri = new Uri("http://www.helix.com/with-leading-slash") }
             );
             AddTheoryDescription(
                 new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "//www.sanity.com" },
-                new Resource { ParentUri = new Uri("http://www.helix.com"), Uri = new Uri("http://www.sanity.com") },
-                HttpStatusCode.OK
+                new Resource { ParentUri = new Uri("http://www.helix.com"), Uri = new Uri("http://www.sanity.com") }
             );
         }
 
@@ -39,8 +36,7 @@ namespace Helix.Crawler.Specifications
         {
             AddTheoryDescription(
                 new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://www.helix.com/anything" },
-                new Resource { ParentUri = new Uri("http://www.helix.com"), Uri = new Uri("http://www.helix.com/anything") },
-                HttpStatusCode.OK
+                new Resource { ParentUri = new Uri("http://www.helix.com"), Uri = new Uri("http://www.helix.com/anything") }
             );
         }
 
@@ -48,7 +44,7 @@ namespace Helix.Crawler.Specifications
         {
             AddTheoryDescription(
                 new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http:///malformed-uri" },
-                p3: HttpStatusCode.MalformedUri
+                new Resource { ParentUri = new Uri("http://www.helix.com"), HttpStatusCode = HttpStatusCode.MalformedUri }
             );
         }
 
@@ -56,8 +52,7 @@ namespace Helix.Crawler.Specifications
         {
             AddTheoryDescription(
                 new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://www.helix.com/anything#fragment" },
-                new Resource { ParentUri = new Uri("http://www.helix.com"), Uri = new Uri("http://www.helix.com/anything") },
-                HttpStatusCode.OK
+                new Resource { ParentUri = new Uri("http://www.helix.com"), Uri = new Uri("http://www.helix.com/anything") }
             );
         }
 
@@ -65,26 +60,26 @@ namespace Helix.Crawler.Specifications
         {
             AddTheoryDescription(
                 new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "ftp://www.sanity.com" },
-                p3: HttpStatusCode.UriSchemeNotSupported
+                new Resource { ParentUri = new Uri("http://www.helix.com"), HttpStatusCode = HttpStatusCode.UriSchemeNotSupported }
             );
             AddTheoryDescription(
                 new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "mailto://www.sanity.com" },
-                p3: HttpStatusCode.UriSchemeNotSupported
+                new Resource { ParentUri = new Uri("http://www.helix.com"), HttpStatusCode = HttpStatusCode.UriSchemeNotSupported }
             );
             AddTheoryDescription(
                 new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "telnet://www.sanity.com" },
-                p3: HttpStatusCode.UriSchemeNotSupported
+                new Resource { ParentUri = new Uri("http://www.helix.com"), HttpStatusCode = HttpStatusCode.UriSchemeNotSupported }
             );
             AddTheoryDescription(
                 new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "file://www.sanity.com" },
-                p3: HttpStatusCode.UriSchemeNotSupported
+                new Resource { ParentUri = new Uri("http://www.helix.com"), HttpStatusCode = HttpStatusCode.UriSchemeNotSupported }
             );
             AddTheoryDescription(
                 new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "tel:12345678" },
-                p3: HttpStatusCode.UriSchemeNotSupported
+                new Resource { ParentUri = new Uri("http://www.helix.com"), HttpStatusCode = HttpStatusCode.UriSchemeNotSupported }
             );
         }
 
-        void ThrowExceptionIfArgumentNull() { AddTheoryDescription(null, p4: typeof(ArgumentNullException)); }
+        void ThrowExceptionIfArgumentNull() { AddTheoryDescription(null, p3: typeof(ArgumentNullException)); }
     }
 }

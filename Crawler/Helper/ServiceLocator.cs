@@ -39,6 +39,7 @@ namespace Helix.Crawler
                     .AddTransient<IRawResourceVerifier, RawResourceVerifier>()
                     .AddTransient<IRawResourceProcessor, RawResourceProcessor>()
                     .AddTransient<IResourceScope, ResourceScope>()
+                    .AddSingleton<IIncrementalIdGenerator, IncrementalIdGenerator>()
                     .AddSingleton<IStatistics, Statistics>()
                     .AddSingleton<IPersistenceProvider, PersistenceProvider>()
                     .AddSingleton<IWebBrowserProvider, WebBrowserProvider>()

@@ -1,7 +1,4 @@
-using System;
 using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using Helix.Persistence.Abstractions;
 using JetBrains.Annotations;
 using Microsoft.Data.Sqlite;
@@ -9,21 +6,19 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Helix.Persistence
 {
-    class SQLitePersistence<TDto> : ISQLitePersistence<TDto> where TDto : class
+    class SQLitePersistence<TDataTransferObject> : ISQLitePersistence<TDataTransferObject> where TDataTransferObject : class
     {
-        readonly object _flushToDatabaseFileOnDiskLock;
-        IList<TDto> _memoryBuffer;
-        bool _objectDisposed;
         readonly string _pathToDatabaseFile;
         readonly Dictionary<string, object> _publicApiLockMap;
 
         public SQLitePersistence(string pathToDatabaseFile)
         {
-            _memoryBuffer = new List<TDto>();
-            _objectDisposed = false;
             _pathToDatabaseFile = pathToDatabaseFile;
-            _flushToDatabaseFileOnDiskLock = new object();
-            _publicApiLockMap = new Dictionary<string, object> { { $"{nameof(Save)}", new object() } };
+            _publicApiLockMap = new Dictionary<string, object>
+            {
+                { $"{nameof(Save)}", new object() },
+                { $"{nameof(Update)}", new object() }
+            };
             EnsureDatabaseIsRecreated();
 
             void EnsureDatabaseIsRecreated()
@@ -36,53 +31,41 @@ namespace Helix.Persistence
             }
         }
 
-        public void Dispose()
+        public TDataTransferObject GetByPrimaryKey(params object[] primaryKeyValues)
         {
-            try
-            {
-                foreach (var lockObject in _publicApiLockMap.Values) Monitor.Enter(lockObject);
-                if (_objectDisposed) return;
-                FlushToDatabaseFileOnDisk();
-                _objectDisposed = true;
-            }
-            finally
-            {
-                foreach (var lockObject in _publicApiLockMap.Values) Monitor.Exit(lockObject);
-            }
+            using (var sqLiteDbContext = new SQLiteDbContext(_pathToDatabaseFile))
+                return sqLiteDbContext.DataTransferObjects.Find(primaryKeyValues);
         }
 
-        public void Save(TDto dto)
+        public void Save(params TDataTransferObject[] dataTransferObjects)
         {
             lock (_publicApiLockMap[nameof(Save)])
             {
-                if (_objectDisposed) throw new ObjectDisposedException(nameof(SQLitePersistence<TDto>));
-                if (_memoryBuffer.Count >= 300) FlushToDatabaseFileOnDisk();
-                _memoryBuffer.Add(dto);
+                using (var sqLiteDbContext = new SQLiteDbContext(_pathToDatabaseFile))
+                {
+                    sqLiteDbContext.DataTransferObjects.AddRange(dataTransferObjects);
+                    sqLiteDbContext.SaveChanges();
+                }
             }
         }
 
-        void FlushToDatabaseFileOnDisk()
+        public void Update(params TDataTransferObject[] dataTransferObjects)
         {
-            var memoryBuffer = _memoryBuffer;
-            Task.Run(() =>
+            lock (_publicApiLockMap[nameof(Update)])
             {
-                lock (_flushToDatabaseFileOnDiskLock)
+                using (var sqLiteDbContext = new SQLiteDbContext(_pathToDatabaseFile))
                 {
-                    using (var sqLiteDbContext = new SQLiteDbContext(_pathToDatabaseFile))
-                    {
-                        sqLiteDbContext.DTOs.AddRange(memoryBuffer);
-                        sqLiteDbContext.SaveChanges();
-                    }
+                    sqLiteDbContext.DataTransferObjects.UpdateRange(dataTransferObjects);
+                    sqLiteDbContext.SaveChanges();
                 }
-            });
-            _memoryBuffer = new List<TDto>();
+            }
         }
 
         class SQLiteDbContext : DbContext
         {
             readonly string _pathToDatabaseFile;
 
-            public DbSet<TDto> DTOs { get; [UsedImplicitly] set; }
+            public DbSet<TDataTransferObject> DataTransferObjects { get; [UsedImplicitly] set; }
 
             public SQLiteDbContext(string pathToDatabaseFile) { _pathToDatabaseFile = pathToDatabaseFile; }
 

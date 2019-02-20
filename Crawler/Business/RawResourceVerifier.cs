@@ -62,44 +62,35 @@ namespace Helix.Crawler
             lock (_publicApiLockMap[nameof(TryVerify)])
             {
                 if (_objectDisposed) throw new ObjectDisposedException(nameof(RawResourceVerifier));
-                verificationResult = new VerificationResult { RawResource = rawResource };
-                var rawResourceProcessingResultCode = _rawResourceProcessor.TryProcessRawResource(rawResource, out var resource);
-                if (rawResourceProcessingResultCode != HttpStatusCode.OK)
-                {
-                    verificationResult.Resource = null;
-                    verificationResult.StatusCode = rawResourceProcessingResultCode;
-                    verificationResult.IsInternalResource = false;
-                    return true;
-                }
+                _rawResourceProcessor.ProcessRawResource(rawResource, out var resource);
+                verificationResult = new VerificationResult { RawResource = rawResource, Resource = resource };
+                if (verificationResult.Resource.Uri == null) return true;
 
-                verificationResult.IsInternalResource = _resourceScope.IsInternalResource(resource);
+                verificationResult.IsInternalResource = _resourceScope.IsInternalResource(verificationResult.Resource);
                 if (!verificationResult.IsInternalResource && !_configurations.VerifyExternalUrls)
                 {
                     verificationResult = null;
                     return false;
                 }
 
-                verificationResult.Resource = resource;
-                verificationResult.StatusCode = rawResource.HttpStatusCode;
-                if (verificationResult.StatusCode != 0) return true;
-
+                if (verificationResult.Resource.HttpStatusCode != 0) return true;
                 try
                 {
-                    _sendingGETRequestTask = _httpClient.GetAsync(resource.Uri, _cancellationTokenSource.Token);
-                    verificationResult.StatusCode = (HttpStatusCode) _sendingGETRequestTask.Result.StatusCode;
+                    _sendingGETRequestTask = _httpClient.GetAsync(verificationResult.Resource.Uri, _cancellationTokenSource.Token);
+                    verificationResult.Resource.HttpStatusCode = (HttpStatusCode) _sendingGETRequestTask.Result.StatusCode;
                 }
                 catch (AggregateException aggregateException)
                 {
                     switch (aggregateException.InnerException)
                     {
                         case TaskCanceledException _:
-                            verificationResult.StatusCode = _cancellationTokenSource.Token.IsCancellationRequested
+                            verificationResult.Resource.HttpStatusCode = _cancellationTokenSource.Token.IsCancellationRequested
                                 ? HttpStatusCode.Processing
                                 : HttpStatusCode.RequestTimeout;
                             break;
                         case HttpRequestException _:
                         case SocketException _:
-                            verificationResult.StatusCode = HttpStatusCode.BadRequest;
+                            verificationResult.Resource.HttpStatusCode = HttpStatusCode.BadRequest;
                             break;
                         default:
                             throw;

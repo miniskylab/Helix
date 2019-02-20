@@ -5,23 +5,34 @@ namespace Helix.Crawler
 {
     public sealed class RawResourceProcessor : IRawResourceProcessor
     {
+        readonly IIncrementalIdGenerator _incrementalIdGenerator;
         readonly IResourceScope _resourceScope;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public RawResourceProcessor(IResourceScope resourceScope) { _resourceScope = resourceScope; }
+        public RawResourceProcessor(IResourceScope resourceScope, IIncrementalIdGenerator incrementalIdGenerator)
+        {
+            _resourceScope = resourceScope;
+            _incrementalIdGenerator = incrementalIdGenerator;
+        }
 
-        public HttpStatusCode TryProcessRawResource(RawResource rawResource, out Resource resource)
+        public void ProcessRawResource(RawResource rawResource, out Resource resource)
         {
             if (rawResource == null) throw new ArgumentNullException();
 
-            resource = null;
-            if (!TryCreateAbsoluteUri(out var uri)) return HttpStatusCode.MalformedUri;
-            if (UriSchemeIsNotSupported()) return HttpStatusCode.UriSchemeNotSupported;
-            if (IsOrphanedUri()) return HttpStatusCode.OrphanedUri;
-            StripFragment();
-
-            resource = new Resource { ParentUri = rawResource.ParentUri, Uri = uri, HttpStatusCode = rawResource.HttpStatusCode };
-            return HttpStatusCode.OK;
+            resource = new Resource
+            {
+                Id = _incrementalIdGenerator.GetNext(),
+                ParentUri = rawResource.ParentUri
+            };
+            if (!TryCreateAbsoluteUri(out var uri)) resource.HttpStatusCode = HttpStatusCode.MalformedUri;
+            else if (UriSchemeIsNotSupported()) resource.HttpStatusCode = HttpStatusCode.UriSchemeNotSupported;
+            else if (IsOrphanedUri()) resource.HttpStatusCode = HttpStatusCode.OrphanedUri;
+            else
+            {
+                StripFragment();
+                resource.Uri = uri;
+                resource.HttpStatusCode = rawResource.HttpStatusCode;
+            }
 
             bool TryCreateAbsoluteUri(out Uri absoluteUri)
             {

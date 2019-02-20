@@ -8,13 +8,13 @@ namespace Helix.Crawler.Abstractions
 
         public Resource Resource { get; set; }
 
-        public HttpStatusCode StatusCode { get; set; }
-
         public bool IsBrokenResource => StatusCode < 0 || 400 <= (int) StatusCode;
 
         public bool IsExtractedResource => RawResource?.HttpStatusCode == 0;
 
         public string ParentUrl => RawResource.ParentUri?.OriginalString;
+
+        public HttpStatusCode StatusCode => Resource.HttpStatusCode;
 
         public string VerifiedUrl
         {
