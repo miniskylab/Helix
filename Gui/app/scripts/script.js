@@ -8,8 +8,10 @@ socket.connect(18880, "127.0.0.1", () => {
     const txtHtmlRendererCount = document.getElementById("txt-html-renderer-count");
     const ckbVerifyExternalUrls = document.getElementById("ckb-verify-external-urls");
     const ckbShowWebBrowsers = document.getElementById("ckb-show-web-browsers");
+    const configurationPanel = document.getElementById("configuration-panel");
     btnMain.addEventListener("click", () => {
         if (!btnMain.hasAttribute("disabled")) btnMain.setAttribute("disabled", "");
+        if (!configurationPanel.hasAttribute("disabled")) configurationPanel.setAttribute("disabled", "");
         socket.write(JSON.stringify({
             text: "btn-start-clicked",
             payload: JSON.stringify({
@@ -39,7 +41,6 @@ socket.connect(18880, "127.0.0.1", () => {
     const lblElapsedTime = document.getElementById("lbl-elapsed-time");
     const lblStatusText = document.getElementById("lbl-status-text");
     const btnStop = document.getElementById("btn-stop");
-    const configurationPanel = document.getElementById("configuration-panel");
     socket.on("data", ipcMessageJson => {
         const ipcMessage = JSON.parse(ipcMessageJson);
         switch (ipcMessage.Text) {
