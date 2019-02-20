@@ -12,14 +12,14 @@ namespace Helix.Crawler
         readonly ConcurrentSet<string> _alreadyVerifiedUrls;
         readonly object _memorizationLock;
         readonly BlockingCollection<HtmlDocument> _toBeExtractedHtmlDocuments;
-        readonly BlockingCollection<Uri> _toBeRenderedUris;
+        readonly BlockingCollection<Resource> _toBeRenderedResources;
         readonly BlockingCollection<RawResource> _toBeVerifiedRawResources;
 
         public Configurations Configurations { get; }
 
         public int ToBeExtractedHtmlDocumentCount => _toBeExtractedHtmlDocuments.Count;
 
-        public int ToBeRenderedUriCount => _toBeRenderedUris.Count;
+        public int ToBeRenderedResourceCount => _toBeRenderedResources.Count;
 
         public int ToBeVerifiedRawResourceCount => _toBeVerifiedRawResources.Count;
 
@@ -29,7 +29,7 @@ namespace Helix.Crawler
             Configurations = configurations;
             _memorizationLock = new object();
             _toBeExtractedHtmlDocuments = new BlockingCollection<HtmlDocument>();
-            _toBeRenderedUris = new BlockingCollection<Uri>();
+            _toBeRenderedResources = new BlockingCollection<Resource>();
             _alreadyVerifiedUrls = new ConcurrentSet<string> { Configurations.StartUri.AbsoluteUri };
             _toBeVerifiedRawResources = new BlockingCollection<RawResource>
             {
@@ -45,7 +45,7 @@ namespace Helix.Crawler
                 while (_toBeVerifiedRawResources.Any()) _toBeVerifiedRawResources.Take();
             }
             while (_toBeExtractedHtmlDocuments.Any()) _toBeExtractedHtmlDocuments.Take();
-            while (_toBeRenderedUris.Any()) _toBeRenderedUris.Take();
+            while (_toBeRenderedResources.Any()) _toBeRenderedResources.Take();
         }
 
         public void Memorize(RawResource toBeVerifiedRawResource, CancellationToken cancellationToken)
@@ -60,9 +60,9 @@ namespace Helix.Crawler
                 Thread.Sleep(TimeSpan.FromSeconds(3));
         }
 
-        public void Memorize(Uri toBeRenderedUri, CancellationToken cancellationToken)
+        public void Memorize(Resource toBeRenderedResource, CancellationToken cancellationToken)
         {
-            while (!cancellationToken.IsCancellationRequested && !_toBeRenderedUris.TryAdd(toBeRenderedUri))
+            while (!cancellationToken.IsCancellationRequested && !_toBeRenderedResources.TryAdd(toBeRenderedResource))
                 Thread.Sleep(TimeSpan.FromSeconds(3));
         }
 
@@ -74,14 +74,14 @@ namespace Helix.Crawler
 
         public bool TryTake(out HtmlDocument htmlDocument) { return _toBeExtractedHtmlDocuments.TryTake(out htmlDocument); }
 
-        public bool TryTake(out Uri uri) { return _toBeRenderedUris.TryTake(out uri); }
+        public bool TryTake(out Resource resource) { return _toBeRenderedResources.TryTake(out resource); }
 
         public bool TryTake(out RawResource rawResource) { return _toBeVerifiedRawResources.TryTake(out rawResource); }
 
         ~Memory()
         {
             _toBeExtractedHtmlDocuments?.Dispose();
-            _toBeRenderedUris?.Dispose();
+            _toBeRenderedResources?.Dispose();
             _toBeVerifiedRawResources?.Dispose();
         }
     }

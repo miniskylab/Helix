@@ -45,10 +45,10 @@ namespace Helix.Crawler
                     lock (_renderingLock)
                     lock (_verificationLock)
                     {
-                        var noMoreToBeRenderedUris = _memory.ToBeRenderedUriCount == 0;
+                        var noMoreToBeRenderedResources = _memory.ToBeRenderedResourceCount == 0;
                         var noMoreToBeVerifiedRawResources = _memory.ToBeVerifiedRawResourceCount == 0;
                         var noMoreToBeExtractedHtmlDocuments = _memory.ToBeExtractedHtmlDocumentCount == 0;
-                        var nothingToDo = noMoreToBeExtractedHtmlDocuments && noMoreToBeRenderedUris && noMoreToBeVerifiedRawResources;
+                        var nothingToDo = noMoreToBeExtractedHtmlDocuments && noMoreToBeRenderedResources && noMoreToBeVerifiedRawResources;
                         var noActiveThread = _pendingExtractionTaskCount + _pendingRenderingTaskCount + _pendingVerificationTaskCount == 0;
                         return nothingToDo && noActiveThread;
                     }
@@ -67,8 +67,11 @@ namespace Helix.Crawler
                     lock (_renderingLock)
                     lock (_verificationLock)
                     {
+                        var toBeExtractedHtmlDocumentCount = _memory.ToBeExtractedHtmlDocumentCount;
+                        var toBeRenderedResourceCount = _memory.ToBeRenderedResourceCount;
+                        var toBeVerifiedRawResourceCount = _memory.ToBeVerifiedRawResourceCount;
                         return _pendingExtractionTaskCount + _pendingRenderingTaskCount + _pendingVerificationTaskCount +
-                               _memory.ToBeExtractedHtmlDocumentCount + _memory.ToBeRenderedUriCount + _memory.ToBeVerifiedRawResourceCount;
+                               toBeExtractedHtmlDocumentCount + toBeRenderedResourceCount + toBeVerifiedRawResourceCount;
                     }
                 }
             }
@@ -183,20 +186,20 @@ namespace Helix.Crawler
             }
         }
 
-        public void CreateTask(Action<IHtmlRenderer, Uri> taskDescription)
+        public void CreateTask(Action<IHtmlRenderer, Resource> taskDescription)
         {
             lock (_publicApiLockMap["CreateRenderingTask"])
             {
                 if (_objectDisposed) throw new ObjectDisposedException(nameof(Scheduler));
                 IHtmlRenderer htmlRenderer;
-                Uri toBeRenderedUri;
+                Resource toBeRenderedResource;
                 try
                 {
-                    GetHtmlRendererAndToBeRenderedUri();
+                    GetHtmlRendererAndToBeRenderedResource();
                     Task.Run(
                         () =>
                         {
-                            try { taskDescription(htmlRenderer, toBeRenderedUri); }
+                            try { taskDescription(htmlRenderer, toBeRenderedResource); }
                             catch (Exception exception) { _logger.LogException(exception); }
                             finally { ReleaseHtmlRenderer(); }
                         },
@@ -205,7 +208,7 @@ namespace Helix.Crawler
                         _ =>
                         {
                             ReleaseHtmlRenderer();
-                            ReturnToBeRenderedUri();
+                            ReturnToBeRenderedResource();
                         },
                         TaskContinuationOptions.OnlyOnCanceled | TaskContinuationOptions.ExecuteSynchronously
                     );
@@ -216,7 +219,7 @@ namespace Helix.Crawler
                     _logger.LogException(exception);
                 }
 
-                void GetHtmlRendererAndToBeRenderedUri()
+                void GetHtmlRendererAndToBeRenderedResource()
                 {
                     while (!EverythingIsDone && !CancellationToken.IsCancellationRequested)
                     {
@@ -229,7 +232,7 @@ namespace Helix.Crawler
                         }
 
                         _pendingRenderingTaskCount++;
-                        if (!_memory.TryTake(out toBeRenderedUri))
+                        if (!_memory.TryTake(out toBeRenderedResource))
                         {
                             _pendingRenderingTaskCount--;
                             Monitor.Exit(_renderingLock);
@@ -254,7 +257,7 @@ namespace Helix.Crawler
                     lock (_renderingLock) _pendingRenderingTaskCount--;
                     _servicePool.Return(htmlRenderer);
                 }
-                void ReturnToBeRenderedUri() { _memory.Memorize(toBeRenderedUri, CancellationToken.None); }
+                void ReturnToBeRenderedResource() { _memory.Memorize(toBeRenderedResource, CancellationToken.None); }
             }
         }
 

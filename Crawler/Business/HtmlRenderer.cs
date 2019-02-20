@@ -87,13 +87,13 @@ namespace Helix.Crawler
             }
         }
 
-        public bool TryRender(Uri uri, Action<Exception> onFailed, CancellationToken cancellationToken, out string html,
+        public bool TryRender(Resource resource, Action<Exception> onFailed, CancellationToken cancellationToken, out string html,
             out long? pageLoadTime, int attemptCount = 3)
         {
             lock (_publicApiLockMap[nameof(TryRender)])
             {
                 if (_objectDisposed) throw new ObjectDisposedException(nameof(HtmlRenderer));
-                return _webBrowser.TryRender(uri, onFailed, cancellationToken, out html, out pageLoadTime, attemptCount);
+                return _webBrowser.TryRender(resource.Uri, onFailed, cancellationToken, out html, out pageLoadTime, attemptCount);
             }
         }
 

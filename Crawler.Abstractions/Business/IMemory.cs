@@ -1,4 +1,3 @@
-using System;
 using System.Threading;
 
 namespace Helix.Crawler.Abstractions
@@ -9,7 +8,7 @@ namespace Helix.Crawler.Abstractions
 
         int ToBeExtractedHtmlDocumentCount { get; }
 
-        int ToBeRenderedUriCount { get; }
+        int ToBeRenderedResourceCount { get; }
 
         int ToBeVerifiedRawResourceCount { get; }
 
@@ -17,13 +16,13 @@ namespace Helix.Crawler.Abstractions
 
         void Memorize(RawResource toBeVerifiedRawResource, CancellationToken cancellationToken);
 
-        void Memorize(Uri toBeRenderedUri, CancellationToken cancellationToken);
+        void Memorize(Resource toBeRenderedResource, CancellationToken cancellationToken);
 
         void Memorize(HtmlDocument toBeExtractedHtmlDocument, CancellationToken cancellationToken);
 
         bool TryTake(out HtmlDocument htmlDocument);
 
-        bool TryTake(out Uri uri);
+        bool TryTake(out Resource resource);
 
         bool TryTake(out RawResource rawResource);
     }
