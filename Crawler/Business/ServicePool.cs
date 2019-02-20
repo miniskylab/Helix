@@ -13,6 +13,9 @@ namespace Helix.Crawler
     {
         const int RawResourceExtractorCount = 300;
         const int RawResourceVerifierCount = 2500;
+        int _createdHtmlRendererCount;
+        int _createdRawResourceExtractorCount;
+        int _createdRawResourceVerifierCount;
         BlockingCollection<IHtmlRenderer> _htmlRendererPool;
         readonly ILogger _logger;
         readonly IMemory _memory;
@@ -71,28 +74,52 @@ namespace Helix.Crawler
                 {
                     for (var rawResourceExtractorId = 0; rawResourceExtractorId < RawResourceExtractorCount; rawResourceExtractorId++)
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var rawResourceExtractor = ServiceLocator.Get<IRawResourceExtractor>();
-                        _rawResourceExtractorPool.Add(rawResourceExtractor, cancellationToken);
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            while (_rawResourceExtractorPool.Any()) _rawResourceExtractorPool.Take();
+                            _createdRawResourceExtractorCount = 0;
+                        }
+                        else
+                        {
+                            var rawResourceExtractor = ServiceLocator.Get<IRawResourceExtractor>();
+                            _rawResourceExtractorPool.Add(rawResourceExtractor, CancellationToken.None);
+                            _createdRawResourceExtractorCount++;
+                        }
                     }
                 }
                 void InitializeRawResourceVerifierPool()
                 {
                     for (var rawResourceVerifierId = 0; rawResourceVerifierId < RawResourceVerifierCount; rawResourceVerifierId++)
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var rawResourceVerifier = ServiceLocator.Get<IRawResourceVerifier>();
-                        _rawResourceVerifierPool.Add(rawResourceVerifier, cancellationToken);
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            while (_rawResourceVerifierPool.Any()) _rawResourceVerifierPool.Take().Dispose();
+                            _createdRawResourceVerifierCount = 0;
+                        }
+                        else
+                        {
+                            var rawResourceVerifier = ServiceLocator.Get<IRawResourceVerifier>();
+                            _rawResourceVerifierPool.Add(rawResourceVerifier, CancellationToken.None);
+                            _createdRawResourceVerifierCount++;
+                        }
                     }
                 }
                 void InitializeHtmlRendererPool()
                 {
                     Parallel.For(0, _memory.Configurations.HtmlRendererCount, htmlRendererId =>
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var htmlRenderer = ServiceLocator.Get<IHtmlRenderer>();
-                        htmlRenderer.OnRawResourceCaptured += rawResource => _memory.Memorize(rawResource, CancellationToken.None);
-                        _htmlRendererPool.Add(htmlRenderer, cancellationToken);
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            while (_htmlRendererPool.Any()) _htmlRendererPool.Take().Dispose();
+                            Interlocked.Exchange(ref _createdHtmlRendererCount, 0);
+                        }
+                        else
+                        {
+                            var htmlRenderer = ServiceLocator.Get<IHtmlRenderer>();
+                            htmlRenderer.OnRawResourceCaptured += rawResource => _memory.Memorize(rawResource, CancellationToken.None);
+                            _htmlRendererPool.Add(htmlRenderer, CancellationToken.None);
+                            Interlocked.Increment(ref _createdHtmlRendererCount);
+                        }
                     });
                 }
             }
@@ -198,21 +225,21 @@ namespace Helix.Crawler
             void CheckForOrphanedResources()
             {
                 var orphanedResourceErrorMessage = string.Empty;
-                if (disposedRawResourceExtractorCount != RawResourceExtractorCount)
+                if (disposedRawResourceExtractorCount != _createdRawResourceExtractorCount)
                     orphanedResourceErrorMessage += GetErrorMessage(
                         RawResourceExtractorCount,
                         nameof(RawResourceExtractor),
                         disposedRawResourceExtractorCount
                     );
 
-                if (disposedRawResourceVerifierCount != RawResourceVerifierCount)
+                if (disposedRawResourceVerifierCount != _createdRawResourceVerifierCount)
                     orphanedResourceErrorMessage += GetErrorMessage(
                         RawResourceVerifierCount,
                         nameof(RawResourceVerifier),
                         disposedRawResourceVerifierCount
                     );
 
-                if (disposedHtmlRendererCount != _memory.Configurations.HtmlRendererCount)
+                if (disposedHtmlRendererCount != _createdHtmlRendererCount)
                     orphanedResourceErrorMessage += GetErrorMessage(
                         _memory.Configurations.HtmlRendererCount,
                         nameof(HtmlRenderer),
