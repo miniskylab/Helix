@@ -36,7 +36,7 @@ namespace Helix.Gui
             }
             IpcSocket.On("btn-start-clicked", configurationJsonString =>
             {
-                if (CrawlerBot.CrawlerState != CrawlerState.Ready) return;
+                if (CrawlerBot.CrawlerState != CrawlerState.WaitingToRun) return;
                 var configurations = new Configurations(configurationJsonString);
                 RedrawGui("Initializing ...");
                 CrawlerBot.OnStopped += everythingIsDone =>
@@ -82,7 +82,7 @@ namespace Helix.Gui
             {
                 Text = "redraw",
                 Payload = JsonConvert.SerializeObject(
-                    CrawlerBot.CrawlerState == CrawlerState.Ready
+                    CrawlerBot.CrawlerState == CrawlerState.WaitingToRun
                         ? new Frame { StatusText = statusText }
                         : new Frame
                         {
@@ -103,7 +103,7 @@ namespace Helix.Gui
         {
             BackgroundTasks.Add(Task.Run(() =>
             {
-                while (CrawlerBot.CrawlerState != CrawlerState.Ready)
+                while (CrawlerBot.CrawlerState != CrawlerState.WaitingToRun)
                 {
                     RedrawGui();
                     Thread.Sleep(timeSpan);

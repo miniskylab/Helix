@@ -2,10 +2,12 @@
 {
     public enum CrawlerState
     {
-        Unknown,
-        Ready,
-        Working,
+        WaitingToRun,
+        Running,
         Stopping,
+        RanToCompletion,
+        Cancelled,
+        Faulted,
         Paused
     }
 }

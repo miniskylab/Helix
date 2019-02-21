@@ -17,7 +17,7 @@ namespace Helix.Crawler
         static readonly List<Task> BackgroundTasks;
         static readonly object CrawlerStateTransitionLock;
 
-        public static CrawlerState CrawlerState { get; private set; } = CrawlerState.Ready;
+        public static CrawlerState CrawlerState { get; private set; }
 
         public static IStatistics Statistics { get; private set; }
 
@@ -47,7 +47,7 @@ namespace Helix.Crawler
             _servicePool = ServiceLocator.Get<IServicePool>();
             _memory = ServiceLocator.Get<IMemory>();
 
-            if (!TryTransitTo(CrawlerState.Working)) return;
+            if (!TryTransitTo(CrawlerState.Running)) return;
             BackgroundTasks.Add(Task.Run(() =>
             {
                 try
@@ -86,7 +86,7 @@ namespace Helix.Crawler
             catch (Exception exception) { _logger.LogException(exception); }
 
             ServiceLocator.Dispose();
-            TryTransitTo(CrawlerState.Ready);
+            TryTransitTo(CrawlerState.WaitingToRun);
             OnStopped?.Invoke(everythingIsDone);
         }
 
@@ -128,39 +128,36 @@ namespace Helix.Crawler
 
         static bool TryTransitTo(CrawlerState crawlerState)
         {
-            if (CrawlerState == CrawlerState.Unknown) return false;
             switch (crawlerState)
             {
-                case CrawlerState.Ready:
+                case CrawlerState.WaitingToRun:
                     lock (CrawlerStateTransitionLock)
                     {
                         if (CrawlerState != CrawlerState.Stopping) return false;
-                        CrawlerState = CrawlerState.Ready;
+                        CrawlerState = CrawlerState.WaitingToRun;
                         return true;
                     }
-                case CrawlerState.Working:
+                case CrawlerState.Running:
                     lock (CrawlerStateTransitionLock)
                     {
-                        if (CrawlerState != CrawlerState.Ready && CrawlerState != CrawlerState.Paused) return false;
-                        CrawlerState = CrawlerState.Working;
+                        if (CrawlerState != CrawlerState.WaitingToRun && CrawlerState != CrawlerState.Paused) return false;
+                        CrawlerState = CrawlerState.Running;
                         return true;
                     }
                 case CrawlerState.Stopping:
                     lock (CrawlerStateTransitionLock)
                     {
-                        if (CrawlerState != CrawlerState.Working && CrawlerState != CrawlerState.Paused) return false;
+                        if (CrawlerState != CrawlerState.Running && CrawlerState != CrawlerState.Paused) return false;
                         CrawlerState = CrawlerState.Stopping;
                         return true;
                     }
                 case CrawlerState.Paused:
                     lock (CrawlerStateTransitionLock)
                     {
-                        if (CrawlerState != CrawlerState.Working) return false;
+                        if (CrawlerState != CrawlerState.Running) return false;
                         CrawlerState = CrawlerState.Paused;
                         return true;
                     }
-                case CrawlerState.Unknown:
-                    throw new NotSupportedException($"Cannot transit to [{nameof(CrawlerState.Unknown)}] state.");
                 default:
                     throw new ArgumentOutOfRangeException(nameof(crawlerState), crawlerState, null);
             }

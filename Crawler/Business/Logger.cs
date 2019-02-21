@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using Helix.Crawler.Abstractions;
 using Helix.Persistence;
 
 namespace Helix.Crawler
