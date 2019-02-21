@@ -46,7 +46,6 @@ namespace Helix.Crawler
             _scheduler = ServiceLocator.Get<IScheduler>();
             _servicePool = ServiceLocator.Get<IServicePool>();
             _memory = ServiceLocator.Get<IMemory>();
-            _reportWriter = ServiceLocator.Get<IReportWriter>();
 
             if (!TryTransitTo(CrawlerState.Working)) return;
             BackgroundTasks.Add(Task.Run(() =>
@@ -54,6 +53,7 @@ namespace Helix.Crawler
                 try
                 {
                     EnsureErrorLogFileIsRecreated();
+                    _reportWriter = ServiceLocator.Get<IReportWriter>();
                     _servicePool.EnsureEnoughResources(_scheduler.CancellationToken);
 
                     var renderingTask = Task.Run(Render, _scheduler.CancellationToken);
@@ -116,14 +116,7 @@ namespace Helix.Crawler
                         Statistics.SuccessfullyRenderedPageCount++;
                         Statistics.TotalPageLoadTime += pageLoadTime.Value;
                     }
-                    else
-                    {
-                        try { throw new InvalidConstraintException(); }
-                        catch (InvalidConstraintException invalidConstraintException)
-                        {
-                            _logger.LogException(invalidConstraintException);
-                        }
-                    }
+                    else _logger.LogException(new InvalidConstraintException(ErrorMessage.SuccessfulRenderWithoutPageLoadTime));
 
                     _memory.Memorize(new HtmlDocument
                     {
