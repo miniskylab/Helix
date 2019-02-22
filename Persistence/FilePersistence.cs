@@ -81,6 +81,6 @@ namespace Helix.Persistence
             _textWriter = null;
         }
 
-        ~FilePersistence() { Dispose(); }
+        ~FilePersistence() { ReleaseUnmanagedResources(); }
     }
 }

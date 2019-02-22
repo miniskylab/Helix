@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Threading.Tasks;
+using Helix.Core;
 using Helix.Crawler.Abstractions;
 using Helix.Persistence.Abstractions;
 
@@ -14,12 +15,19 @@ namespace Helix.Crawler
         static IReportWriter _reportWriter;
         static IScheduler _scheduler;
         static IServicePool _servicePool;
+        static readonly StateMachine<CrawlerState, CrawlerCommand> _stateMachine;
         static readonly List<Task> BackgroundTasks;
-        static readonly object CrawlerStateTransitionLock;
-
-        public static CrawlerState CrawlerState { get; private set; }
+        static readonly object TransitionLock;
 
         public static IStatistics Statistics { get; private set; }
+
+        public static CrawlerState CrawlerState
+        {
+            get
+            {
+                lock (TransitionLock) return _stateMachine.CurrentState;
+            }
+        }
 
         public static int RemainingUrlCount
         {
@@ -31,12 +39,36 @@ namespace Helix.Crawler
         }
 
         public static event Action<VerificationResult> OnResourceVerified;
-        public static event Action<bool> OnStopped;
+        public static event Action OnStopped;
 
         static CrawlerBot()
         {
             BackgroundTasks = new List<Task>();
-            CrawlerStateTransitionLock = new object();
+            TransitionLock = new object();
+            _stateMachine = new StateMachine<CrawlerState, CrawlerCommand>(
+                new Dictionary<Transition<CrawlerState, CrawlerCommand>, CrawlerState>
+                {
+                    { CreateTransition(CrawlerState.WaitingToRun, CrawlerCommand.StartWorking), CrawlerState.Running },
+                    { CreateTransition(CrawlerState.WaitingToRun, CrawlerCommand.StopWorking), CrawlerState.Stopping },
+                    { CreateTransition(CrawlerState.Running, CrawlerCommand.StopWorking), CrawlerState.Stopping },
+                    { CreateTransition(CrawlerState.Running, CrawlerCommand.Pause), CrawlerState.Paused },
+                    { CreateTransition(CrawlerState.Running, CrawlerCommand.MarkAsFaulted), CrawlerState.Faulted },
+                    { CreateTransition(CrawlerState.Stopping, CrawlerCommand.MarkAsRanToCompletion), CrawlerState.RanToCompletion },
+                    { CreateTransition(CrawlerState.Stopping, CrawlerCommand.MarkAsCancelled), CrawlerState.Cancelled },
+                    { CreateTransition(CrawlerState.Stopping, CrawlerCommand.MarkAsFaulted), CrawlerState.Faulted },
+                    { CreateTransition(CrawlerState.Faulted, CrawlerCommand.StartWorking), CrawlerState.Running },
+                    { CreateTransition(CrawlerState.Faulted, CrawlerCommand.StopWorking), CrawlerState.Faulted },
+                    { CreateTransition(CrawlerState.Paused, CrawlerCommand.Resume), CrawlerState.Running },
+                    { CreateTransition(CrawlerState.RanToCompletion, CrawlerCommand.StartWorking), CrawlerState.Running },
+                    { CreateTransition(CrawlerState.Cancelled, CrawlerCommand.StartWorking), CrawlerState.Running }
+                },
+                CrawlerState.WaitingToRun
+            );
+
+            Transition<CrawlerState, CrawlerCommand> CreateTransition(CrawlerState fromState, CrawlerCommand command)
+            {
+                return new Transition<CrawlerState, CrawlerCommand>(fromState, command);
+            }
         }
 
         public static void StartWorking(Configurations configurations)
@@ -47,7 +79,7 @@ namespace Helix.Crawler
             _servicePool = ServiceLocator.Get<IServicePool>();
             _memory = ServiceLocator.Get<IMemory>();
 
-            if (!TryTransitTo(CrawlerState.Running)) return;
+            if (!TryTransit(CrawlerCommand.StartWorking)) return;
             BackgroundTasks.Add(Task.Run(() =>
             {
                 try
@@ -64,7 +96,11 @@ namespace Helix.Crawler
                     BackgroundTasks.Add(verificationTask);
                     Task.WhenAll(renderingTask, extractionTask, verificationTask).Wait();
                 }
-                catch (Exception exception) { _logger.LogException(exception); }
+                catch (Exception exception)
+                {
+                    _logger.LogException(exception);
+                    TryTransit(CrawlerCommand.MarkAsFaulted);
+                }
                 finally { Task.Run(StopWorking); }
             }, _scheduler.CancellationToken));
 
@@ -77,17 +113,22 @@ namespace Helix.Crawler
 
         public static void StopWorking()
         {
-            if (_scheduler != null && !TryTransitTo(CrawlerState.Stopping)) return;
-            var everythingIsDone = _scheduler?.EverythingIsDone ?? false;
+            if (!TryTransit(CrawlerCommand.StopWorking)) return;
+            var crawlerCommand = CrawlerCommand.MarkAsRanToCompletion;
+            if (_scheduler == null || !_scheduler.EverythingIsDone) crawlerCommand = CrawlerCommand.MarkAsCancelled;
 
             _logger.LogInfo("Stopping ...");
             _scheduler?.CancelEverything();
             try { Task.WhenAll(BackgroundTasks).Wait(); }
-            catch (Exception exception) { _logger.LogException(exception); }
+            catch (Exception exception)
+            {
+                _logger.LogException(exception);
+                crawlerCommand = CrawlerCommand.MarkAsFaulted;
+            }
 
             ServiceLocator.Dispose();
-            TryTransitTo(CrawlerState.WaitingToRun);
-            OnStopped?.Invoke(everythingIsDone);
+            TryTransit(crawlerCommand);
+            OnStopped?.Invoke();
         }
 
         static void Extract()
@@ -126,40 +167,13 @@ namespace Helix.Crawler
                 });
         }
 
-        static bool TryTransitTo(CrawlerState crawlerState)
+        static bool TryTransit(CrawlerCommand crawlerCommand)
         {
-            switch (crawlerState)
+            lock (TransitionLock)
             {
-                case CrawlerState.WaitingToRun:
-                    lock (CrawlerStateTransitionLock)
-                    {
-                        if (CrawlerState != CrawlerState.Stopping) return false;
-                        CrawlerState = CrawlerState.WaitingToRun;
-                        return true;
-                    }
-                case CrawlerState.Running:
-                    lock (CrawlerStateTransitionLock)
-                    {
-                        if (CrawlerState != CrawlerState.WaitingToRun && CrawlerState != CrawlerState.Paused) return false;
-                        CrawlerState = CrawlerState.Running;
-                        return true;
-                    }
-                case CrawlerState.Stopping:
-                    lock (CrawlerStateTransitionLock)
-                    {
-                        if (CrawlerState != CrawlerState.Running && CrawlerState != CrawlerState.Paused) return false;
-                        CrawlerState = CrawlerState.Stopping;
-                        return true;
-                    }
-                case CrawlerState.Paused:
-                    lock (CrawlerStateTransitionLock)
-                    {
-                        if (CrawlerState != CrawlerState.Running) return false;
-                        CrawlerState = CrawlerState.Paused;
-                        return true;
-                    }
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(crawlerState), crawlerState, null);
+                if (!_stateMachine.TryGetNext(crawlerCommand, out _)) return false;
+                _stateMachine.MoveNext(crawlerCommand);
+                return true;
             }
         }
 

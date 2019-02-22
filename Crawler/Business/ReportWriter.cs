@@ -37,7 +37,6 @@ namespace Helix.Crawler
                 foreach (var lockObject in _publicApiLockMap.Values) Monitor.Enter(lockObject);
                 if (_objectDisposed) return;
                 FlushMemoryBufferToDisk();
-                GC.SuppressFinalize(this);
                 _objectDisposed = true;
             }
             finally
@@ -109,7 +108,5 @@ namespace Helix.Crawler
             [Required]
             public string VerifiedUrl { [UsedImplicitly] get; set; }
         }
-
-        ~ReportWriter() { Dispose(); }
     }
 }

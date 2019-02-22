@@ -120,6 +120,6 @@ namespace Helix.Crawler
             _httpClient = null;
         }
 
-        ~RawResourceVerifier() { Dispose(); }
+        ~RawResourceVerifier() { ReleaseUnmanagedResources(); }
     }
 }

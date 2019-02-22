@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 namespace Helix.Core
 {
-    public class ConcurrentSet<T> : ICollection<T>
+    public sealed class ConcurrentSet<T> : ICollection<T>
     {
         readonly ConcurrentDictionary<T, bool> _concurrentDictionary;
 

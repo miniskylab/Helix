@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -39,10 +40,23 @@ namespace Helix.Gui
                 if (CrawlerBot.CrawlerState != CrawlerState.WaitingToRun) return;
                 var configurations = new Configurations(configurationJsonString);
                 RedrawGui("Initializing ...");
-                CrawlerBot.OnStopped += everythingIsDone =>
+                CrawlerBot.OnStopped += () =>
                 {
-                    RedrawGui(everythingIsDone ? "Done." : "Stopped.");
                     Stopwatch.Stop();
+                    switch (CrawlerBot.CrawlerState)
+                    {
+                        case CrawlerState.RanToCompletion:
+                            RedrawGui("Done.");
+                            break;
+                        case CrawlerState.Cancelled:
+                            RedrawGui("Cancelled.");
+                            break;
+                        case CrawlerState.Faulted:
+                            RedrawGui("One or more errors occurred. Check the logs for more details.");
+                            break;
+                        default:
+                            throw new InvalidConstraintException();
+                    }
                 };
                 CrawlerBot.OnResourceVerified += OnResourceVerified;
                 CrawlerBot.StartWorking(configurations);

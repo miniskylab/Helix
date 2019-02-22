@@ -11,6 +11,7 @@ namespace Helix.Crawler
     {
         readonly ConcurrentSet<string> _alreadyVerifiedUrls;
         readonly object _memorizationLock;
+        bool _objectDisposed;
         readonly BlockingCollection<HtmlDocument> _toBeExtractedHtmlDocuments;
         readonly BlockingCollection<Resource> _toBeRenderedResources;
         readonly BlockingCollection<RawResource> _toBeVerifiedRawResources;
@@ -27,6 +28,7 @@ namespace Helix.Crawler
         public Memory(Configurations configurations)
         {
             Configurations = configurations;
+            _objectDisposed = false;
             _memorizationLock = new object();
             _toBeExtractedHtmlDocuments = new BlockingCollection<HtmlDocument>();
             _toBeRenderedResources = new BlockingCollection<Resource>();
@@ -46,6 +48,17 @@ namespace Helix.Crawler
             }
             while (_toBeExtractedHtmlDocuments.Any()) _toBeExtractedHtmlDocuments.Take();
             while (_toBeRenderedResources.Any()) _toBeRenderedResources.Take();
+        }
+
+        public void Dispose()
+        {
+            lock (_memorizationLock)
+            {
+                if (_objectDisposed) return;
+                ReleaseUnmanagedResources();
+                GC.SuppressFinalize(this);
+                _objectDisposed = true;
+            }
         }
 
         public void Memorize(RawResource toBeVerifiedRawResource, CancellationToken cancellationToken)
@@ -78,11 +91,13 @@ namespace Helix.Crawler
 
         public bool TryTake(out RawResource rawResource) { return _toBeVerifiedRawResources.TryTake(out rawResource); }
 
-        ~Memory()
+        void ReleaseUnmanagedResources()
         {
             _toBeExtractedHtmlDocuments?.Dispose();
             _toBeRenderedResources?.Dispose();
             _toBeVerifiedRawResources?.Dispose();
         }
+
+        ~Memory() { ReleaseUnmanagedResources(); }
     }
 }

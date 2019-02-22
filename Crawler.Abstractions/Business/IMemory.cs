@@ -1,8 +1,9 @@
+using System;
 using System.Threading;
 
 namespace Helix.Crawler.Abstractions
 {
-    public interface IMemory
+    public interface IMemory : IDisposable
     {
         Configurations Configurations { get; }
 

@@ -5,6 +5,7 @@ namespace Helix.Crawler.Abstractions
     [Flags]
     public enum CrawlerState
     {
+        None = 0,
         WaitingToRun = 1 << 0,
         Running = 1 << 1,
         Stopping = 1 << 2,
