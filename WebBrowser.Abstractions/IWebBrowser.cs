@@ -11,7 +11,9 @@ namespace Helix.WebBrowser.Abstractions
         event AsyncEventHandler<SessionEventArgs> BeforeRequest;
         event AsyncEventHandler<SessionEventArgs> BeforeResponse;
 
-        bool TryRender(Uri uri, Action<Exception> onFailed, CancellationToken cancellationToken, out string html, out long? pageLoadTime,
-            int attemptCount = 3);
+        bool TryRender(Uri uri, out string html, out long? pageLoadTime, CancellationToken cancellationToken,
+            int attemptCount = 3, Action<Exception> onFailed = null);
+
+        bool TryTakeScreenShot(string screenShotFileName, Action<Exception> onFailed = null);
     }
 }

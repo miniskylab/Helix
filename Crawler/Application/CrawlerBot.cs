@@ -148,9 +148,8 @@ namespace Helix.Crawler
             while (!_scheduler.EverythingIsDone && !_scheduler.CancellationToken.IsCancellationRequested)
                 _scheduler.CreateTask((htmlRenderer, toBeRenderedResource) =>
                 {
-                    Action<Exception> onFailed = _logger.LogException;
-                    if (!htmlRenderer.TryRender(toBeRenderedResource, onFailed, _scheduler.CancellationToken, out var htmlText,
-                        out var pageLoadTime)) return;
+                    if (!htmlRenderer.TryRender(toBeRenderedResource, out var htmlText, out var pageLoadTime, _scheduler.CancellationToken,
+                        onFailed: _logger.LogException)) return;
 
                     if (pageLoadTime.HasValue)
                     {
@@ -196,9 +195,8 @@ namespace Helix.Crawler
 
                     var resourceExists = verificationResult.Resource != null;
                     var isExtracted = verificationResult.IsExtractedResource;
-                    var isNotBroken = !verificationResult.IsBrokenResource;
                     var isInternal = verificationResult.IsInternalResource;
-                    if (resourceExists && isExtracted && isNotBroken && isInternal)
+                    if (resourceExists && isExtracted && isInternal)
                         _memory.Memorize(verificationResult.Resource, _scheduler.CancellationToken);
                 });
         }

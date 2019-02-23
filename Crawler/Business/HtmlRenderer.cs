@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Helix.Crawler.Abstractions;
+using Helix.Persistence.Abstractions;
 using Helix.WebBrowser.Abstractions;
 using Titanium.Web.Proxy.EventArguments;
 
@@ -15,13 +16,14 @@ namespace Helix.Crawler
         bool _objectDisposed;
         readonly Dictionary<string, object> _publicApiLockMap;
         Resource _resourceBeingRendered;
+        bool _takeScreenShot;
         IWebBrowser _webBrowser;
 
         public event Action<RawResource> OnRawResourceCaptured;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public HtmlRenderer(Configurations configurations, IWebBrowserProvider webBrowserProvider, IResourceScope resourceScope,
-            IReportWriter reportWriter)
+            IReportWriter reportWriter, ILogger logger)
         {
             var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
             var pathToChromiumExecutable = Path.Combine(workingDirectory, "chromium/chrome.exe");
@@ -35,6 +37,7 @@ namespace Helix.Crawler
             _webBrowser.BeforeRequest += EnsureInternal;
             _webBrowser.BeforeResponse += CaptureNetworkTraffic;
             _objectDisposed = false;
+            _takeScreenShot = false;
             _publicApiLockMap = new Dictionary<string, object> { { $"{nameof(TryRender)}", new object() } };
 
             Task EnsureInternal(object _, SessionEventArgs networkTraffic)
@@ -58,9 +61,17 @@ namespace Helix.Crawler
                                                             response.StatusCode != (int) _resourceBeingRendered.HttpStatusCode;
                     if (responseHttpStatusCodesDoNotMatch)
                     {
+                        var uri = _resourceBeingRendered.Uri;
+                        var oldStatusCode = _resourceBeingRendered.HttpStatusCode;
+                        var newStatusCode = response.StatusCode;
+                        logger.LogInfo($"StatusCode changed from {oldStatusCode} to {newStatusCode} at [{uri}]");
+
+                        _resourceBeingRendered.HttpStatusCode = (HttpStatusCode) response.StatusCode;
                         reportWriter.UpdateStatusCode(_resourceBeingRendered.Id, (HttpStatusCode) response.StatusCode);
-                        return;
                     }
+
+                    var resourceIsBroken = (int) _resourceBeingRendered.HttpStatusCode >= 400;
+                    if (resourceIsBroken && configurations.CaptureImageEvidence) _takeScreenShot = true;
 
                     var isNotGETRequest = request.Method.ToUpperInvariant() != "GET";
                     var isNotCss = !response.ContentType.StartsWith("text/css", StringComparison.OrdinalIgnoreCase);
@@ -97,14 +108,20 @@ namespace Helix.Crawler
             }
         }
 
-        public bool TryRender(Resource resource, Action<Exception> onFailed, CancellationToken cancellationToken, out string html,
-            out long? pageLoadTime, int attemptCount = 3)
+        public bool TryRender(Resource resource, out string html, out long? pageLoadTime, CancellationToken cancellationToken,
+            int attemptCount = 3, Action<Exception> onFailed = null)
         {
             lock (_publicApiLockMap[nameof(TryRender)])
             {
                 if (_objectDisposed) throw new ObjectDisposedException(nameof(HtmlRenderer));
                 _resourceBeingRendered = resource;
-                return _webBrowser.TryRender(resource.Uri, onFailed, cancellationToken, out html, out pageLoadTime, attemptCount);
+
+                var uri = resource.Uri;
+                if (!_webBrowser.TryRender(uri, out html, out pageLoadTime, cancellationToken, attemptCount, onFailed)) return false;
+                if (!_takeScreenShot) return true;
+
+                _takeScreenShot = false;
+                return _webBrowser.TryTakeScreenShot($"screenshots\\{_resourceBeingRendered.Id}.png", onFailed);
             }
         }
 

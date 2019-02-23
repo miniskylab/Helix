@@ -6,6 +6,7 @@ using System.Management;
 using System.Net;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
 using Helix.WebBrowser.Abstractions;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
@@ -66,11 +67,10 @@ namespace Helix.WebBrowser
             }
         }
 
-        public bool TryRender(Uri uri, Action<Exception> onFailed, CancellationToken cancellationToken, out string html,
-            out long? pageLoadTime, int attemptCount = 3)
+        public bool TryRender(Uri uri, out string html, out long? pageLoadTime, CancellationToken cancellationToken, int attemptCount = 3,
+            Action<Exception> onFailed = null)
         {
             CurrentUri = uri ?? throw new ArgumentNullException(nameof(uri));
-            if (onFailed == null) throw new ArgumentNullException(nameof(onFailed));
 
             html = null;
             pageLoadTime = null;
@@ -82,7 +82,7 @@ namespace Helix.WebBrowser
                 {
                     if (!TryGoToUri())
                     {
-                        onFailed.Invoke(new TimeoutException(renderingFailedErrorMessage));
+                        onFailed?.Invoke(new TimeoutException(renderingFailedErrorMessage));
                         return false;
                     }
 
@@ -91,13 +91,13 @@ namespace Helix.WebBrowser
                         pageLoadTime = _stopwatch.ElapsedMilliseconds;
                         return true;
                     }
-                    onFailed.Invoke(new MemberAccessException($"Chromium web browser failed to obtain page source of the URI: {uri}"));
+                    onFailed?.Invoke(new MemberAccessException($"Chromium web browser failed to obtain page source of the URI: {uri}"));
                     return false;
                 }
                 catch (OperationCanceledException operationCanceledException)
                 {
                     if (operationCanceledException.CancellationToken != cancellationToken) throw;
-                    onFailed.Invoke(new OperationCanceledException(renderingFailedErrorMessage, cancellationToken));
+                    onFailed?.Invoke(new OperationCanceledException(renderingFailedErrorMessage, cancellationToken));
                     return false;
                 }
                 finally { _stopwatch.Reset(); }
@@ -158,6 +158,29 @@ namespace Helix.WebBrowser
                         };
                     }
                 }
+            }
+        }
+
+        public bool TryTakeScreenShot(string screenShotFileName, Action<Exception> onFailed = null)
+        {
+            try
+            {
+                if (CurrentUri == null) throw new InvalidOperationException();
+                var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
+                if (workingDirectory == null) throw new InvalidOperationException();
+
+                var absolutePathToScreenShotFile = Path.Combine(workingDirectory, screenShotFileName);
+                var parentDirectoryOfScreenShotFile = Directory.GetParent(absolutePathToScreenShotFile);
+                if (!parentDirectoryOfScreenShotFile.Exists) parentDirectoryOfScreenShotFile.Create();
+
+                var screenShot = _chromeDriver.GetScreenshot();
+                Task.Run(() => { screenShot.SaveAsFile(screenShotFileName, ScreenshotImageFormat.Png); });
+                return true;
+            }
+            catch (Exception exception)
+            {
+                onFailed?.Invoke(exception);
+                return false;
             }
         }
 

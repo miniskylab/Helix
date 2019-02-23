@@ -117,7 +117,7 @@ namespace Helix.Gui
         {
             BackgroundTasks.Add(Task.Run(() =>
             {
-                while (CrawlerBot.CrawlerState != CrawlerState.WaitingToRun)
+                while (!(CrawlerState.WaitingToRun | CrawlerState.Completed).HasFlag(CrawlerBot.CrawlerState))
                 {
                     RedrawGui();
                     Thread.Sleep(timeSpan);
