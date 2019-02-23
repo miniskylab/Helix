@@ -57,21 +57,22 @@ namespace Helix.Crawler
                     if (response.ContentType == null) return;
 
                     var request = networkTraffic.WebSession.Request;
-                    var responseHttpStatusCodesDoNotMatch = request.RequestUri.Equals(_resourceBeingRendered.Uri) &&
-                                                            response.StatusCode != (int) _resourceBeingRendered.HttpStatusCode;
-                    if (responseHttpStatusCodesDoNotMatch)
+                    if (request.RequestUri.Equals(_resourceBeingRendered.Uri))
                     {
-                        var uri = _resourceBeingRendered.Uri;
-                        var oldStatusCode = _resourceBeingRendered.HttpStatusCode;
-                        var newStatusCode = response.StatusCode;
-                        logger.LogInfo($"StatusCode changed from {oldStatusCode} to {newStatusCode} at [{uri}]");
+                        if (response.StatusCode != (int) _resourceBeingRendered.HttpStatusCode)
+                        {
+                            var uri = _resourceBeingRendered.Uri;
+                            var oldStatusCode = (int) _resourceBeingRendered.HttpStatusCode;
+                            var newStatusCode = response.StatusCode;
+                            logger.LogInfo($"StatusCode changed from [{oldStatusCode}] to [{newStatusCode}] at [{uri}]");
 
-                        _resourceBeingRendered.HttpStatusCode = (HttpStatusCode) response.StatusCode;
-                        reportWriter.UpdateStatusCode(_resourceBeingRendered.Id, (HttpStatusCode) response.StatusCode);
+                            _resourceBeingRendered.HttpStatusCode = (HttpStatusCode) response.StatusCode;
+                            reportWriter.UpdateStatusCode(_resourceBeingRendered.Id, (HttpStatusCode) response.StatusCode);
+                        }
+
+                        var resourceIsBroken = (int) _resourceBeingRendered.HttpStatusCode >= 400;
+                        if (resourceIsBroken && configurations.CaptureImageEvidence) _takeScreenShot = true;
                     }
-
-                    var resourceIsBroken = (int) _resourceBeingRendered.HttpStatusCode >= 400;
-                    if (resourceIsBroken && configurations.CaptureImageEvidence) _takeScreenShot = true;
 
                     var isNotGETRequest = request.Method.ToUpperInvariant() != "GET";
                     var isNotCss = !response.ContentType.StartsWith("text/css", StringComparison.OrdinalIgnoreCase);
