@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Helix.Core;
 using Helix.Crawler.Abstractions;
 using Helix.Persistence.Abstractions;
 
@@ -196,14 +197,18 @@ namespace Helix.Crawler
                 try
                 {
                     GetHtmlRendererAndToBeRenderedResource();
-                    Task.Run(
-                        () =>
-                        {
-                            try { taskDescription(htmlRenderer, toBeRenderedResource); }
-                            catch (Exception exception) { _logger.LogException(exception); }
-                            finally { ReleaseHtmlRenderer(); }
-                        },
-                        CancellationToken
+                    (
+                        (int) toBeRenderedResource.HttpStatusCode >= 400
+                            ? Task.Factory.StartNew(
+                                ExecuteTaskDescription,
+                                CancellationToken,
+                                TaskCreationOptions.None,
+                                PriorityTaskScheduler.Highest
+                            )
+                            : Task.Run(
+                                ExecuteTaskDescription,
+                                CancellationToken
+                            )
                     ).ContinueWith(
                         _ =>
                         {
@@ -219,6 +224,12 @@ namespace Helix.Crawler
                     _logger.LogException(exception);
                 }
 
+                void ExecuteTaskDescription()
+                {
+                    try { taskDescription(htmlRenderer, toBeRenderedResource); }
+                    catch (Exception exception) { _logger.LogException(exception); }
+                    finally { ReleaseHtmlRenderer(); }
+                }
                 void GetHtmlRendererAndToBeRenderedResource()
                 {
                     while (!EverythingIsDone && !CancellationToken.IsCancellationRequested)

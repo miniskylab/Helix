@@ -36,6 +36,7 @@ namespace Helix.Crawler
             _httpClient.DefaultRequestHeaders.AcceptLanguage.ParseAdd("*");
             _httpClient.DefaultRequestHeaders.CacheControl = CacheControlHeaderValue.Parse("no-cache");
             _httpClient.DefaultRequestHeaders.Pragma.ParseAdd("no-cache");
+            _httpClient.DefaultRequestHeaders.Upgrade.ParseAdd("1");
             _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(
                 "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.109 Safari/537.36"
             );

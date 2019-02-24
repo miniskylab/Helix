@@ -14,6 +14,6 @@ namespace Helix.WebBrowser.Abstractions
         bool TryRender(Uri uri, out string html, out long? pageLoadTime, CancellationToken cancellationToken,
             int attemptCount = 3, Action<Exception> onFailed = null);
 
-        bool TryTakeScreenShot(string screenShotFileName, Action<Exception> onFailed = null);
+        bool TryTakeScreenshot(string screenshotFileName, Action<Exception> onFailed = null);
     }
 }

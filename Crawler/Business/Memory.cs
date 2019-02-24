@@ -14,13 +14,14 @@ namespace Helix.Crawler
         bool _objectDisposed;
         readonly BlockingCollection<HtmlDocument> _toBeExtractedHtmlDocuments;
         readonly BlockingCollection<Resource> _toBeRenderedResources;
+        readonly BlockingCollection<Resource> _toBeTakenScreenshotResources;
         readonly BlockingCollection<RawResource> _toBeVerifiedRawResources;
 
         public Configurations Configurations { get; }
 
         public int ToBeExtractedHtmlDocumentCount => _toBeExtractedHtmlDocuments.Count;
 
-        public int ToBeRenderedResourceCount => _toBeRenderedResources.Count;
+        public int ToBeRenderedResourceCount => _toBeRenderedResources.Count + _toBeTakenScreenshotResources.Count;
 
         public int ToBeVerifiedRawResourceCount => _toBeVerifiedRawResources.Count;
 
@@ -32,11 +33,9 @@ namespace Helix.Crawler
             _memorizationLock = new object();
             _toBeExtractedHtmlDocuments = new BlockingCollection<HtmlDocument>();
             _toBeRenderedResources = new BlockingCollection<Resource>();
-            _alreadyVerifiedUrls = new ConcurrentSet<string> { Configurations.StartUri.AbsoluteUri };
-            _toBeVerifiedRawResources = new BlockingCollection<RawResource>
-            {
-                new RawResource { ParentUri = null, Url = Configurations.StartUri.AbsoluteUri }
-            };
+            _toBeTakenScreenshotResources = new BlockingCollection<Resource>();
+            _alreadyVerifiedUrls = new ConcurrentSet<string>();
+            _toBeVerifiedRawResources = new BlockingCollection<RawResource>();
         }
 
         public void Clear()
@@ -75,7 +74,10 @@ namespace Helix.Crawler
 
         public void Memorize(Resource toBeRenderedResource, CancellationToken cancellationToken)
         {
-            while (!cancellationToken.IsCancellationRequested && !_toBeRenderedResources.TryAdd(toBeRenderedResource))
+            var destinationCollection = (int) toBeRenderedResource.HttpStatusCode >= 400
+                ? _toBeTakenScreenshotResources
+                : _toBeRenderedResources;
+            while (!cancellationToken.IsCancellationRequested && !destinationCollection.TryAdd(toBeRenderedResource))
                 Thread.Sleep(TimeSpan.FromSeconds(3));
         }
 
@@ -87,7 +89,10 @@ namespace Helix.Crawler
 
         public bool TryTake(out HtmlDocument htmlDocument) { return _toBeExtractedHtmlDocuments.TryTake(out htmlDocument); }
 
-        public bool TryTake(out Resource resource) { return _toBeRenderedResources.TryTake(out resource); }
+        public bool TryTake(out Resource resource)
+        {
+            return _toBeTakenScreenshotResources.TryTake(out resource) || _toBeRenderedResources.TryTake(out resource);
+        }
 
         public bool TryTake(out RawResource rawResource) { return _toBeVerifiedRawResources.TryTake(out rawResource); }
 

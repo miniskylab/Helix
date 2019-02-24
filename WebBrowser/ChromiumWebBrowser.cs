@@ -161,7 +161,7 @@ namespace Helix.WebBrowser
             }
         }
 
-        public bool TryTakeScreenShot(string screenShotFileName, Action<Exception> onFailed = null)
+        public bool TryTakeScreenshot(string screenshotFileName, Action<Exception> onFailed = null)
         {
             try
             {
@@ -169,12 +169,12 @@ namespace Helix.WebBrowser
                 var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
                 if (workingDirectory == null) throw new InvalidOperationException();
 
-                var absolutePathToScreenShotFile = Path.Combine(workingDirectory, screenShotFileName);
-                var parentDirectoryOfScreenShotFile = Directory.GetParent(absolutePathToScreenShotFile);
-                if (!parentDirectoryOfScreenShotFile.Exists) parentDirectoryOfScreenShotFile.Create();
+                var absolutePathToScreenshotFile = Path.Combine(workingDirectory, screenshotFileName);
+                var parentDirectoryOfScreenshotFile = Directory.GetParent(absolutePathToScreenshotFile);
+                if (!parentDirectoryOfScreenshotFile.Exists) parentDirectoryOfScreenshotFile.Create();
 
                 var screenShot = _chromeDriver.GetScreenshot();
-                Task.Run(() => { screenShot.SaveAsFile(screenShotFileName, ScreenshotImageFormat.Png); });
+                Task.Run(() => { screenShot.SaveAsFile(screenshotFileName, ScreenshotImageFormat.Png); });
                 return true;
             }
             catch (Exception exception)

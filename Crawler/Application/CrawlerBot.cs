@@ -87,6 +87,10 @@ namespace Helix.Crawler
                     EnsureErrorLogFileIsRecreated();
                     _reportWriter = ServiceLocator.Get<IReportWriter>();
                     _servicePool.EnsureEnoughResources(_scheduler.CancellationToken);
+                    _memory.Memorize(
+                        new RawResource { ParentUri = null, Url = configurations.StartUri.AbsoluteUri },
+                        _scheduler.CancellationToken
+                    );
 
                     var renderingTask = Task.Run(Render, _scheduler.CancellationToken);
                     var extractionTask = Task.Run(Extract, _scheduler.CancellationToken);

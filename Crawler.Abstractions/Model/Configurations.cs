@@ -5,8 +5,6 @@ namespace Helix.Crawler.Abstractions
 {
     public class Configurations
     {
-        public bool CaptureImageEvidence { get; }
-
         public string DomainName { get; }
 
         public int HtmlRendererCount { get; }
@@ -14,6 +12,8 @@ namespace Helix.Crawler.Abstractions
         public int RequestTimeoutDuration { get; }
 
         public Uri StartUri { get; }
+
+        public bool TakeScreenshotEvidence { get; }
 
         public bool UseHeadlessWebBrowsers { get; }
 
@@ -23,7 +23,7 @@ namespace Helix.Crawler.Abstractions
 
         public Configurations(Uri startUri = null, string domainName = "", int htmlRendererCount = 4, int requestTimeoutDuration = 30,
             bool verifyExternalUrls = true, bool useHeadlessWebBrowsers = true, bool useIncognitoWebBrowser = true,
-            bool captureImageEvidence = false)
+            bool takeScreenshotEvidence = false)
         {
             StartUri = startUri;
             DomainName = domainName;
@@ -32,7 +32,7 @@ namespace Helix.Crawler.Abstractions
             RequestTimeoutDuration = requestTimeoutDuration;
             UseHeadlessWebBrowsers = useHeadlessWebBrowsers;
             UseIncognitoWebBrowser = useIncognitoWebBrowser;
-            CaptureImageEvidence = captureImageEvidence;
+            TakeScreenshotEvidence = takeScreenshotEvidence;
         }
 
         public Configurations(string configurationJsonString)
@@ -42,7 +42,7 @@ namespace Helix.Crawler.Abstractions
             HtmlRendererCount = (int) (tokens.SelectToken(nameof(HtmlRendererCount)) ?? 0);
             VerifyExternalUrls = (bool) (tokens.SelectToken(nameof(VerifyExternalUrls)) ?? false);
             StartUri = ValidateStartUri((string) tokens.SelectToken(nameof(StartUri)) ?? string.Empty);
-            CaptureImageEvidence = true;
+            TakeScreenshotEvidence = true;
             UseIncognitoWebBrowser = true;
             RequestTimeoutDuration = 30;
 

@@ -13,10 +13,11 @@ namespace Helix.Crawler
 {
     public class HtmlRenderer : IHtmlRenderer
     {
+        readonly ILogger _logger;
         bool _objectDisposed;
         readonly Dictionary<string, object> _publicApiLockMap;
         Resource _resourceBeingRendered;
-        bool _takeScreenShot;
+        bool _takeScreenshot;
         IWebBrowser _webBrowser;
 
         public event Action<RawResource> OnRawResourceCaptured;
@@ -36,8 +37,9 @@ namespace Helix.Crawler
             );
             _webBrowser.BeforeRequest += EnsureInternal;
             _webBrowser.BeforeResponse += CaptureNetworkTraffic;
+            _logger = logger;
             _objectDisposed = false;
-            _takeScreenShot = false;
+            _takeScreenshot = false;
             _publicApiLockMap = new Dictionary<string, object> { { $"{nameof(TryRender)}", new object() } };
 
             Task EnsureInternal(object _, SessionEventArgs networkTraffic)
@@ -54,11 +56,25 @@ namespace Helix.Crawler
                 return Task.Run(() =>
                 {
                     var response = networkTraffic.WebSession.Response;
-                    if (response.ContentType == null) return;
-
                     var request = networkTraffic.WebSession.Request;
                     if (request.RequestUri.Equals(_resourceBeingRendered.Uri))
                     {
+                        var isRedirectResponse = 300 <= response.StatusCode && response.StatusCode < 400;
+                        if (isRedirectResponse && response.Headers.Headers.TryGetValue("Location", out var locationHeader))
+                        {
+                            if (Uri.TryCreate(locationHeader.Value, UriKind.RelativeOrAbsolute, out var redirectUri))
+                            {
+                                if (redirectUri.IsAbsoluteUri) _resourceBeingRendered.Uri = redirectUri;
+                                else
+                                {
+                                    var baseUri = new Uri(request.RequestUri.GetLeftPart(UriPartial.Authority));
+                                    _resourceBeingRendered.Uri = new Uri(baseUri, redirectUri);
+                                }
+                                return;
+                            }
+                            logger.LogInfo($"Invalid redirect at: [{_resourceBeingRendered.Uri}]");
+                        }
+
                         if (response.StatusCode != (int) _resourceBeingRendered.HttpStatusCode)
                         {
                             var uri = _resourceBeingRendered.Uri;
@@ -71,9 +87,10 @@ namespace Helix.Crawler
                         }
 
                         var resourceIsBroken = (int) _resourceBeingRendered.HttpStatusCode >= 400;
-                        if (resourceIsBroken && configurations.CaptureImageEvidence) _takeScreenShot = true;
+                        if (resourceIsBroken && configurations.TakeScreenshotEvidence) _takeScreenshot = true;
                     }
 
+                    if (response.ContentType == null) return;
                     var isNotGETRequest = request.Method.ToUpperInvariant() != "GET";
                     var isNotCss = !response.ContentType.StartsWith("text/css", StringComparison.OrdinalIgnoreCase);
                     var isNotImage = !response.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
@@ -118,11 +135,17 @@ namespace Helix.Crawler
                 _resourceBeingRendered = resource;
 
                 var uri = resource.Uri;
-                if (!_webBrowser.TryRender(uri, out html, out pageLoadTime, cancellationToken, attemptCount, onFailed)) return false;
-                if (!_takeScreenShot) return true;
+                var renderingResult = _webBrowser.TryRender(uri, out html, out pageLoadTime, cancellationToken, attemptCount, onFailed);
+                if (!_takeScreenshot) return renderingResult;
 
-                _takeScreenShot = false;
-                return _webBrowser.TryTakeScreenShot($"screenshots\\{_resourceBeingRendered.Id}.png", onFailed);
+                _takeScreenshot = false;
+                _webBrowser.TryTakeScreenshot($"screenshots\\{_resourceBeingRendered.Id}.png", OnScreenshotTakingFailed);
+                return renderingResult;
+
+                void OnScreenshotTakingFailed(Exception exception)
+                {
+                    _logger.LogInfo($"Failed to take screenshot of [{uri}].\r\n{exception}");
+                }
             }
         }
 
