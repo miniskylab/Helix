@@ -55,9 +55,10 @@ namespace Helix.Crawler
                 var parentUri = _webBrowser.CurrentUri;
                 return Task.Run(() =>
                 {
-                    var response = networkTraffic.WebSession.Response;
                     var request = networkTraffic.WebSession.Request;
-                    if (request.RequestUri.Equals(_resourceBeingRendered.Uri))
+                    var response = networkTraffic.WebSession.Response;
+                    var isGETRequest = request.Method.ToUpperInvariant() == "GET";
+                    if (isGETRequest && request.RequestUri.Equals(_resourceBeingRendered.Uri))
                     {
                         var isRedirectResponse = 300 <= response.StatusCode && response.StatusCode < 400;
                         if (isRedirectResponse && response.Headers.Headers.TryGetValue("Location", out var locationHeader))
@@ -91,7 +92,6 @@ namespace Helix.Crawler
                     }
 
                     if (response.ContentType == null) return;
-                    var isNotGETRequest = request.Method.ToUpperInvariant() != "GET";
                     var isNotCss = !response.ContentType.StartsWith("text/css", StringComparison.OrdinalIgnoreCase);
                     var isNotImage = !response.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
                     var isNotAudio = !response.ContentType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase);
@@ -99,7 +99,7 @@ namespace Helix.Crawler
                     var isNotFont = !response.ContentType.StartsWith("font/", StringComparison.OrdinalIgnoreCase);
                     var isNotJavaScript = !response.ContentType.StartsWith("application/javascript", StringComparison.OrdinalIgnoreCase) &&
                                           !response.ContentType.StartsWith("application/ecmascript", StringComparison.OrdinalIgnoreCase);
-                    if (isNotGETRequest || isNotCss && isNotFont && isNotJavaScript && isNotImage && isNotAudio && isNotVideo) return;
+                    if (!isGETRequest || isNotCss && isNotFont && isNotJavaScript && isNotImage && isNotAudio && isNotVideo) return;
                     OnRawResourceCaptured?.Invoke(new RawResource
                     {
                         ParentUri = parentUri,
