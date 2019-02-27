@@ -13,11 +13,13 @@ namespace Helix.Crawler
 {
     public class HtmlRenderer : IHtmlRenderer
     {
+        readonly object _httpResponseConsumptionLock;
         readonly ILogger _logger;
         bool _objectDisposed;
         readonly Dictionary<string, object> _publicApiLockMap;
         Resource _resourceBeingRendered;
         bool _takeScreenshot;
+        bool _theFirstNoneRedirectResponseWasConsumed;
         IWebBrowser _webBrowser;
 
         public event Action<RawResource> OnRawResourceCaptured;
@@ -40,6 +42,8 @@ namespace Helix.Crawler
             _logger = logger;
             _objectDisposed = false;
             _takeScreenshot = false;
+            _theFirstNoneRedirectResponseWasConsumed = false;
+            _httpResponseConsumptionLock = new object();
             _publicApiLockMap = new Dictionary<string, object> { { $"{nameof(TryRender)}", new object() } };
 
             Task EnsureInternal(object _, SessionEventArgs networkTraffic)
@@ -57,41 +61,56 @@ namespace Helix.Crawler
                 {
                     var request = networkTraffic.WebSession.Request;
                     var response = networkTraffic.WebSession.Response;
-                    var isGETRequest = request.Method.ToUpperInvariant() == "GET";
-                    if (isGETRequest && request.RequestUri.Equals(_resourceBeingRendered.Uri))
+                    lock (_httpResponseConsumptionLock)
                     {
-                        var isRedirectResponse = 300 <= response.StatusCode && response.StatusCode < 400;
-                        if (isRedirectResponse && response.Headers.Headers.TryGetValue("Location", out var locationHeader))
+                        if (!_theFirstNoneRedirectResponseWasConsumed)
                         {
-                            if (Uri.TryCreate(locationHeader.Value, UriKind.RelativeOrAbsolute, out var redirectUri))
+                            if (ThisIsAValidRedirectResponse(out var destinationUri))
                             {
-                                if (redirectUri.IsAbsoluteUri) _resourceBeingRendered.Uri = redirectUri;
-                                else
-                                {
-                                    var baseUri = new Uri(request.RequestUri.GetLeftPart(UriPartial.Authority));
-                                    _resourceBeingRendered.Uri = new Uri(baseUri, redirectUri);
-                                }
+                                _resourceBeingRendered.Uri = destinationUri;
                                 return;
                             }
-                            logger.LogInfo($"Invalid redirect at: [{_resourceBeingRendered.Uri}]");
+                            UpdateStatusCodeIfNotMatch();
+
+                            var resourceIsBroken = (int) _resourceBeingRendered.HttpStatusCode >= 400;
+                            if (resourceIsBroken && configurations.TakeScreenshotEvidence) _takeScreenshot = true;
+                            _theFirstNoneRedirectResponseWasConsumed = true;
+
+                            bool ThisIsAValidRedirectResponse(out Uri redirectUri)
+                            {
+                                redirectUri = null;
+                                var isNotRedirectResponse = response.StatusCode < 300 || 400 <= response.StatusCode;
+                                if (isNotRedirectResponse || !response.Headers.Headers.TryGetValue("Location", out var locationHeader))
+                                    return false;
+
+                                if (Uri.TryCreate(locationHeader.Value, UriKind.RelativeOrAbsolute, out redirectUri))
+                                {
+                                    if (redirectUri.IsAbsoluteUri) return true;
+                                    var baseUri = new Uri(request.RequestUri.GetLeftPart(UriPartial.Authority));
+                                    redirectUri = new Uri(baseUri, redirectUri);
+                                    return true;
+                                }
+
+                                logger.LogInfo($"Invalid redirect at: [{_resourceBeingRendered.Uri}]");
+                                return false;
+                            }
+                            void UpdateStatusCodeIfNotMatch()
+                            {
+                                if (response.StatusCode == (int) _resourceBeingRendered.HttpStatusCode) return;
+
+                                var uri = _resourceBeingRendered.Uri;
+                                var oldStatusCode = (int) _resourceBeingRendered.HttpStatusCode;
+                                var newStatusCode = response.StatusCode;
+                                logger.LogInfo($"StatusCode changed from [{oldStatusCode}] to [{newStatusCode}] at [{uri}]");
+
+                                _resourceBeingRendered.HttpStatusCode = (HttpStatusCode) response.StatusCode;
+                                reportWriter.UpdateStatusCode(_resourceBeingRendered.Id, (HttpStatusCode) response.StatusCode);
+                            }
                         }
-
-                        if (response.StatusCode != (int) _resourceBeingRendered.HttpStatusCode)
-                        {
-                            var uri = _resourceBeingRendered.Uri;
-                            var oldStatusCode = (int) _resourceBeingRendered.HttpStatusCode;
-                            var newStatusCode = response.StatusCode;
-                            logger.LogInfo($"StatusCode changed from [{oldStatusCode}] to [{newStatusCode}] at [{uri}]");
-
-                            _resourceBeingRendered.HttpStatusCode = (HttpStatusCode) response.StatusCode;
-                            reportWriter.UpdateStatusCode(_resourceBeingRendered.Id, (HttpStatusCode) response.StatusCode);
-                        }
-
-                        var resourceIsBroken = (int) _resourceBeingRendered.HttpStatusCode >= 400;
-                        if (resourceIsBroken && configurations.TakeScreenshotEvidence) _takeScreenshot = true;
                     }
 
                     if (response.ContentType == null) return;
+                    var isNotGETRequest = request.Method.ToUpperInvariant() != "GET";
                     var isNotCss = !response.ContentType.StartsWith("text/css", StringComparison.OrdinalIgnoreCase);
                     var isNotImage = !response.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
                     var isNotAudio = !response.ContentType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase);
@@ -99,7 +118,7 @@ namespace Helix.Crawler
                     var isNotFont = !response.ContentType.StartsWith("font/", StringComparison.OrdinalIgnoreCase);
                     var isNotJavaScript = !response.ContentType.StartsWith("application/javascript", StringComparison.OrdinalIgnoreCase) &&
                                           !response.ContentType.StartsWith("application/ecmascript", StringComparison.OrdinalIgnoreCase);
-                    if (!isGETRequest || isNotCss && isNotFont && isNotJavaScript && isNotImage && isNotAudio && isNotVideo) return;
+                    if (!isNotGETRequest || isNotCss && isNotFont && isNotJavaScript && isNotImage && isNotAudio && isNotVideo) return;
                     OnRawResourceCaptured?.Invoke(new RawResource
                     {
                         ParentUri = parentUri,
@@ -132,6 +151,7 @@ namespace Helix.Crawler
             lock (_publicApiLockMap[nameof(TryRender)])
             {
                 if (_objectDisposed) throw new ObjectDisposedException(nameof(HtmlRenderer));
+                _theFirstNoneRedirectResponseWasConsumed = false;
                 _resourceBeingRendered = resource;
 
                 var uri = resource.Uri;
