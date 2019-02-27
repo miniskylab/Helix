@@ -13,7 +13,6 @@ namespace Helix.Crawler
 {
     public class HtmlRenderer : IHtmlRenderer
     {
-        readonly object _httpResponseConsumptionLock;
         readonly ILogger _logger;
         bool _objectDisposed;
         readonly Dictionary<string, object> _publicApiLockMap;
@@ -28,6 +27,7 @@ namespace Helix.Crawler
         public HtmlRenderer(Configurations configurations, IWebBrowserProvider webBrowserProvider, IResourceScope resourceScope,
             IReportWriter reportWriter, ILogger logger)
         {
+            var httpResponseConsumptionLock = new object();
             var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
             var pathToChromiumExecutable = Path.Combine(workingDirectory, "chromium/chrome.exe");
             _webBrowser = webBrowserProvider.GetWebBrowser(
@@ -43,7 +43,6 @@ namespace Helix.Crawler
             _objectDisposed = false;
             _takeScreenshot = false;
             _theFirstNoneRedirectResponseWasConsumed = false;
-            _httpResponseConsumptionLock = new object();
             _publicApiLockMap = new Dictionary<string, object> { { $"{nameof(TryRender)}", new object() } };
 
             Task EnsureInternal(object _, SessionEventArgs networkTraffic)
@@ -61,7 +60,7 @@ namespace Helix.Crawler
                 {
                     var request = networkTraffic.WebSession.Request;
                     var response = networkTraffic.WebSession.Response;
-                    lock (_httpResponseConsumptionLock)
+                    lock (httpResponseConsumptionLock)
                     {
                         if (!_theFirstNoneRedirectResponseWasConsumed)
                         {
