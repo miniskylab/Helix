@@ -39,11 +39,14 @@ namespace Helix.Crawler
             );
             _webBrowser.BeforeRequest += EnsureInternal;
             _webBrowser.BeforeResponse += CaptureNetworkTraffic;
+
             _logger = logger;
             _objectDisposed = false;
             _takeScreenshot = false;
             _theFirstNoneRedirectResponseWasConsumed = false;
             _publicApiLockMap = new Dictionary<string, object> { { $"{nameof(TryRender)}", new object() } };
+
+            EnsureDirectoryContainsScreenshotFilesIsRecreated();
 
             Task EnsureInternal(object _, SessionEventArgs networkTraffic)
             {
@@ -64,39 +67,24 @@ namespace Helix.Crawler
                     {
                         if (!_theFirstNoneRedirectResponseWasConsumed)
                         {
-                            if (ThisIsAValidRedirectResponse(out var destinationUri))
+                            var isRedirectResponse = 300 <= response.StatusCode && response.StatusCode < 400;
+                            if (isRedirectResponse && response.Headers.Headers.TryGetValue("Location", out var locationHeader))
                             {
-                                _resourceBeingRendered.Uri = destinationUri;
-                                return;
-                            }
-                            UpdateStatusCodeIfNotMatch();
-
-                            var resourceIsBroken = (int) _resourceBeingRendered.HttpStatusCode >= 400;
-                            if (resourceIsBroken && configurations.TakeScreenshotEvidence) _takeScreenshot = true;
-                            _theFirstNoneRedirectResponseWasConsumed = true;
-
-                            bool ThisIsAValidRedirectResponse(out Uri redirectUri)
-                            {
-                                redirectUri = null;
-                                var isNotRedirectResponse = response.StatusCode < 300 || 400 <= response.StatusCode;
-                                if (isNotRedirectResponse || !response.Headers.Headers.TryGetValue("Location", out var locationHeader))
-                                    return false;
-
-                                if (Uri.TryCreate(locationHeader.Value, UriKind.RelativeOrAbsolute, out redirectUri))
+                                if (Uri.TryCreate(locationHeader.Value, UriKind.RelativeOrAbsolute, out var redirectUri))
                                 {
-                                    if (redirectUri.IsAbsoluteUri) return true;
-                                    var baseUri = new Uri(request.RequestUri.GetLeftPart(UriPartial.Authority));
-                                    redirectUri = new Uri(baseUri, redirectUri);
-                                    return true;
+                                    if (redirectUri.IsAbsoluteUri) _resourceBeingRendered.Uri = redirectUri;
+                                    else
+                                    {
+                                        var baseUri = new Uri(request.RequestUri.GetLeftPart(UriPartial.Authority));
+                                        _resourceBeingRendered.Uri = new Uri(baseUri, redirectUri);
+                                    }
+                                    return;
                                 }
-
                                 logger.LogInfo($"Invalid redirect at: [{_resourceBeingRendered.Uri}]");
-                                return false;
                             }
-                            void UpdateStatusCodeIfNotMatch()
-                            {
-                                if (response.StatusCode == (int) _resourceBeingRendered.HttpStatusCode) return;
 
+                            if (response.StatusCode != (int) _resourceBeingRendered.HttpStatusCode)
+                            {
                                 var uri = _resourceBeingRendered.Uri;
                                 var oldStatusCode = (int) _resourceBeingRendered.HttpStatusCode;
                                 var newStatusCode = response.StatusCode;
@@ -105,6 +93,10 @@ namespace Helix.Crawler
                                 _resourceBeingRendered.HttpStatusCode = (HttpStatusCode) response.StatusCode;
                                 reportWriter.UpdateStatusCode(_resourceBeingRendered.Id, (HttpStatusCode) response.StatusCode);
                             }
+
+                            var resourceIsBroken = (int) _resourceBeingRendered.HttpStatusCode >= 400;
+                            if (resourceIsBroken && configurations.TakeScreenshotEvidence) _takeScreenshot = true;
+                            _theFirstNoneRedirectResponseWasConsumed = true;
                         }
                     }
 
@@ -125,6 +117,13 @@ namespace Helix.Crawler
                         HttpStatusCode = (HttpStatusCode) response.StatusCode
                     });
                 });
+            }
+            void EnsureDirectoryContainsScreenshotFilesIsRecreated()
+            {
+                var absolutePathToDirectoryContainsScreenshotFiles = Path.Combine(workingDirectory, "screenshots");
+                if (Directory.Exists(absolutePathToDirectoryContainsScreenshotFiles))
+                    Directory.Delete(absolutePathToDirectoryContainsScreenshotFiles, true);
+                Directory.CreateDirectory(absolutePathToDirectoryContainsScreenshotFiles);
             }
         }
 

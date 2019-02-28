@@ -170,8 +170,8 @@ namespace Helix.WebBrowser
                 if (workingDirectory == null) throw new InvalidOperationException();
 
                 var absolutePathToScreenshotFile = Path.Combine(workingDirectory, screenshotFileName);
-                var parentDirectoryOfScreenshotFile = Directory.GetParent(absolutePathToScreenshotFile);
-                if (!parentDirectoryOfScreenshotFile.Exists) parentDirectoryOfScreenshotFile.Create();
+                var absolutePathToDirectoryContainsScreenshotFile = Directory.GetParent(absolutePathToScreenshotFile);
+                if (!absolutePathToDirectoryContainsScreenshotFile.Exists) absolutePathToDirectoryContainsScreenshotFile.Create();
 
                 var screenShot = _chromeDriver.GetScreenshot();
                 Task.Run(() => { screenShot.SaveAsFile(screenshotFileName, ScreenshotImageFormat.Png); });
