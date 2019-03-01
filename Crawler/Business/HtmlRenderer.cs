@@ -13,12 +13,13 @@ namespace Helix.Crawler
 {
     public class HtmlRenderer : IHtmlRenderer
     {
+        int _activeHttpTrafficCount;
+        CancellationTokenSource _cancellationTokenSource;
         readonly ILogger _logger;
         bool _objectDisposed;
         readonly Dictionary<string, object> _publicApiLockMap;
         Resource _resourceBeingRendered;
         bool _takeScreenshot;
-        bool _theFirstNoneRedirectResponseWasConsumed;
         IWebBrowser _webBrowser;
 
         public event Action<RawResource> OnRawResourceCaptured;
@@ -27,7 +28,6 @@ namespace Helix.Crawler
         public HtmlRenderer(Configurations configurations, IWebBrowserProvider webBrowserProvider, IResourceScope resourceScope,
             IReportWriter reportWriter, ILogger logger)
         {
-            var httpResponseConsumptionLock = new object();
             var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
             var pathToChromiumExecutable = Path.Combine(workingDirectory, "chromium/chrome.exe");
             _webBrowser = webBrowserProvider.GetWebBrowser(
@@ -43,7 +43,6 @@ namespace Helix.Crawler
             _logger = logger;
             _objectDisposed = false;
             _takeScreenshot = false;
-            _theFirstNoneRedirectResponseWasConsumed = false;
             _publicApiLockMap = new Dictionary<string, object> { { $"{nameof(TryRender)}", new object() } };
 
             EnsureDirectoryContainsScreenshotFilesIsRecreated();
@@ -52,71 +51,79 @@ namespace Helix.Crawler
             {
                 return Task.Run(() =>
                 {
-                    networkTraffic.WebSession.Request.RequestUri = resourceScope.Localize(networkTraffic.WebSession.Request.RequestUri);
-                    networkTraffic.WebSession.Request.Host = networkTraffic.WebSession.Request.RequestUri.Host;
-                });
+                    Interlocked.Increment(ref _activeHttpTrafficCount);
+                    try
+                    {
+                        networkTraffic.WebSession.Request.RequestUri = resourceScope.Localize(networkTraffic.WebSession.Request.RequestUri);
+                        networkTraffic.WebSession.Request.Host = networkTraffic.WebSession.Request.RequestUri.Host;
+                    }
+                    finally { Interlocked.Decrement(ref _activeHttpTrafficCount); }
+                }, _cancellationTokenSource.Token);
             }
             Task CaptureNetworkTraffic(object _, SessionEventArgs networkTraffic)
             {
                 var parentUri = _webBrowser.CurrentUri;
+                var request = networkTraffic.WebSession.Request;
+                var response = networkTraffic.WebSession.Response;
                 return Task.Run(() =>
                 {
-                    var request = networkTraffic.WebSession.Request;
-                    var response = networkTraffic.WebSession.Response;
-                    lock (httpResponseConsumptionLock)
+                    Interlocked.Increment(ref _activeHttpTrafficCount);
+                    try
                     {
-                        if (!_theFirstNoneRedirectResponseWasConsumed)
+                        if (ParentUriWasFound())
                         {
-                            var isRedirectResponse = 300 <= response.StatusCode && response.StatusCode < 400;
-                            if (isRedirectResponse && response.Headers.Headers.TryGetValue("Location", out var locationHeader))
-                            {
-                                if (Uri.TryCreate(locationHeader.Value, UriKind.RelativeOrAbsolute, out var redirectUri))
-                                {
-                                    if (redirectUri.IsAbsoluteUri) _resourceBeingRendered.Uri = redirectUri;
-                                    else
-                                    {
-                                        var baseUri = new Uri(request.RequestUri.GetLeftPart(UriPartial.Authority));
-                                        _resourceBeingRendered.Uri = new Uri(baseUri, redirectUri);
-                                    }
-                                    return;
-                                }
-                                logger.LogInfo($"Invalid redirect at: [{_resourceBeingRendered.Uri}]");
-                            }
-
-                            if (response.StatusCode != (int) _resourceBeingRendered.HttpStatusCode)
-                            {
-                                var uri = _resourceBeingRendered.Uri;
-                                var oldStatusCode = (int) _resourceBeingRendered.HttpStatusCode;
-                                var newStatusCode = response.StatusCode;
-                                logger.LogInfo($"StatusCode changed from [{oldStatusCode}] to [{newStatusCode}] at [{uri}]");
-
-                                _resourceBeingRendered.HttpStatusCode = (HttpStatusCode) response.StatusCode;
-                                reportWriter.UpdateStatusCode(_resourceBeingRendered.Id, (HttpStatusCode) response.StatusCode);
-                            }
-
-                            var resourceIsBroken = (int) _resourceBeingRendered.HttpStatusCode >= 400;
-                            if (resourceIsBroken && configurations.TakeScreenshotEvidence) _takeScreenshot = true;
-                            _theFirstNoneRedirectResponseWasConsumed = true;
+                            UpdateStatusCodeIfNotMatch();
+                            TakeScreenshotIfNecessary();
                         }
-                    }
 
-                    if (response.ContentType == null) return;
-                    var isNotGETRequest = request.Method.ToUpperInvariant() != "GET";
-                    var isNotCss = !response.ContentType.StartsWith("text/css", StringComparison.OrdinalIgnoreCase);
-                    var isNotImage = !response.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
-                    var isNotAudio = !response.ContentType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase);
-                    var isNotVideo = !response.ContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase);
-                    var isNotFont = !response.ContentType.StartsWith("font/", StringComparison.OrdinalIgnoreCase);
-                    var isNotJavaScript = !response.ContentType.StartsWith("application/javascript", StringComparison.OrdinalIgnoreCase) &&
-                                          !response.ContentType.StartsWith("application/ecmascript", StringComparison.OrdinalIgnoreCase);
-                    if (!isNotGETRequest || isNotCss && isNotFont && isNotJavaScript && isNotImage && isNotAudio && isNotVideo) return;
-                    OnRawResourceCaptured?.Invoke(new RawResource
-                    {
-                        ParentUri = parentUri,
-                        Url = request.Url,
-                        HttpStatusCode = (HttpStatusCode) response.StatusCode
-                    });
-                });
+                        if (response.ContentType == null) return;
+                        var isNotGETRequest = request.Method.ToUpperInvariant() != "GET";
+                        var isNotCss = !response.ContentType.StartsWith("text/css", StringComparison.OrdinalIgnoreCase);
+                        var isNotImage = !response.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
+                        var isNotAudio = !response.ContentType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase);
+                        var isNotVideo = !response.ContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase);
+                        var isNotFont = !response.ContentType.StartsWith("font/", StringComparison.OrdinalIgnoreCase);
+                        var isNotJavaScript =
+                            !response.ContentType.StartsWith("application/javascript", StringComparison.OrdinalIgnoreCase) &&
+                            !response.ContentType.StartsWith("application/ecmascript", StringComparison.OrdinalIgnoreCase);
+                        if (!isNotGETRequest || isNotCss && isNotFont && isNotJavaScript && isNotImage && isNotAudio && isNotVideo) return;
+                        OnRawResourceCaptured?.Invoke(new RawResource
+                        {
+                            ParentUri = parentUri,
+                            Url = request.Url,
+                            HttpStatusCode = (HttpStatusCode) response.StatusCode
+                        });
+                    }
+                    finally { Interlocked.Decrement(ref _activeHttpTrafficCount); }
+                }, _cancellationTokenSource.Token);
+
+                bool ParentUriWasFound()
+                {
+                    var capturedUri = request.RequestUri;
+                    var uriBeingRendered = _resourceBeingRendered.Uri;
+                    var bothSchemesAreNotEqual = !capturedUri.Scheme.Equals(uriBeingRendered.Scheme);
+                    var strictTransportSecurity = uriBeingRendered.Scheme == "http" && capturedUri.Scheme == "https";
+                    if (bothSchemesAreNotEqual && !strictTransportSecurity) return false;
+
+                    var capturedUriWithoutScheme = capturedUri.Host + capturedUri.PathAndQuery + capturedUri.Fragment;
+                    var uriBeingRenderedWithoutScheme = uriBeingRendered.Host + uriBeingRendered.PathAndQuery + uriBeingRendered.Fragment;
+                    return capturedUriWithoutScheme.Equals(uriBeingRenderedWithoutScheme);
+                }
+                void UpdateStatusCodeIfNotMatch()
+                {
+                    if (response.StatusCode == (int) _resourceBeingRendered.HttpStatusCode) return;
+                    var oldStatusCode = (int) _resourceBeingRendered.HttpStatusCode;
+                    var newStatusCode = response.StatusCode;
+                    logger.LogInfo($"StatusCode changed from [{oldStatusCode}] to [{newStatusCode}] at [{_resourceBeingRendered.Uri}]");
+
+                    _resourceBeingRendered.HttpStatusCode = (HttpStatusCode) response.StatusCode;
+                    reportWriter.UpdateStatusCode(_resourceBeingRendered.Id, (HttpStatusCode) response.StatusCode);
+                }
+                void TakeScreenshotIfNecessary()
+                {
+                    var resourceIsBroken = (int) _resourceBeingRendered.HttpStatusCode >= 400;
+                    if (resourceIsBroken && configurations.TakeScreenshotEvidence) _takeScreenshot = true;
+                }
             }
             void EnsureDirectoryContainsScreenshotFilesIsRecreated()
             {
@@ -149,7 +156,10 @@ namespace Helix.Crawler
             lock (_publicApiLockMap[nameof(TryRender)])
             {
                 if (_objectDisposed) throw new ObjectDisposedException(nameof(HtmlRenderer));
-                _theFirstNoneRedirectResponseWasConsumed = false;
+                _cancellationTokenSource?.Cancel();
+                while (_activeHttpTrafficCount > 0) Thread.Sleep(100);
+                _cancellationTokenSource?.Dispose();
+                _cancellationTokenSource = new CancellationTokenSource();
                 _resourceBeingRendered = resource;
 
                 var uri = resource.Uri;
