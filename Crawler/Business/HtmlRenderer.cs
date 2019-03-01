@@ -99,6 +99,7 @@ namespace Helix.Crawler
 
                 bool ParentUriWasFound()
                 {
+                    if (request.Method.ToUpperInvariant() != "GET") return false;
                     var capturedUri = request.RequestUri;
                     var uriBeingRendered = _resourceBeingRendered.Uri;
                     var bothSchemesAreNotEqual = !capturedUri.Scheme.Equals(uriBeingRendered.Scheme);
