@@ -77,7 +77,7 @@ async function DeployElectronJs(pathToUnzippedElectronJsBinaryDirectory) {
     const pathToGuiSourceCode = "../Gui/app";
     const pathToDeploymentArchiveFile = `${pathToUnzippedElectronJsBinaryDirectory}/resources/app.asar`;
     if (fs.existsSync(pathToDeploymentArchiveFile)) fs.unlinkSync(pathToDeploymentArchiveFile);
-    await new Promise(resolve => asar.createPackage(pathToGuiSourceCode, pathToDeploymentArchiveFile, resolve));
+    await asar.createPackage(pathToGuiSourceCode, pathToDeploymentArchiveFile);
 }
 
 function SendGETRequestOverHttps(destinationUrl) {

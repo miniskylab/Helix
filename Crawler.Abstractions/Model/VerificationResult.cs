@@ -20,7 +20,7 @@ namespace Helix.Crawler.Abstractions
         {
             get
             {
-                var verifiedUrl = RawResource.Url.EndsWith("/") ? Resource?.Uri.AbsoluteUri : Resource?.Uri.AbsoluteUri.TrimEnd('/');
+                var verifiedUrl = RawResource.Url.EndsWith("/") ? Resource?.Uri?.AbsoluteUri : Resource?.Uri?.AbsoluteUri.TrimEnd('/');
                 return verifiedUrl ?? RawResource.Url;
             }
         }

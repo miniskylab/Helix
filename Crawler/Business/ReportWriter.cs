@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Helix.Crawler.Abstractions;
@@ -20,9 +22,12 @@ namespace Helix.Crawler
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public ReportWriter(IPersistenceProvider persistenceProvider)
         {
+            var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
+            var pathToDatabaseFile = Path.Combine(workingDirectory, "report.sqlite3");
+
             _objectDisposed = false;
             _verificationResultDataTransferObjects = new List<VerificationResultDataTransferObject>();
-            _sqLitePersistence = persistenceProvider.GetSQLitePersistence<VerificationResultDataTransferObject>("report.db");
+            _sqLitePersistence = persistenceProvider.GetSQLitePersistence<VerificationResultDataTransferObject>(pathToDatabaseFile);
             _publicApiLockMap = new Dictionary<string, object>
             {
                 { $"{nameof(WriteReport)}", new object() },

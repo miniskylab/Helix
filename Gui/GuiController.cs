@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -70,9 +71,9 @@ namespace Helix.Gui
                     CrawlerBot.OnResourceVerified -= OnResourceVerified;
                     RedrawGui("Shutting down ...");
                     CrawlerBot.StopWorking();
-                    if (!Task.WhenAll(BackgroundTasks).Wait(TimeSpan.FromMinutes(1)))
+                    if (!Task.WhenAll(BackgroundTasks).Wait(TimeSpan.FromMinutes(2)))
                         File.AppendAllText(
-                            "debug.log",
+                            Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "debug.log"),
                             $"\r\n[{DateTime.Now:yyyy/MM/dd HH:mm:ss}] Waiting for background tasks to complete timed out after 60 seconds."
                         );
                 }

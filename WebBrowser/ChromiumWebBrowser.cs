@@ -115,15 +115,18 @@ namespace Helix.WebBrowser
                 bool TryGoToUri()
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    EnableNetwork();
                     for (var attemptNo = 0; attemptNo < attemptCount; attemptNo++)
                     {
                         try
                         {
                             cancellationToken.ThrowIfCancellationRequested();
+                            _httpProxyServer.BeforeResponse += BeforeResponse;
+                            _httpProxyServer.BeforeRequest += BeforeRequest;
                             _stopwatch.Start();
                             _chromeDriver.Navigate().GoToUrl(uri);
                             _stopwatch.Stop();
+                            _httpProxyServer.BeforeRequest -= BeforeRequest;
+                            _httpProxyServer.BeforeResponse -= BeforeResponse;
                             break;
                         }
                         catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
@@ -134,28 +137,15 @@ namespace Helix.WebBrowser
                             return false;
                         }
                     }
-                    DisableNetwork();
                     return true;
 
-                    void DisableNetwork()
+                    Task BeforeRequest(object sender, SessionEventArgs networkTraffic)
                     {
-                        _chromeDriver.NetworkConditions = new ChromeNetworkConditions
-                        {
-                            IsOffline = true,
-                            Latency = TimeSpan.FromTicks(1),
-                            UploadThroughput = long.MaxValue,
-                            DownloadThroughput = long.MaxValue
-                        };
+                        return this.BeforeRequest?.Invoke(sender, networkTraffic);
                     }
-                    void EnableNetwork()
+                    Task BeforeResponse(object sender, SessionEventArgs networkTraffic)
                     {
-                        _chromeDriver.NetworkConditions = new ChromeNetworkConditions
-                        {
-                            IsOffline = false,
-                            Latency = TimeSpan.FromTicks(1),
-                            UploadThroughput = long.MaxValue,
-                            DownloadThroughput = long.MaxValue
-                        };
+                        return this.BeforeResponse?.Invoke(sender, networkTraffic);
                     }
                 }
             }
@@ -233,16 +223,7 @@ namespace Helix.WebBrowser
             if (_useHeadlessWebBrowser) chromeOptions.AddArguments("--headless");
             chromeOptions.AddArguments($"--window-size={_browserWindowSize.width},{_browserWindowSize.height}");
 
-            _chromeDriver = new ChromeDriver(chromeDriverService, chromeOptions)
-            {
-                NetworkConditions = new ChromeNetworkConditions
-                {
-                    IsOffline = true,
-                    Latency = TimeSpan.MinValue,
-                    UploadThroughput = long.MaxValue,
-                    DownloadThroughput = long.MaxValue
-                }
-            };
+            _chromeDriver = new ChromeDriver(chromeDriverService, chromeOptions);
             _processIds.Add(chromeDriverService.ProcessId);
 
             var childProcessQueryString = $"Select * From Win32_Process Where ParentProcessID={chromeDriverService.ProcessId}";
@@ -260,8 +241,6 @@ namespace Helix.WebBrowser
             _httpProxyServer = new ProxyServer();
             _httpProxyServer.AddEndPoint(new ExplicitProxyEndPoint(IPAddress.Loopback, 0));
             _httpProxyServer.Start();
-            _httpProxyServer.BeforeRequest += (sender, networkTraffic) => BeforeRequest?.Invoke(sender, networkTraffic);
-            _httpProxyServer.BeforeResponse += (sender, networkTraffic) => BeforeResponse?.Invoke(sender, networkTraffic);
         }
 
         static bool TimeoutExceptionOccurred(Exception exception)

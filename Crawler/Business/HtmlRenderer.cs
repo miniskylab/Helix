@@ -4,6 +4,7 @@ using System.IO;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Helix.Core;
 using Helix.Crawler.Abstractions;
 using Helix.Persistence.Abstractions;
 using Helix.WebBrowser.Abstractions;
@@ -17,6 +18,7 @@ namespace Helix.Crawler
         CancellationTokenSource _cancellationTokenSource;
         readonly ILogger _logger;
         bool _objectDisposed;
+        readonly string _pathToDirectoryContainsScreenshotFiles;
         readonly Dictionary<string, object> _publicApiLockMap;
         Resource _resourceBeingRendered;
         bool _takeScreenshot;
@@ -43,13 +45,14 @@ namespace Helix.Crawler
             _logger = logger;
             _objectDisposed = false;
             _takeScreenshot = false;
+            _pathToDirectoryContainsScreenshotFiles = Path.Combine(workingDirectory, "screenshots");
             _publicApiLockMap = new Dictionary<string, object> { { $"{nameof(TryRender)}", new object() } };
 
             EnsureDirectoryContainsScreenshotFilesIsRecreated();
 
             Task EnsureInternal(object _, SessionEventArgs networkTraffic)
             {
-                return Task.Run(() =>
+                return Task.Factory.StartNew(() =>
                 {
                     Interlocked.Increment(ref _activeHttpTrafficCount);
                     try
@@ -58,14 +61,14 @@ namespace Helix.Crawler
                         networkTraffic.WebSession.Request.Host = networkTraffic.WebSession.Request.RequestUri.Host;
                     }
                     finally { Interlocked.Decrement(ref _activeHttpTrafficCount); }
-                }, _cancellationTokenSource.Token);
+                }, _cancellationTokenSource.Token, TaskCreationOptions.None, PriorityTaskScheduler.Highest);
             }
             Task CaptureNetworkTraffic(object _, SessionEventArgs networkTraffic)
             {
                 var parentUri = _webBrowser.CurrentUri;
                 var request = networkTraffic.WebSession.Request;
                 var response = networkTraffic.WebSession.Response;
-                return Task.Run(() =>
+                return Task.Factory.StartNew(() =>
                 {
                     Interlocked.Increment(ref _activeHttpTrafficCount);
                     try
@@ -83,10 +86,9 @@ namespace Helix.Crawler
                         var isNotAudio = !response.ContentType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase);
                         var isNotVideo = !response.ContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase);
                         var isNotFont = !response.ContentType.StartsWith("font/", StringComparison.OrdinalIgnoreCase);
-                        var isNotJavaScript =
-                            !response.ContentType.StartsWith("application/javascript", StringComparison.OrdinalIgnoreCase) &&
-                            !response.ContentType.StartsWith("application/ecmascript", StringComparison.OrdinalIgnoreCase);
-                        if (!isNotGETRequest || isNotCss && isNotFont && isNotJavaScript && isNotImage && isNotAudio && isNotVideo) return;
+                        var isNotScript = !response.ContentType.StartsWith("application/javascript", StringComparison.OrdinalIgnoreCase) &&
+                                          !response.ContentType.StartsWith("application/ecmascript", StringComparison.OrdinalIgnoreCase);
+                        if (isNotGETRequest || isNotCss && isNotFont && isNotScript && isNotImage && isNotAudio && isNotVideo) return;
                         OnRawResourceCaptured?.Invoke(new RawResource
                         {
                             ParentUri = parentUri,
@@ -95,7 +97,7 @@ namespace Helix.Crawler
                         });
                     }
                     finally { Interlocked.Decrement(ref _activeHttpTrafficCount); }
-                }, _cancellationTokenSource.Token);
+                }, _cancellationTokenSource.Token, TaskCreationOptions.None, PriorityTaskScheduler.Highest);
 
                 bool ParentUriWasFound()
                 {
@@ -113,9 +115,12 @@ namespace Helix.Crawler
                 void UpdateStatusCodeIfNotMatch()
                 {
                     if (response.StatusCode == (int) _resourceBeingRendered.HttpStatusCode) return;
-                    var oldStatusCode = (int) _resourceBeingRendered.HttpStatusCode;
-                    var newStatusCode = response.StatusCode;
-                    logger.LogInfo($"StatusCode changed from [{oldStatusCode}] to [{newStatusCode}] at [{_resourceBeingRendered.Uri}]");
+                    if (response.StatusCode < 300 && 400 <= response.StatusCode)
+                    {
+                        var newStatusCode = response.StatusCode;
+                        var oldStatusCode = (int) _resourceBeingRendered.HttpStatusCode;
+                        logger.LogInfo($"StatusCode changed from [{oldStatusCode}] to [{newStatusCode}] at [{_resourceBeingRendered.Uri}]");
+                    }
 
                     _resourceBeingRendered.HttpStatusCode = (HttpStatusCode) response.StatusCode;
                     reportWriter.UpdateStatusCode(_resourceBeingRendered.Id, (HttpStatusCode) response.StatusCode);
@@ -128,10 +133,9 @@ namespace Helix.Crawler
             }
             void EnsureDirectoryContainsScreenshotFilesIsRecreated()
             {
-                var absolutePathToDirectoryContainsScreenshotFiles = Path.Combine(workingDirectory, "screenshots");
-                if (Directory.Exists(absolutePathToDirectoryContainsScreenshotFiles))
-                    Directory.Delete(absolutePathToDirectoryContainsScreenshotFiles, true);
-                Directory.CreateDirectory(absolutePathToDirectoryContainsScreenshotFiles);
+                if (Directory.Exists(_pathToDirectoryContainsScreenshotFiles))
+                    Directory.Delete(_pathToDirectoryContainsScreenshotFiles, true);
+                Directory.CreateDirectory(_pathToDirectoryContainsScreenshotFiles);
             }
         }
 
@@ -167,8 +171,10 @@ namespace Helix.Crawler
                 var renderingResult = _webBrowser.TryRender(uri, out html, out pageLoadTime, cancellationToken, attemptCount, onFailed);
                 if (!_takeScreenshot) return renderingResult;
 
+                var pathToScreenshotFile = Path.Combine(_pathToDirectoryContainsScreenshotFiles, $"{_resourceBeingRendered.Id}.png");
+                _webBrowser.TryTakeScreenshot(pathToScreenshotFile, OnScreenshotTakingFailed);
                 _takeScreenshot = false;
-                _webBrowser.TryTakeScreenshot($"screenshots\\{_resourceBeingRendered.Id}.png", OnScreenshotTakingFailed);
+
                 return renderingResult;
 
                 void OnScreenshotTakingFailed(Exception exception)
