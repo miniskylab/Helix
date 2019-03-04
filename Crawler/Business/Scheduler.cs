@@ -343,6 +343,7 @@ namespace Helix.Crawler
                     lock (_verificationLock) _pendingVerificationTaskCount--;
                     _servicePool.Return(rawResourceVerifier);
                 }
+                // TODO: Not gonna work because of _alreadyVerfiedUrls in Memory.cs
                 void ReturnToBeVerifiedRawResource() { _memory.Memorize(toBeVerifiedRawResource, CancellationToken.None); }
             }
         }

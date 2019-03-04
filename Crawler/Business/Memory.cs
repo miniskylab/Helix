@@ -1,15 +1,15 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using Helix.Core;
 using Helix.Crawler.Abstractions;
 
 namespace Helix.Crawler
 {
     public sealed class Memory : IMemory
     {
-        readonly ConcurrentSet<string> _alreadyVerifiedUrls;
+        readonly HashSet<string> _alreadyVerifiedUrls;
         readonly object _memorizationLock;
         bool _objectDisposed;
         readonly BlockingCollection<HtmlDocument> _toBeExtractedHtmlDocuments;
@@ -34,7 +34,7 @@ namespace Helix.Crawler
             _toBeExtractedHtmlDocuments = new BlockingCollection<HtmlDocument>();
             _toBeRenderedResources = new BlockingCollection<Resource>();
             _toBeTakenScreenshotResources = new BlockingCollection<Resource>();
-            _alreadyVerifiedUrls = new ConcurrentSet<string>();
+            _alreadyVerifiedUrls = new HashSet<string>();
             _toBeVerifiedRawResources = new BlockingCollection<RawResource>();
         }
 
