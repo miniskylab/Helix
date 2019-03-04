@@ -64,12 +64,11 @@ namespace Helix.Crawler
         {
             lock (_memorizationLock)
             {
-                if (_alreadyVerifiedUrls.Contains(toBeVerifiedRawResource.Url.StripFragment())) return;
-                _alreadyVerifiedUrls.Add(toBeVerifiedRawResource.Url.StripFragment());
+                var uriWithoutFragment = toBeVerifiedRawResource.Url.StripFragment();
+                if (_alreadyVerifiedUrls.Contains(uriWithoutFragment)) return;
+                _alreadyVerifiedUrls.Add(uriWithoutFragment);
             }
-
-            while (!cancellationToken.IsCancellationRequested && !_toBeVerifiedRawResources.TryAdd(toBeVerifiedRawResource))
-                Thread.Sleep(TimeSpan.FromSeconds(3));
+            _toBeVerifiedRawResources.Add(toBeVerifiedRawResource, cancellationToken);
         }
 
         public void Memorize(Resource toBeRenderedResource, CancellationToken cancellationToken)
@@ -77,14 +76,12 @@ namespace Helix.Crawler
             var destinationCollection = (int) toBeRenderedResource.HttpStatusCode >= 400
                 ? _toBeTakenScreenshotResources
                 : _toBeRenderedResources;
-            while (!cancellationToken.IsCancellationRequested && !destinationCollection.TryAdd(toBeRenderedResource))
-                Thread.Sleep(TimeSpan.FromSeconds(3));
+            destinationCollection.Add(toBeRenderedResource, cancellationToken);
         }
 
         public void Memorize(HtmlDocument toBeExtractedHtmlDocument, CancellationToken cancellationToken)
         {
-            while (!cancellationToken.IsCancellationRequested && !_toBeExtractedHtmlDocuments.TryAdd(toBeExtractedHtmlDocument))
-                Thread.Sleep(TimeSpan.FromSeconds(3));
+            _toBeExtractedHtmlDocuments.Add(toBeExtractedHtmlDocument, cancellationToken);
         }
 
         public bool TryTake(out HtmlDocument htmlDocument) { return _toBeExtractedHtmlDocuments.TryTake(out htmlDocument); }
