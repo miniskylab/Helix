@@ -16,9 +16,9 @@ namespace Helix.Specifications
             _serviceCollection = new ServiceCollection();
             _serviceProvider = _serviceCollection.Add(new[]
             {
-                new ServiceDescriptor(typeof(IRawResourceExtractor), typeof(RawResourceExtractor), ServiceLifetime.Transient),
-                new ServiceDescriptor(typeof(IRawResourceVerifier), typeof(RawResourceVerifier), ServiceLifetime.Transient),
-                new ServiceDescriptor(typeof(IRawResourceProcessor), typeof(RawResourceProcessor), ServiceLifetime.Transient),
+                new ServiceDescriptor(typeof(IResourceExtractor), typeof(ResourceExtractor), ServiceLifetime.Transient),
+                new ServiceDescriptor(typeof(IResourceVerifier), typeof(ResourceVerifier), ServiceLifetime.Transient),
+                new ServiceDescriptor(typeof(IResourceProcessor), typeof(ResourceProcessor), ServiceLifetime.Transient),
                 new ServiceDescriptor(typeof(IResourceScope), typeof(ResourceScope), ServiceLifetime.Transient),
                 new ServiceDescriptor(typeof(Configurations), new Configurations()),
                 new ServiceDescriptor(typeof(IMemory), typeof(Memory), ServiceLifetime.Singleton),

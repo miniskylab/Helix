@@ -13,6 +13,7 @@ namespace Helix.Crawler
         static ILogger _logger;
         static IMemory _memory;
         static IReportWriter _reportWriter;
+        static IResourceProcessor _resourceProcessor;
         static IScheduler _scheduler;
         static IServicePool _servicePool;
         static readonly StateMachine<CrawlerState, CrawlerCommand> _stateMachine;
@@ -78,6 +79,7 @@ namespace Helix.Crawler
             _scheduler = ServiceLocator.Get<IScheduler>();
             _servicePool = ServiceLocator.Get<IServicePool>();
             _memory = ServiceLocator.Get<IMemory>();
+            _resourceProcessor = ServiceLocator.Get<IResourceProcessor>();
 
             if (!TryTransit(CrawlerCommand.StartWorking)) return;
             BackgroundTasks.Add(Task.Run(() =>
@@ -87,8 +89,12 @@ namespace Helix.Crawler
                     EnsureErrorLogFileIsRecreated();
                     _reportWriter = ServiceLocator.Get<IReportWriter>();
                     _servicePool.EnsureEnoughResources(_scheduler.CancellationToken);
-                    _memory.Memorize(
-                        new RawResource { ParentUri = null, Url = configurations.StartUri.AbsoluteUri },
+                    _memory.MemorizeToBeVerifiedResource(
+                        _resourceProcessor.Enrich(new Resource
+                        {
+                            ParentUri = null,
+                            OriginalUrl = configurations.StartUri.AbsoluteUri
+                        }),
                         _scheduler.CancellationToken
                     );
 
@@ -138,11 +144,11 @@ namespace Helix.Crawler
         static void Extract()
         {
             while (!_scheduler.EverythingIsDone && !_scheduler.CancellationToken.IsCancellationRequested)
-                _scheduler.CreateTask((rawResourceExtractor, toBeExtractedHtmlDocument) =>
+                _scheduler.CreateTask((resourceExtractor, toBeExtractedHtmlDocument) =>
                 {
-                    rawResourceExtractor.ExtractRawResourcesFrom(
+                    resourceExtractor.ExtractResourcesFrom(
                         toBeExtractedHtmlDocument,
-                        rawResource => _memory.Memorize(rawResource, _scheduler.CancellationToken)
+                        resource => _memory.MemorizeToBeVerifiedResource(resource, _scheduler.CancellationToken)
                     );
                 });
         }
@@ -162,7 +168,7 @@ namespace Helix.Crawler
                     }
                     else _logger.LogException(new InvalidConstraintException(ErrorMessage.SuccessfulRenderWithoutPageLoadTime));
 
-                    _memory.Memorize(new HtmlDocument
+                    _memory.MemorizeToBeExtractedHtmlDocument(new HtmlDocument
                     {
                         Uri = toBeRenderedResource.Uri,
                         Text = htmlText
@@ -183,25 +189,21 @@ namespace Helix.Crawler
         static void Verify()
         {
             while (!_scheduler.EverythingIsDone && !_scheduler.CancellationToken.IsCancellationRequested)
-                _scheduler.CreateTask((rawResourceVerifier, toBeVerifiedRawResource) =>
+                _scheduler.CreateTask((resourceVerifier, resource) =>
                 {
-                    if (!rawResourceVerifier.TryVerify(toBeVerifiedRawResource, out var verificationResult)) return;
-                    var isOrphanedUri = verificationResult.StatusCode == HttpStatusCode.OrphanedUri;
-                    var uriSchemeNotSupported = verificationResult.StatusCode == HttpStatusCode.UriSchemeNotSupported;
+                    if (!resourceVerifier.TryVerify(resource, out var verificationResult)) return;
+                    var isOrphanedUri = verificationResult.StatusCode == StatusCode.OrphanedUri;
+                    var uriSchemeNotSupported = verificationResult.StatusCode == StatusCode.UriSchemeNotSupported;
                     if (isOrphanedUri || uriSchemeNotSupported) return;
                     // TODO: We should log these orphaned uri-s somewhere
 
-                    _reportWriter.WriteReport(verificationResult);
                     Statistics.VerifiedUrlCount++;
-                    if (verificationResult.IsBrokenResource) Statistics.BrokenUrlCount++;
+                    if (resource.IsBroken) Statistics.BrokenUrlCount++;
                     else Statistics.ValidUrlCount++;
-                    OnResourceVerified?.Invoke(verificationResult);
 
-                    var resourceExists = verificationResult.Resource != null;
-                    var isExtracted = verificationResult.IsExtractedResource;
-                    var isInternal = verificationResult.IsInternalResource;
-                    if (resourceExists && isExtracted && isInternal)
-                        _memory.Memorize(verificationResult.Resource, _scheduler.CancellationToken);
+                    _reportWriter.WriteReport(verificationResult);
+                    OnResourceVerified?.Invoke(verificationResult);
+                    if (resource.IsInternal) _memory.MemorizeToBeRenderedResource(resource, _scheduler.CancellationToken);
                 });
         }
     }

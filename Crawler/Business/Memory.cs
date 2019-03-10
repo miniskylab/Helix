@@ -15,7 +15,7 @@ namespace Helix.Crawler
         readonly BlockingCollection<HtmlDocument> _toBeExtractedHtmlDocuments;
         readonly BlockingCollection<Resource> _toBeRenderedResources;
         readonly BlockingCollection<Resource> _toBeTakenScreenshotResources;
-        readonly BlockingCollection<RawResource> _toBeVerifiedRawResources;
+        readonly BlockingCollection<Resource> _toBeVerifiedResources;
 
         public Configurations Configurations { get; }
 
@@ -23,7 +23,7 @@ namespace Helix.Crawler
 
         public int ToBeRenderedResourceCount => _toBeRenderedResources.Count + _toBeTakenScreenshotResources.Count;
 
-        public int ToBeVerifiedRawResourceCount => _toBeVerifiedRawResources.Count;
+        public int ToBeVerifiedResourceCount => _toBeVerifiedResources.Count;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public Memory(Configurations configurations)
@@ -35,7 +35,7 @@ namespace Helix.Crawler
             _toBeRenderedResources = new BlockingCollection<Resource>();
             _toBeTakenScreenshotResources = new BlockingCollection<Resource>();
             _alreadyVerifiedUrls = new HashSet<string>();
-            _toBeVerifiedRawResources = new BlockingCollection<RawResource>();
+            _toBeVerifiedResources = new BlockingCollection<Resource>();
         }
 
         public void Clear()
@@ -43,7 +43,7 @@ namespace Helix.Crawler
             lock (_memorizationLock)
             {
                 _alreadyVerifiedUrls.Clear();
-                while (_toBeVerifiedRawResources.Any()) _toBeVerifiedRawResources.Take();
+                while (_toBeVerifiedResources.Any()) _toBeVerifiedResources.Take();
             }
             while (_toBeExtractedHtmlDocuments.Any()) _toBeExtractedHtmlDocuments.Take();
             while (_toBeRenderedResources.Any()) _toBeRenderedResources.Take();
@@ -60,44 +60,50 @@ namespace Helix.Crawler
             }
         }
 
-        public void Memorize(RawResource toBeVerifiedRawResource, CancellationToken cancellationToken)
+        public void MemorizeToBeExtractedHtmlDocument(HtmlDocument toBeExtractedHtmlDocument, CancellationToken cancellationToken)
         {
-            lock (_memorizationLock)
-            {
-                var uriWithoutFragment = toBeVerifiedRawResource.Url.StripFragment();
-                if (_alreadyVerifiedUrls.Contains(uriWithoutFragment)) return;
-                _alreadyVerifiedUrls.Add(uriWithoutFragment);
-            }
-            _toBeVerifiedRawResources.Add(toBeVerifiedRawResource, cancellationToken);
+            _toBeExtractedHtmlDocuments.Add(toBeExtractedHtmlDocument, cancellationToken);
         }
 
-        public void Memorize(Resource toBeRenderedResource, CancellationToken cancellationToken)
+        public void MemorizeToBeRenderedResource(Resource toBeRenderedResource, CancellationToken cancellationToken)
         {
-            var destinationCollection = (int) toBeRenderedResource.HttpStatusCode >= 400
+            var destinationCollection = (int) toBeRenderedResource.StatusCode >= 400
                 ? _toBeTakenScreenshotResources
                 : _toBeRenderedResources;
             destinationCollection.Add(toBeRenderedResource, cancellationToken);
         }
 
-        public void Memorize(HtmlDocument toBeExtractedHtmlDocument, CancellationToken cancellationToken)
+        public void MemorizeToBeVerifiedResource(Resource toBeVerifiedResource, CancellationToken cancellationToken)
         {
-            _toBeExtractedHtmlDocuments.Add(toBeExtractedHtmlDocument, cancellationToken);
+            lock (_memorizationLock)
+            {
+                if (_alreadyVerifiedUrls.Contains(toBeVerifiedResource.AbsoluteUrl)) return;
+                _alreadyVerifiedUrls.Add(toBeVerifiedResource.AbsoluteUrl);
+            }
+            _toBeVerifiedResources.Add(toBeVerifiedResource, cancellationToken);
         }
 
-        public bool TryTake(out HtmlDocument htmlDocument) { return _toBeExtractedHtmlDocuments.TryTake(out htmlDocument); }
-
-        public bool TryTake(out Resource resource)
+        public bool TryTakeToBeExtractedHtmlDocument(out HtmlDocument toBeExtractedHtmlDocument)
         {
-            return _toBeTakenScreenshotResources.TryTake(out resource) || _toBeRenderedResources.TryTake(out resource);
+            return _toBeExtractedHtmlDocuments.TryTake(out toBeExtractedHtmlDocument);
         }
 
-        public bool TryTake(out RawResource rawResource) { return _toBeVerifiedRawResources.TryTake(out rawResource); }
+        public bool TryTakeToBeRenderedResource(out Resource toBeRenderedResource)
+        {
+            return _toBeTakenScreenshotResources.TryTake(out toBeRenderedResource) ||
+                   _toBeRenderedResources.TryTake(out toBeRenderedResource);
+        }
+
+        public bool TryTakeToBeVerifiedResource(out Resource toBeVerifiedResource)
+        {
+            return _toBeVerifiedResources.TryTake(out toBeVerifiedResource);
+        }
 
         void ReleaseUnmanagedResources()
         {
             _toBeExtractedHtmlDocuments?.Dispose();
             _toBeRenderedResources?.Dispose();
-            _toBeVerifiedRawResources?.Dispose();
+            _toBeVerifiedResources?.Dispose();
         }
 
         ~Memory() { ReleaseUnmanagedResources(); }

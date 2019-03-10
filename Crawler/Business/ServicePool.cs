@@ -11,18 +11,18 @@ namespace Helix.Crawler
 {
     public class ServicePool : IServicePool
     {
-        const int RawResourceExtractorCount = 300;
-        const int RawResourceVerifierCount = 2500;
+        const int ResourceExtractorCount = 300;
+        const int ResourceVerifierCount = 2500;
         int _createdHtmlRendererCount;
-        int _createdRawResourceExtractorCount;
-        int _createdRawResourceVerifierCount;
+        int _createdResourceExtractorCount;
+        int _createdResourceVerifierCount;
         BlockingCollection<IHtmlRenderer> _htmlRendererPool;
         readonly ILogger _logger;
         readonly IMemory _memory;
         bool _objectDisposed;
         readonly Dictionary<string, object> _publicApiLockMap;
-        BlockingCollection<IRawResourceExtractor> _rawResourceExtractorPool;
-        BlockingCollection<IRawResourceVerifier> _rawResourceVerifierPool;
+        BlockingCollection<IResourceExtractor> _resourceExtractorPool;
+        BlockingCollection<IResourceVerifier> _resourceVerifierPool;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public ServicePool(IMemory memory, ILogger logger)
@@ -30,17 +30,17 @@ namespace Helix.Crawler
             _memory = memory;
             _logger = logger;
             _objectDisposed = false;
-            _rawResourceExtractorPool = new BlockingCollection<IRawResourceExtractor>();
-            _rawResourceVerifierPool = new BlockingCollection<IRawResourceVerifier>();
+            _resourceExtractorPool = new BlockingCollection<IResourceExtractor>();
+            _resourceVerifierPool = new BlockingCollection<IResourceVerifier>();
             _htmlRendererPool = new BlockingCollection<IHtmlRenderer>();
             _publicApiLockMap = new Dictionary<string, object>
             {
                 { $"{nameof(EnsureEnoughResources)}", new object() },
                 { $"{nameof(GetHtmlRenderer)}", new object() },
-                { $"{nameof(GetRawResourceExtractor)}", new object() },
+                { $"{nameof(GetResourceExtractor)}", new object() },
                 { $"{nameof(GetResourceVerifier)}", new object() },
-                { $"{nameof(Return)}{nameof(RawResourceExtractor)}", new object() },
-                { $"{nameof(Return)}{nameof(RawResourceVerifier)}", new object() },
+                { $"{nameof(Return)}{nameof(ResourceExtractor)}", new object() },
+                { $"{nameof(Return)}{nameof(ResourceVerifier)}", new object() },
                 { $"{nameof(Return)}{nameof(HtmlRenderer)}", new object() }
             };
         }
@@ -66,41 +66,41 @@ namespace Helix.Crawler
             lock (_publicApiLockMap[nameof(EnsureEnoughResources)])
             {
                 if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
-                InitializeRawResourceExtractorPool();
-                InitializeRawResourceVerifierPool();
+                InitializeResourceExtractorPool();
+                InitializeResourceVerifierPool();
                 InitializeHtmlRendererPool();
 
-                void InitializeRawResourceExtractorPool()
+                void InitializeResourceExtractorPool()
                 {
-                    for (var rawResourceExtractorId = 0; rawResourceExtractorId < RawResourceExtractorCount; rawResourceExtractorId++)
+                    for (var resourceExtractorId = 0; resourceExtractorId < ResourceExtractorCount; resourceExtractorId++)
                     {
                         if (cancellationToken.IsCancellationRequested)
                         {
-                            while (_rawResourceExtractorPool.Any()) _rawResourceExtractorPool.Take();
-                            _createdRawResourceExtractorCount = 0;
+                            while (_resourceExtractorPool.Any()) _resourceExtractorPool.Take();
+                            _createdResourceExtractorCount = 0;
                         }
                         else
                         {
-                            var rawResourceExtractor = ServiceLocator.Get<IRawResourceExtractor>();
-                            _rawResourceExtractorPool.Add(rawResourceExtractor, CancellationToken.None);
-                            _createdRawResourceExtractorCount++;
+                            var resourceExtractor = ServiceLocator.Get<IResourceExtractor>();
+                            _resourceExtractorPool.Add(resourceExtractor, CancellationToken.None);
+                            _createdResourceExtractorCount++;
                         }
                     }
                 }
-                void InitializeRawResourceVerifierPool()
+                void InitializeResourceVerifierPool()
                 {
-                    for (var rawResourceVerifierId = 0; rawResourceVerifierId < RawResourceVerifierCount; rawResourceVerifierId++)
+                    for (var resourceVerifierId = 0; resourceVerifierId < ResourceVerifierCount; resourceVerifierId++)
                     {
                         if (cancellationToken.IsCancellationRequested)
                         {
-                            while (_rawResourceVerifierPool.Any()) _rawResourceVerifierPool.Take().Dispose();
-                            _createdRawResourceVerifierCount = 0;
+                            while (_resourceVerifierPool.Any()) _resourceVerifierPool.Take().Dispose();
+                            _createdResourceVerifierCount = 0;
                         }
                         else
                         {
-                            var rawResourceVerifier = ServiceLocator.Get<IRawResourceVerifier>();
-                            _rawResourceVerifierPool.Add(rawResourceVerifier, CancellationToken.None);
-                            _createdRawResourceVerifierCount++;
+                            var resourceVerifier = ServiceLocator.Get<IResourceVerifier>();
+                            _resourceVerifierPool.Add(resourceVerifier, CancellationToken.None);
+                            _createdResourceVerifierCount++;
                         }
                     }
                 }
@@ -116,7 +116,10 @@ namespace Helix.Crawler
                         else
                         {
                             var htmlRenderer = ServiceLocator.Get<IHtmlRenderer>();
-                            htmlRenderer.OnRawResourceCaptured += rawResource => _memory.Memorize(rawResource, CancellationToken.None);
+                            htmlRenderer.OnResourceCaptured += resource =>
+                            {
+                                /* TODO */
+                            };
                             _htmlRendererPool.Add(htmlRenderer, CancellationToken.None);
                             Interlocked.Increment(ref _createdHtmlRendererCount);
                         }
@@ -134,39 +137,39 @@ namespace Helix.Crawler
             }
         }
 
-        public IRawResourceExtractor GetRawResourceExtractor(CancellationToken cancellationToken)
+        public IResourceExtractor GetResourceExtractor(CancellationToken cancellationToken)
         {
-            lock (_publicApiLockMap[nameof(GetRawResourceExtractor)])
+            lock (_publicApiLockMap[nameof(GetResourceExtractor)])
             {
                 if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
-                return _rawResourceExtractorPool.Take(cancellationToken);
+                return _resourceExtractorPool.Take(cancellationToken);
             }
         }
 
-        public IRawResourceVerifier GetResourceVerifier(CancellationToken cancellationToken)
+        public IResourceVerifier GetResourceVerifier(CancellationToken cancellationToken)
         {
             lock (_publicApiLockMap[nameof(GetResourceVerifier)])
             {
                 if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
-                return _rawResourceVerifierPool.Take(cancellationToken);
+                return _resourceVerifierPool.Take(cancellationToken);
             }
         }
 
-        public void Return(IRawResourceExtractor rawResourceExtractor)
+        public void Return(IResourceExtractor resourceExtractor)
         {
-            lock (_publicApiLockMap[$"{nameof(Return)}{nameof(RawResourceExtractor)}"])
+            lock (_publicApiLockMap[$"{nameof(Return)}{nameof(ResourceExtractor)}"])
             {
                 if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
-                _rawResourceExtractorPool.Add(rawResourceExtractor);
+                _resourceExtractorPool.Add(resourceExtractor);
             }
         }
 
-        public void Return(IRawResourceVerifier rawResourceVerifier)
+        public void Return(IResourceVerifier resourceVerifier)
         {
-            lock (_publicApiLockMap[$"{nameof(Return)}{nameof(RawResourceVerifier)}"])
+            lock (_publicApiLockMap[$"{nameof(Return)}{nameof(ResourceVerifier)}"])
             {
                 if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
-                _rawResourceVerifierPool.Add(rawResourceVerifier);
+                _resourceVerifierPool.Add(resourceVerifier);
             }
         }
 
@@ -181,37 +184,37 @@ namespace Helix.Crawler
 
         void ReleaseUnmanagedResources()
         {
-            var disposedRawResourceExtractorCount = 0;
-            var disposedRawResourceVerifierCount = 0;
+            var disposedResourceExtractorCount = 0;
+            var disposedResourceVerifierCount = 0;
             var disposedHtmlRendererCount = 0;
-            DisposeRawResourceExtractorPool();
-            DisposeRawResourceVerifierPool();
+            DisposeResourceExtractorPool();
+            DisposeResourceVerifierPool();
             DisposeHtmlRendererPool();
 
-            _rawResourceExtractorPool?.Dispose();
-            _rawResourceVerifierPool?.Dispose();
+            _resourceExtractorPool?.Dispose();
+            _resourceVerifierPool?.Dispose();
             _htmlRendererPool?.Dispose();
 
-            _rawResourceExtractorPool = null;
-            _rawResourceVerifierPool = null;
+            _resourceExtractorPool = null;
+            _resourceVerifierPool = null;
             _htmlRendererPool = null;
 
             CheckForOrphanedResources();
 
-            void DisposeRawResourceExtractorPool()
+            void DisposeResourceExtractorPool()
             {
-                while (_rawResourceExtractorPool?.Any() ?? false)
+                while (_resourceExtractorPool?.Any() ?? false)
                 {
-                    _rawResourceExtractorPool.Take();
-                    disposedRawResourceExtractorCount++;
+                    _resourceExtractorPool.Take();
+                    disposedResourceExtractorCount++;
                 }
             }
-            void DisposeRawResourceVerifierPool()
+            void DisposeResourceVerifierPool()
             {
-                while (_rawResourceVerifierPool?.Any() ?? false)
+                while (_resourceVerifierPool?.Any() ?? false)
                 {
-                    _rawResourceVerifierPool.Take().Dispose();
-                    disposedRawResourceVerifierCount++;
+                    _resourceVerifierPool.Take().Dispose();
+                    disposedResourceVerifierCount++;
                 }
             }
             void DisposeHtmlRendererPool()
@@ -225,18 +228,18 @@ namespace Helix.Crawler
             void CheckForOrphanedResources()
             {
                 var orphanedResourceErrorMessage = string.Empty;
-                if (disposedRawResourceExtractorCount != _createdRawResourceExtractorCount)
+                if (disposedResourceExtractorCount != _createdResourceExtractorCount)
                     orphanedResourceErrorMessage += GetErrorMessage(
-                        RawResourceExtractorCount,
-                        nameof(RawResourceExtractor),
-                        disposedRawResourceExtractorCount
+                        ResourceExtractorCount,
+                        nameof(ResourceExtractor),
+                        disposedResourceExtractorCount
                     );
 
-                if (disposedRawResourceVerifierCount != _createdRawResourceVerifierCount)
+                if (disposedResourceVerifierCount != _createdResourceVerifierCount)
                     orphanedResourceErrorMessage += GetErrorMessage(
-                        RawResourceVerifierCount,
-                        nameof(RawResourceVerifier),
-                        disposedRawResourceVerifierCount
+                        ResourceVerifierCount,
+                        nameof(ResourceVerifier),
+                        disposedResourceVerifierCount
                     );
 
                 if (disposedHtmlRendererCount != _createdHtmlRendererCount)

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -8,7 +7,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Helix.Crawler.Abstractions;
 using Helix.Persistence.Abstractions;
-using JetBrains.Annotations;
 
 namespace Helix.Crawler
 {
@@ -16,8 +14,8 @@ namespace Helix.Crawler
     {
         bool _objectDisposed;
         readonly Dictionary<string, object> _publicApiLockMap;
-        readonly ISQLitePersistence<VerificationResultDataTransferObject> _sqLitePersistence;
-        IList<VerificationResultDataTransferObject> _verificationResultDataTransferObjects;
+        readonly ISQLitePersistence<VerificationResult> _sqLitePersistence;
+        IList<VerificationResult> _verificationResults;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public ReportWriter(IPersistenceProvider persistenceProvider)
@@ -26,8 +24,8 @@ namespace Helix.Crawler
             var pathToDatabaseFile = Path.Combine(workingDirectory, "report.sqlite3");
 
             _objectDisposed = false;
-            _verificationResultDataTransferObjects = new List<VerificationResultDataTransferObject>();
-            _sqLitePersistence = persistenceProvider.GetSQLitePersistence<VerificationResultDataTransferObject>(pathToDatabaseFile);
+            _verificationResults = new List<VerificationResult>();
+            _sqLitePersistence = persistenceProvider.GetSQLitePersistence<VerificationResult>(pathToDatabaseFile);
             _publicApiLockMap = new Dictionary<string, object>
             {
                 { $"{nameof(WriteReport)}", new object() },
@@ -50,22 +48,22 @@ namespace Helix.Crawler
             }
         }
 
-        public void UpdateStatusCode(int resourceId, HttpStatusCode newStatusCode)
+        public void UpdateStatusCode(int resourceId, StatusCode newStatusCode)
         {
             lock (_publicApiLockMap[nameof(UpdateStatusCode)])
             {
                 if (_objectDisposed) throw new ObjectDisposedException(nameof(ReportWriter));
-                var dataTransferObject = _sqLitePersistence.GetByPrimaryKey(resourceId);
-                if (dataTransferObject != null)
+                var verificationResult = _sqLitePersistence.GetByPrimaryKey(resourceId);
+                if (verificationResult != null)
                 {
-                    dataTransferObject.StatusCode = newStatusCode;
-                    _sqLitePersistence.Update(dataTransferObject);
+                    verificationResult.StatusCode = newStatusCode;
+                    _sqLitePersistence.Update(verificationResult);
                     return;
                 }
 
-                dataTransferObject = _verificationResultDataTransferObjects.FirstOrDefault(dto => dto.Id == resourceId);
-                if (dataTransferObject == null) throw new KeyNotFoundException();
-                dataTransferObject.StatusCode = newStatusCode;
+                verificationResult = _verificationResults.FirstOrDefault(dto => dto.Id == resourceId);
+                if (verificationResult == null) throw new KeyNotFoundException();
+                verificationResult.StatusCode = newStatusCode;
             }
         }
 
@@ -74,44 +72,16 @@ namespace Helix.Crawler
             lock (_publicApiLockMap[nameof(WriteReport)])
             {
                 if (_objectDisposed) throw new ObjectDisposedException(nameof(ReportWriter));
-                if (_verificationResultDataTransferObjects.Count >= 300) FlushMemoryBufferToDisk();
-                _verificationResultDataTransferObjects.Add(new VerificationResultDataTransferObject
-                {
-                    Id = verificationResult.Resource.Id,
-                    StatusCode = verificationResult.StatusCode,
-                    VerifiedUrl = verificationResult.VerifiedUrl,
-                    ParentUrl = verificationResult.ParentUrl,
-                    IsExtractedResource = verificationResult.IsExtractedResource,
-                    IsInternalResource = verificationResult.IsInternalResource
-                });
+                if (_verificationResults.Count >= 300) FlushMemoryBufferToDisk();
+                _verificationResults.Add(verificationResult);
             }
         }
 
         void FlushMemoryBufferToDisk()
         {
-            var verificationResultDataTransferObjects = _verificationResultDataTransferObjects;
-            Task.Run(() => { _sqLitePersistence.Save(verificationResultDataTransferObjects.ToArray()); });
-            _verificationResultDataTransferObjects = new List<VerificationResultDataTransferObject>();
-        }
-
-        class VerificationResultDataTransferObject
-        {
-            [Key]
-            public int Id { [UsedImplicitly] get; set; }
-
-            [Required]
-            public bool IsExtractedResource { [UsedImplicitly] get; set; }
-
-            [Required]
-            public bool IsInternalResource { [UsedImplicitly] get; set; }
-
-            public string ParentUrl { [UsedImplicitly] get; set; }
-
-            [Required]
-            public HttpStatusCode StatusCode { [UsedImplicitly] get; set; }
-
-            [Required]
-            public string VerifiedUrl { [UsedImplicitly] get; set; }
+            var verificationResults = _verificationResults;
+            Task.Run(() => { _sqLitePersistence.Save(verificationResults.ToArray()); });
+            _verificationResults = new List<VerificationResult>();
         }
     }
 }

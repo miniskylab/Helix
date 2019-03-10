@@ -47,9 +47,9 @@ namespace Helix.Crawler
                     lock (_verificationLock)
                     {
                         var noMoreToBeRenderedResources = _memory.ToBeRenderedResourceCount == 0;
-                        var noMoreToBeVerifiedRawResources = _memory.ToBeVerifiedRawResourceCount == 0;
+                        var noMoreToBeVerifiedResources = _memory.ToBeVerifiedResourceCount == 0;
                         var noMoreToBeExtractedHtmlDocuments = _memory.ToBeExtractedHtmlDocumentCount == 0;
-                        var nothingToDo = noMoreToBeExtractedHtmlDocuments && noMoreToBeRenderedResources && noMoreToBeVerifiedRawResources;
+                        var nothingToDo = noMoreToBeExtractedHtmlDocuments && noMoreToBeRenderedResources && noMoreToBeVerifiedResources;
                         var noActiveThread = _pendingExtractionTaskCount + _pendingRenderingTaskCount + _pendingVerificationTaskCount == 0;
                         return nothingToDo && noActiveThread;
                     }
@@ -70,9 +70,9 @@ namespace Helix.Crawler
                     {
                         var toBeExtractedHtmlDocumentCount = _memory.ToBeExtractedHtmlDocumentCount;
                         var toBeRenderedResourceCount = _memory.ToBeRenderedResourceCount;
-                        var toBeVerifiedRawResourceCount = _memory.ToBeVerifiedRawResourceCount;
+                        var toBeVerifiedResourceCount = _memory.ToBeVerifiedResourceCount;
                         return _pendingExtractionTaskCount + _pendingRenderingTaskCount + _pendingVerificationTaskCount +
-                               toBeExtractedHtmlDocumentCount + toBeRenderedResourceCount + toBeVerifiedRawResourceCount;
+                               toBeExtractedHtmlDocumentCount + toBeRenderedResourceCount + toBeVerifiedResourceCount;
                     }
                 }
             }
@@ -112,28 +112,28 @@ namespace Helix.Crawler
             }
         }
 
-        public void CreateTask(Action<IRawResourceExtractor, HtmlDocument> taskDescription)
+        public void CreateTask(Action<IResourceExtractor, HtmlDocument> taskDescription)
         {
             lock (_publicApiLockMap["CreateExtractionTask"])
             {
                 if (_objectDisposed) throw new ObjectDisposedException(nameof(Scheduler));
-                IRawResourceExtractor rawResourceExtractor;
+                IResourceExtractor resourceExtractor;
                 HtmlDocument toBeExtractedHtmlDocument;
                 try
                 {
-                    GetRawResourceExtractorAndToBeExtractedHtmlDocument();
+                    GetResourceExtractorAndToBeExtractedHtmlDocument();
                     Task.Run(
                         () =>
                         {
-                            try { taskDescription(rawResourceExtractor, toBeExtractedHtmlDocument); }
+                            try { taskDescription(resourceExtractor, toBeExtractedHtmlDocument); }
                             catch (Exception exception) { _logger.LogException(exception); }
-                            finally { ReleaseRawResourceExtractor(); }
+                            finally { ReleaseResourceExtractor(); }
                         },
                         CancellationToken
                     ).ContinueWith(
                         _ =>
                         {
-                            ReleaseRawResourceExtractor();
+                            ReleaseResourceExtractor();
                             ReturnToBeExtractedHtmlDocument();
                         },
                         TaskContinuationOptions.OnlyOnCanceled | TaskContinuationOptions.ExecuteSynchronously
@@ -145,7 +145,7 @@ namespace Helix.Crawler
                     _logger.LogException(exception);
                 }
 
-                void GetRawResourceExtractorAndToBeExtractedHtmlDocument()
+                void GetResourceExtractorAndToBeExtractedHtmlDocument()
                 {
                     while (!EverythingIsDone && !CancellationToken.IsCancellationRequested)
                     {
@@ -158,7 +158,7 @@ namespace Helix.Crawler
                         }
 
                         _pendingExtractionTaskCount++;
-                        if (!_memory.TryTake(out toBeExtractedHtmlDocument))
+                        if (!_memory.TryTakeToBeExtractedHtmlDocument(out toBeExtractedHtmlDocument))
                         {
                             _pendingExtractionTaskCount--;
                             Monitor.Exit(_extractionLock);
@@ -167,7 +167,7 @@ namespace Helix.Crawler
                         }
                         Monitor.Exit(_extractionLock);
 
-                        try { rawResourceExtractor = _servicePool.GetRawResourceExtractor(CancellationToken); }
+                        try { resourceExtractor = _servicePool.GetResourceExtractor(CancellationToken); }
                         catch (OperationCanceledException)
                         {
                             _pendingExtractionTaskCount--;
@@ -178,12 +178,15 @@ namespace Helix.Crawler
                     CancellationToken.ThrowIfCancellationRequested();
                     throw new EverythingIsDoneException();
                 }
-                void ReleaseRawResourceExtractor()
+                void ReleaseResourceExtractor()
                 {
                     lock (_extractionLock) _pendingExtractionTaskCount--;
-                    _servicePool.Return(rawResourceExtractor);
+                    _servicePool.Return(resourceExtractor);
                 }
-                void ReturnToBeExtractedHtmlDocument() { _memory.Memorize(toBeExtractedHtmlDocument, CancellationToken.None); }
+                void ReturnToBeExtractedHtmlDocument()
+                {
+                    _memory.MemorizeToBeExtractedHtmlDocument(toBeExtractedHtmlDocument, CancellationToken.None);
+                }
             }
         }
 
@@ -198,7 +201,7 @@ namespace Helix.Crawler
                 {
                     GetHtmlRendererAndToBeRenderedResource();
                     (
-                        (int) toBeRenderedResource.HttpStatusCode >= 400
+                        (int) toBeRenderedResource.StatusCode >= 400
                             ? Task.Factory.StartNew(
                                 ExecuteTaskDescription,
                                 CancellationToken,
@@ -243,7 +246,7 @@ namespace Helix.Crawler
                         }
 
                         _pendingRenderingTaskCount++;
-                        if (!_memory.TryTake(out toBeRenderedResource))
+                        if (!_memory.TryTakeToBeRenderedResource(out toBeRenderedResource))
                         {
                             _pendingRenderingTaskCount--;
                             Monitor.Exit(_renderingLock);
@@ -268,33 +271,33 @@ namespace Helix.Crawler
                     lock (_renderingLock) _pendingRenderingTaskCount--;
                     _servicePool.Return(htmlRenderer);
                 }
-                void ReturnToBeRenderedResource() { _memory.Memorize(toBeRenderedResource, CancellationToken.None); }
+                void ReturnToBeRenderedResource() { _memory.MemorizeToBeRenderedResource(toBeRenderedResource, CancellationToken.None); }
             }
         }
 
-        public void CreateTask(Action<IRawResourceVerifier, RawResource> taskDescription)
+        public void CreateTask(Action<IResourceVerifier, Resource> taskDescription)
         {
             lock (_publicApiLockMap["CreateVerificationTask"])
             {
                 if (_objectDisposed) throw new ObjectDisposedException(nameof(Scheduler));
-                IRawResourceVerifier rawResourceVerifier;
-                RawResource toBeVerifiedRawResource;
+                IResourceVerifier resourceVerifier;
+                Resource toBeVerifiedResource;
                 try
                 {
-                    GetRawResourceVerifierAndToBeVerifiedRawResource();
+                    GetResourceVerifierAndToBeVerifiedResource();
                     Task.Run(
                         () =>
                         {
-                            try { taskDescription(rawResourceVerifier, toBeVerifiedRawResource); }
+                            try { taskDescription(resourceVerifier, toBeVerifiedResource); }
                             catch (Exception exception) { _logger.LogException(exception); }
-                            finally { ReleaseRawResourceVerifier(); }
+                            finally { ReleaseResourceVerifier(); }
                         },
                         CancellationToken
                     ).ContinueWith(
                         _ =>
                         {
-                            ReleaseRawResourceVerifier();
-                            ReturnToBeVerifiedRawResource();
+                            ReleaseResourceVerifier();
+                            ReturnToBeVerifiedResource();
                         },
                         TaskContinuationOptions.OnlyOnCanceled | TaskContinuationOptions.ExecuteSynchronously
                     );
@@ -305,7 +308,7 @@ namespace Helix.Crawler
                     _logger.LogException(exception);
                 }
 
-                void GetRawResourceVerifierAndToBeVerifiedRawResource()
+                void GetResourceVerifierAndToBeVerifiedResource()
                 {
                     while (!EverythingIsDone && !CancellationToken.IsCancellationRequested)
                     {
@@ -318,7 +321,7 @@ namespace Helix.Crawler
                         }
 
                         _pendingVerificationTaskCount++;
-                        if (!_memory.TryTake(out toBeVerifiedRawResource))
+                        if (!_memory.TryTakeToBeVerifiedResource(out toBeVerifiedResource))
                         {
                             _pendingVerificationTaskCount--;
                             Monitor.Exit(_verificationLock);
@@ -327,7 +330,7 @@ namespace Helix.Crawler
                         }
                         Monitor.Exit(_verificationLock);
 
-                        try { rawResourceVerifier = _servicePool.GetResourceVerifier(CancellationToken); }
+                        try { resourceVerifier = _servicePool.GetResourceVerifier(CancellationToken); }
                         catch (OperationCanceledException)
                         {
                             _pendingVerificationTaskCount--;
@@ -338,13 +341,13 @@ namespace Helix.Crawler
                     CancellationToken.ThrowIfCancellationRequested();
                     throw new EverythingIsDoneException();
                 }
-                void ReleaseRawResourceVerifier()
+                void ReleaseResourceVerifier()
                 {
                     lock (_verificationLock) _pendingVerificationTaskCount--;
-                    _servicePool.Return(rawResourceVerifier);
+                    _servicePool.Return(resourceVerifier);
                 }
-                // TODO: Not gonna work because of _alreadyVerfiedUrls in Memory.cs
-                void ReturnToBeVerifiedRawResource() { _memory.Memorize(toBeVerifiedRawResource, CancellationToken.None); }
+                // TODO: Not gonna work because of _alreadyVerifiedUrls in Memory.cs
+                void ReturnToBeVerifiedResource() { _memory.MemorizeToBeVerifiedResource(toBeVerifiedResource, CancellationToken.None); }
             }
         }
 

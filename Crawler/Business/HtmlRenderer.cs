@@ -24,11 +24,11 @@ namespace Helix.Crawler
         bool _takeScreenshot;
         IWebBrowser _webBrowser;
 
-        public event Action<RawResource> OnRawResourceCaptured;
+        public event Action<Resource> OnResourceCaptured;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public HtmlRenderer(Configurations configurations, IWebBrowserProvider webBrowserProvider, IResourceScope resourceScope,
-            IReportWriter reportWriter, ILogger logger)
+            IReportWriter reportWriter, IResourceProcessor resourceProcessor, ILogger logger)
         {
             var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
             var pathToChromiumExecutable = Path.Combine(workingDirectory, "chromium/chrome.exe");
@@ -89,12 +89,15 @@ namespace Helix.Crawler
                         var isNotScript = !response.ContentType.StartsWith("application/javascript", StringComparison.OrdinalIgnoreCase) &&
                                           !response.ContentType.StartsWith("application/ecmascript", StringComparison.OrdinalIgnoreCase);
                         if (isNotGETRequest || isNotCss && isNotFont && isNotScript && isNotImage && isNotAudio && isNotVideo) return;
-                        OnRawResourceCaptured?.Invoke(new RawResource
-                        {
-                            ParentUri = parentUri,
-                            Url = request.Url,
-                            HttpStatusCode = (HttpStatusCode) response.StatusCode
-                        });
+                        OnResourceCaptured?.Invoke(
+                            resourceProcessor.Enrich(new Resource
+                            {
+                                ParentUri = parentUri,
+                                OriginalUrl = request.Url,
+                                Uri = request.RequestUri,
+                                StatusCode = (StatusCode) response.StatusCode
+                            })
+                        );
                     }
                     finally { Interlocked.Decrement(ref _activeHttpTrafficCount); }
                 }, _cancellationTokenSource.Token, TaskCreationOptions.None, PriorityTaskScheduler.Highest);
@@ -114,20 +117,20 @@ namespace Helix.Crawler
                 }
                 void UpdateStatusCodeIfNotMatch()
                 {
-                    if (response.StatusCode == (int) _resourceBeingRendered.HttpStatusCode) return;
+                    if (response.StatusCode == (int) _resourceBeingRendered.StatusCode) return;
                     if (response.StatusCode < 300 && 400 <= response.StatusCode)
                     {
                         var newStatusCode = response.StatusCode;
-                        var oldStatusCode = (int) _resourceBeingRendered.HttpStatusCode;
+                        var oldStatusCode = (int) _resourceBeingRendered.StatusCode;
                         logger.LogInfo($"StatusCode changed from [{oldStatusCode}] to [{newStatusCode}] at [{_resourceBeingRendered.Uri}]");
                     }
 
-                    _resourceBeingRendered.HttpStatusCode = (HttpStatusCode) response.StatusCode;
-                    reportWriter.UpdateStatusCode(_resourceBeingRendered.Id, (HttpStatusCode) response.StatusCode);
+                    _resourceBeingRendered.StatusCode = (StatusCode) response.StatusCode;
+                    reportWriter.UpdateStatusCode(_resourceBeingRendered.Id, (StatusCode) response.StatusCode);
                 }
                 void TakeScreenshotIfNecessary()
                 {
-                    var resourceIsBroken = (int) _resourceBeingRendered.HttpStatusCode >= 400;
+                    var resourceIsBroken = (int) _resourceBeingRendered.StatusCode >= 400;
                     if (resourceIsBroken && configurations.TakeScreenshotEvidence) _takeScreenshot = true;
                 }
             }

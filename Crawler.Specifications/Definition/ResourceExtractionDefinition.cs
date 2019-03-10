@@ -5,18 +5,18 @@ using Helix.Specifications;
 
 namespace Helix.Crawler.Specifications
 {
-    class RawResourceExtractionDefinition : TheoryDescription<HtmlDocument, IList<RawResource>, Type>
+    class ResourceExtractionDefinition : TheoryDescription<HtmlDocument, IList<Resource>, Type>
     {
-        public RawResourceExtractionDefinition()
+        public ResourceExtractionDefinition()
         {
-            ExtractRawResourcesFromHtmlDocument();
+            ExtractResourcesFromHtmlDocument();
             IgnoreAnchorTagsWithoutHrefAttribute();
             IgnoreAnchorTagsWithHrefAttributeContainingEmptyOrWhiteSpaceCharactersOnly();
             IgnoreAnchorTagsWithHrefAttributeContainingJavaScriptCode();
             ThrowExceptionIfArgumentNull();
         }
 
-        void ExtractRawResourcesFromHtmlDocument()
+        void ExtractResourcesFromHtmlDocument()
         {
             AddTheoryDescription(
                 new HtmlDocument
@@ -34,14 +34,14 @@ namespace Helix.Crawler.Specifications
                             </body>
                         </html>"
                 },
-                new List<RawResource>
+                new List<Resource>
                 {
-                    new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "//www.sanity.com" },
-                    new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://www.sanity.com/" },
-                    new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "ftp://www.sanity.com" },
-                    new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "/with-leading-slash" },
-                    new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "without-leading-slash" },
-                    new RawResource { ParentUri = new Uri("http://www.helix.com"), Url = "http://192.168.1.2" }
+                    new Resource { ParentUri = new Uri("http://www.helix.com"), OriginalUrl = "//www.sanity.com" },
+                    new Resource { ParentUri = new Uri("http://www.helix.com"), OriginalUrl = "http://www.sanity.com/" },
+                    new Resource { ParentUri = new Uri("http://www.helix.com"), OriginalUrl = "ftp://www.sanity.com" },
+                    new Resource { ParentUri = new Uri("http://www.helix.com"), OriginalUrl = "/with-leading-slash" },
+                    new Resource { ParentUri = new Uri("http://www.helix.com"), OriginalUrl = "without-leading-slash" },
+                    new Resource { ParentUri = new Uri("http://www.helix.com"), OriginalUrl = "http://192.168.1.2" }
                 }
             );
         }
@@ -59,7 +59,7 @@ namespace Helix.Crawler.Specifications
                             </body>
                         </html>"
                 },
-                new List<RawResource>()
+                new List<Resource>()
             );
         }
 
@@ -76,7 +76,7 @@ namespace Helix.Crawler.Specifications
                             </body>
                         </html>"
                 },
-                new List<RawResource>()
+                new List<Resource>()
             );
         }
 
@@ -92,7 +92,7 @@ namespace Helix.Crawler.Specifications
                             </body>
                         </html>"
                 },
-                new List<RawResource>()
+                new List<Resource>()
             );
         }
 

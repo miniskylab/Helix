@@ -5,15 +5,17 @@ using HtmlAgilityPackDocument = HtmlAgilityPack.HtmlDocument;
 
 namespace Helix.Crawler
 {
-    public class RawResourceExtractor : IRawResourceExtractor
+    public class ResourceExtractor : IResourceExtractor
     {
-        [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public RawResourceExtractor() { }
+        readonly IResourceProcessor _resourceProcessor;
 
-        public void ExtractRawResourcesFrom(HtmlDocument htmlDocument, Action<RawResource> onRawResourceExtracted)
+        [Obsolete(ErrorMessage.UseDependencyInjection, true)]
+        public ResourceExtractor(IResourceProcessor resourceProcessor) { _resourceProcessor = resourceProcessor; }
+
+        public void ExtractResourcesFrom(HtmlDocument htmlDocument, Action<Resource> onResourceExtracted)
         {
             if (htmlDocument == null) throw new ArgumentNullException(nameof(htmlDocument));
-            if (onRawResourceExtracted == null) throw new ArgumentNullException(nameof(onRawResourceExtracted));
+            if (onResourceExtracted == null) throw new ArgumentNullException(nameof(onResourceExtracted));
 
             var htmlAgilityPackDocument = new HtmlAgilityPackDocument();
             htmlAgilityPackDocument.LoadHtml(htmlDocument.Text);
@@ -24,11 +26,13 @@ namespace Helix.Crawler
             {
                 var extractedUrl = anchorTag.Attributes["href"].Value;
                 if (IsNullOrWhiteSpace() || IsJavaScriptCode()) return;
-                onRawResourceExtracted.Invoke(new RawResource
-                {
-                    ParentUri = htmlDocument.Uri,
-                    Url = extractedUrl
-                });
+                onResourceExtracted.Invoke(
+                    _resourceProcessor.Enrich(new Resource
+                    {
+                        ParentUri = htmlDocument.Uri,
+                        OriginalUrl = extractedUrl
+                    })
+                );
 
                 bool IsNullOrWhiteSpace() { return string.IsNullOrWhiteSpace(extractedUrl); }
                 bool IsJavaScriptCode() { return extractedUrl.StartsWith("javascript:", StringComparison.InvariantCultureIgnoreCase); }

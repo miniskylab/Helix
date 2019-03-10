@@ -35,9 +35,9 @@ namespace Helix.Crawler
                 _serviceProvider?.Dispose();
                 _serviceProvider = new ServiceCollection()
                     .AddTransient<IHtmlRenderer, HtmlRenderer>()
-                    .AddTransient<IRawResourceExtractor, RawResourceExtractor>()
-                    .AddTransient<IRawResourceVerifier, RawResourceVerifier>()
-                    .AddTransient<IRawResourceProcessor, RawResourceProcessor>()
+                    .AddTransient<IResourceExtractor, ResourceExtractor>()
+                    .AddTransient<IResourceVerifier, ResourceVerifier>()
+                    .AddTransient<IResourceProcessor, ResourceProcessor>()
                     .AddTransient<IResourceScope, ResourceScope>()
                     .AddSingleton<IIncrementalIdGenerator, IncrementalIdGenerator>()
                     .AddSingleton<IStatistics, Statistics>()

@@ -13,10 +13,10 @@ namespace Helix.Crawler.Abstractions
 
         void CancelEverything();
 
-        void CreateTask(Action<IRawResourceExtractor, HtmlDocument> taskDescription);
+        void CreateTask(Action<IResourceExtractor, HtmlDocument> taskDescription);
 
         void CreateTask(Action<IHtmlRenderer, Resource> taskDescription);
 
-        void CreateTask(Action<IRawResourceVerifier, RawResource> taskDescription);
+        void CreateTask(Action<IResourceVerifier, Resource> taskDescription);
     }
 }

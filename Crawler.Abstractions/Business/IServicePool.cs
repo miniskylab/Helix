@@ -9,13 +9,13 @@ namespace Helix.Crawler.Abstractions
 
         IHtmlRenderer GetHtmlRenderer(CancellationToken cancellationToken);
 
-        IRawResourceExtractor GetRawResourceExtractor(CancellationToken cancellationToken);
+        IResourceExtractor GetResourceExtractor(CancellationToken cancellationToken);
 
-        IRawResourceVerifier GetResourceVerifier(CancellationToken cancellationToken);
+        IResourceVerifier GetResourceVerifier(CancellationToken cancellationToken);
 
-        void Return(IRawResourceExtractor rawResourceExtractor);
+        void Return(IResourceExtractor resourceExtractor);
 
-        void Return(IRawResourceVerifier rawResourceVerifier);
+        void Return(IResourceVerifier resourceVerifier);
 
         void Return(IHtmlRenderer htmlRenderer);
     }

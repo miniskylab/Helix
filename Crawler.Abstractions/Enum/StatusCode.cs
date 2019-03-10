@@ -1,6 +1,6 @@
 namespace Helix.Crawler.Abstractions
 {
-    public enum HttpStatusCode
+    public enum StatusCode
     {
         /* -1xx Parsing Error */
         MalformedUri = -100,

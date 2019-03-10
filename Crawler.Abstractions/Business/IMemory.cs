@@ -11,20 +11,20 @@ namespace Helix.Crawler.Abstractions
 
         int ToBeRenderedResourceCount { get; }
 
-        int ToBeVerifiedRawResourceCount { get; }
+        int ToBeVerifiedResourceCount { get; }
 
         void Clear();
 
-        void Memorize(RawResource toBeVerifiedRawResource, CancellationToken cancellationToken);
+        void MemorizeToBeExtractedHtmlDocument(HtmlDocument toBeExtractedHtmlDocument, CancellationToken cancellationToken);
 
-        void Memorize(Resource toBeRenderedResource, CancellationToken cancellationToken);
+        void MemorizeToBeRenderedResource(Resource toBeRenderedResource, CancellationToken cancellationToken);
 
-        void Memorize(HtmlDocument toBeExtractedHtmlDocument, CancellationToken cancellationToken);
+        void MemorizeToBeVerifiedResource(Resource toBeVerifiedResource, CancellationToken cancellationToken);
 
-        bool TryTake(out HtmlDocument htmlDocument);
+        bool TryTakeToBeExtractedHtmlDocument(out HtmlDocument toBeExtractedHtmlDocument);
 
-        bool TryTake(out Resource resource);
+        bool TryTakeToBeRenderedResource(out Resource toBeRenderedResource);
 
-        bool TryTake(out RawResource rawResource);
+        bool TryTakeToBeVerifiedResource(out Resource toBeVerifiedResource);
     }
 }
