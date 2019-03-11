@@ -118,7 +118,7 @@ namespace Helix.Crawler
                             var htmlRenderer = ServiceLocator.Get<IHtmlRenderer>();
                             htmlRenderer.OnResourceCaptured += resource =>
                             {
-                                /* TODO */
+                                _memory.MemorizeToBeVerifiedResource(resource, cancellationToken);
                             };
                             _htmlRendererPool.Add(htmlRenderer, CancellationToken.None);
                             Interlocked.Increment(ref _createdHtmlRendererCount);

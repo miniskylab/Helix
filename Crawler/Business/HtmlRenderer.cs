@@ -65,12 +65,12 @@ namespace Helix.Crawler
             }
             Task CaptureNetworkTraffic(object _, SessionEventArgs networkTraffic)
             {
+                Interlocked.Increment(ref _activeHttpTrafficCount);
                 var parentUri = _webBrowser.CurrentUri;
                 var request = networkTraffic.WebSession.Request;
                 var response = networkTraffic.WebSession.Response;
                 return Task.Factory.StartNew(() =>
                 {
-                    Interlocked.Increment(ref _activeHttpTrafficCount);
                     try
                     {
                         if (ParentUriWasFound())
@@ -146,6 +146,7 @@ namespace Helix.Crawler
         {
             try
             {
+                while (_activeHttpTrafficCount > 0) Thread.Sleep(100);
                 foreach (var lockObject in _publicApiLockMap.Values) Monitor.Enter(lockObject);
                 if (_objectDisposed) return;
                 ReleaseUnmanagedResources();

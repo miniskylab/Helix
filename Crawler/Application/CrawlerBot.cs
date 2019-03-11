@@ -16,8 +16,8 @@ namespace Helix.Crawler
         static IResourceProcessor _resourceProcessor;
         static IScheduler _scheduler;
         static IServicePool _servicePool;
-        static readonly StateMachine<CrawlerState, CrawlerCommand> _stateMachine;
         static readonly List<Task> BackgroundTasks;
+        static readonly StateMachine<CrawlerState, CrawlerCommand> StateMachine;
         static readonly object TransitionLock;
 
         public static IStatistics Statistics { get; private set; }
@@ -26,7 +26,7 @@ namespace Helix.Crawler
         {
             get
             {
-                lock (TransitionLock) return _stateMachine.CurrentState;
+                lock (TransitionLock) return StateMachine.CurrentState;
             }
         }
 
@@ -46,7 +46,7 @@ namespace Helix.Crawler
         {
             BackgroundTasks = new List<Task>();
             TransitionLock = new object();
-            _stateMachine = new StateMachine<CrawlerState, CrawlerCommand>(
+            StateMachine = new StateMachine<CrawlerState, CrawlerCommand>(
                 new Dictionary<Transition<CrawlerState, CrawlerCommand>, CrawlerState>
                 {
                     { CreateTransition(CrawlerState.WaitingToRun, CrawlerCommand.StartWorking), CrawlerState.Running },
@@ -180,8 +180,8 @@ namespace Helix.Crawler
         {
             lock (TransitionLock)
             {
-                if (!_stateMachine.TryGetNext(crawlerCommand, out _)) return false;
-                _stateMachine.MoveNext(crawlerCommand);
+                if (!StateMachine.TryGetNext(crawlerCommand, out _)) return false;
+                StateMachine.MoveNext(crawlerCommand);
                 return true;
             }
         }
