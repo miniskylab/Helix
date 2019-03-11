@@ -16,6 +16,21 @@ namespace Helix.Crawler
             _incrementalIdGenerator = incrementalIdGenerator;
         }
 
+        public Resource Categorize(Resource resource, string contentType)
+        {
+            const StringComparison ordinalIgnoreCase = StringComparison.OrdinalIgnoreCase;
+            if (contentType.StartsWith("text/css", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Css;
+            if (contentType.StartsWith("text/html", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Html;
+            else if (contentType.StartsWith("image/", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Image;
+            else if (contentType.StartsWith("audio/", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Audio;
+            else if (contentType.StartsWith("video/", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Video;
+            else if (contentType.StartsWith("font/", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Font;
+            else if (contentType.StartsWith("application/javascript", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Script;
+            else if (contentType.StartsWith("application/ecmascript", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Script;
+            else if (contentType.StartsWith("application/octet-stream", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Blob;
+            return resource;
+        }
+
         public Resource Enrich(Resource resource)
         {
             if (resource == null) throw new ArgumentNullException();

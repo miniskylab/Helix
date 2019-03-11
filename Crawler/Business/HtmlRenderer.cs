@@ -16,9 +16,9 @@ namespace Helix.Crawler
     {
         int _activeHttpTrafficCount;
         CancellationTokenSource _cancellationTokenSource;
+        readonly Configurations _configurations;
         readonly ILogger _logger;
         bool _objectDisposed;
-        readonly string _pathToDirectoryContainsScreenshotFiles;
         readonly Dictionary<string, object> _publicApiLockMap;
         Resource _resourceBeingRendered;
         bool _takeScreenshot;
@@ -45,10 +45,8 @@ namespace Helix.Crawler
             _logger = logger;
             _objectDisposed = false;
             _takeScreenshot = false;
-            _pathToDirectoryContainsScreenshotFiles = Path.Combine(workingDirectory, "screenshots");
+            _configurations = configurations;
             _publicApiLockMap = new Dictionary<string, object> { { $"{nameof(TryRender)}", new object() } };
-
-            EnsureDirectoryContainsScreenshotFilesIsRecreated();
 
             Task EnsureInternal(object _, SessionEventArgs networkTraffic)
             {
@@ -65,12 +63,12 @@ namespace Helix.Crawler
             }
             Task CaptureNetworkTraffic(object _, SessionEventArgs networkTraffic)
             {
-                Interlocked.Increment(ref _activeHttpTrafficCount);
                 var parentUri = _webBrowser.CurrentUri;
                 var request = networkTraffic.WebSession.Request;
                 var response = networkTraffic.WebSession.Response;
                 return Task.Factory.StartNew(() =>
                 {
+                    Interlocked.Increment(ref _activeHttpTrafficCount);
                     try
                     {
                         if (ParentUriWasFound())
@@ -79,25 +77,18 @@ namespace Helix.Crawler
                             TakeScreenshotIfNecessary();
                         }
 
-                        if (response.ContentType == null) return;
-                        var isNotGETRequest = request.Method.ToUpperInvariant() != "GET";
-                        var isNotCss = !response.ContentType.StartsWith("text/css", StringComparison.OrdinalIgnoreCase);
-                        var isNotImage = !response.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
-                        var isNotAudio = !response.ContentType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase);
-                        var isNotVideo = !response.ContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase);
-                        var isNotFont = !response.ContentType.StartsWith("font/", StringComparison.OrdinalIgnoreCase);
-                        var isNotScript = !response.ContentType.StartsWith("application/javascript", StringComparison.OrdinalIgnoreCase) &&
-                                          !response.ContentType.StartsWith("application/ecmascript", StringComparison.OrdinalIgnoreCase);
-                        if (isNotGETRequest || isNotCss && isNotFont && isNotScript && isNotImage && isNotAudio && isNotVideo) return;
-                        OnResourceCaptured?.Invoke(
-                            resourceProcessor.Enrich(new Resource
-                            {
-                                ParentUri = parentUri,
-                                OriginalUrl = request.Url,
-                                Uri = request.RequestUri,
-                                StatusCode = (StatusCode) response.StatusCode
-                            })
-                        );
+                        if (request.Method.ToUpperInvariant() != "GET") return;
+                        var resource = new Resource
+                        {
+                            ParentUri = parentUri,
+                            OriginalUrl = request.Url,
+                            Uri = request.RequestUri,
+                            StatusCode = (StatusCode) response.StatusCode,
+                            Size = response.ContentLength
+                        };
+                        resourceProcessor.Enrich(resource);
+                        resourceProcessor.Categorize(resource, response.ContentType);
+                        OnResourceCaptured?.Invoke(resource);
                     }
                     finally { Interlocked.Decrement(ref _activeHttpTrafficCount); }
                 }, _cancellationTokenSource.Token, TaskCreationOptions.None, PriorityTaskScheduler.Highest);
@@ -134,19 +125,12 @@ namespace Helix.Crawler
                     if (resourceIsBroken && configurations.TakeScreenshotEvidence) _takeScreenshot = true;
                 }
             }
-            void EnsureDirectoryContainsScreenshotFilesIsRecreated()
-            {
-                if (Directory.Exists(_pathToDirectoryContainsScreenshotFiles))
-                    Directory.Delete(_pathToDirectoryContainsScreenshotFiles, true);
-                Directory.CreateDirectory(_pathToDirectoryContainsScreenshotFiles);
-            }
         }
 
         public void Dispose()
         {
             try
             {
-                while (_activeHttpTrafficCount > 0) Thread.Sleep(100);
                 foreach (var lockObject in _publicApiLockMap.Values) Monitor.Enter(lockObject);
                 if (_objectDisposed) return;
                 ReleaseUnmanagedResources();
@@ -175,7 +159,8 @@ namespace Helix.Crawler
                 var renderingResult = _webBrowser.TryRender(uri, out html, out pageLoadTime, cancellationToken, attemptCount, onFailed);
                 if (!_takeScreenshot) return renderingResult;
 
-                var pathToScreenshotFile = Path.Combine(_pathToDirectoryContainsScreenshotFiles, $"{_resourceBeingRendered.Id}.png");
+                var pathToDirectoryContainsScreenshotFiles = _configurations.PathToDirectoryContainsScreenshotFiles;
+                var pathToScreenshotFile = Path.Combine(pathToDirectoryContainsScreenshotFiles, $"{_resourceBeingRendered.Id}.png");
                 _webBrowser.TryTakeScreenshot(pathToScreenshotFile, OnScreenshotTakingFailed);
                 _takeScreenshot = false;
 

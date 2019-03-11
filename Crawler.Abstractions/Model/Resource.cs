@@ -6,6 +6,8 @@ namespace Helix.Crawler.Abstractions
     {
         public int Id { get; set; }
 
+        public bool IsExtracted { get; set; }
+
         public bool IsInternal { get; set; }
 
         // public bool Localized { get; set; }
@@ -13,6 +15,10 @@ namespace Helix.Crawler.Abstractions
         public string OriginalUrl { get; set; }
 
         public Uri ParentUri { get; set; } // TODO: Potential redundant trailing slash
+
+        public ResourceType ResourceType { get; set; }
+
+        public long? Size { get; set; }
 
         public StatusCode StatusCode { get; set; }
 

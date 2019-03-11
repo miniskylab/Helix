@@ -35,9 +35,7 @@ namespace Helix.Crawler
             _httpClient.DefaultRequestHeaders.CacheControl = CacheControlHeaderValue.Parse("no-cache");
             _httpClient.DefaultRequestHeaders.Pragma.ParseAdd("no-cache");
             _httpClient.DefaultRequestHeaders.Upgrade.ParseAdd("1");
-            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(
-                "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.109 Safari/537.36"
-            );
+            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(configurations.UserAgent);
         }
 
         public void Dispose()
@@ -78,8 +76,15 @@ namespace Helix.Crawler
 
                 try
                 {
-                    _sendingGETRequestTask = _httpClient.GetAsync(resource.Uri, _cancellationTokenSource.Token);
-                    resource.StatusCode = (StatusCode) _sendingGETRequestTask.Result.StatusCode;
+                    _sendingGETRequestTask = _httpClient.GetAsync(
+                        resource.Uri,
+                        HttpCompletionOption.ResponseHeadersRead,
+                        _cancellationTokenSource.Token
+                    );
+                    var httpResponseMessage = _sendingGETRequestTask.Result;
+                    resource.StatusCode = (StatusCode) httpResponseMessage.StatusCode;
+                    resource.Size = httpResponseMessage.Content.Headers.ContentLength;
+                    _resourceProcessor.Categorize(resource, httpResponseMessage.Content.Headers.ContentType.ToString());
                 }
                 catch (AggregateException aggregateException)
                 {

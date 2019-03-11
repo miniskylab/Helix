@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.IO;
 using System.Threading.Tasks;
 using Helix.Core;
 using Helix.Crawler.Abstractions;
@@ -14,6 +15,7 @@ namespace Helix.Crawler
         static IMemory _memory;
         static IReportWriter _reportWriter;
         static IResourceProcessor _resourceProcessor;
+        static IResourceScope _resourceScope;
         static IScheduler _scheduler;
         static IServicePool _servicePool;
         static readonly List<Task> BackgroundTasks;
@@ -79,6 +81,7 @@ namespace Helix.Crawler
             _scheduler = ServiceLocator.Get<IScheduler>();
             _servicePool = ServiceLocator.Get<IServicePool>();
             _memory = ServiceLocator.Get<IMemory>();
+            _resourceScope = ServiceLocator.Get<IResourceScope>();
             _resourceProcessor = ServiceLocator.Get<IResourceProcessor>();
 
             if (!TryTransit(CrawlerCommand.StartWorking)) return;
@@ -87,6 +90,7 @@ namespace Helix.Crawler
                 try
                 {
                     EnsureErrorLogFileIsRecreated();
+                    EnsureDirectoryContainsScreenshotFilesIsRecreated();
                     _reportWriter = ServiceLocator.Get<IReportWriter>();
                     _servicePool.EnsureEnoughResources(_scheduler.CancellationToken);
                     _memory.MemorizeToBeVerifiedResource(
@@ -118,6 +122,12 @@ namespace Helix.Crawler
             {
                 _logger = ServiceLocator.Get<ILogger>();
                 _logger.LogInfo("Started working ...");
+            }
+            void EnsureDirectoryContainsScreenshotFilesIsRecreated()
+            {
+                if (Directory.Exists(configurations.PathToDirectoryContainsScreenshotFiles))
+                    Directory.Delete(configurations.PathToDirectoryContainsScreenshotFiles, true);
+                Directory.CreateDirectory(configurations.PathToDirectoryContainsScreenshotFiles);
             }
         }
 
@@ -203,7 +213,19 @@ namespace Helix.Crawler
 
                     _reportWriter.WriteReport(verificationResult);
                     OnResourceVerified?.Invoke(verificationResult);
-                    if (resource.IsInternal) _memory.MemorizeToBeRenderedResource(resource, _scheduler.CancellationToken);
+
+                    var resourceSizeInMb = resource.Size / 1024f / 1024f;
+                    var resourceIsTooBig = resourceSizeInMb > 10;
+                    if (resourceIsTooBig)
+                        _logger.LogInfo($"Resource was not queued for rendering because it was too big ({resourceSizeInMb} MB) - " +
+                                        $"{resource.Uri}");
+
+                    var isInternalResource = resource.IsInternal;
+                    var isExtractedResource = resource.IsExtracted;
+                    var isInitialResource = _resourceScope.IsStartUri(resource.Uri);
+                    var isNotStaticAsset = !ResourceType.StaticAsset.HasFlag(resource.ResourceType);
+                    if (isInternalResource && isNotStaticAsset && !resourceIsTooBig && (isExtractedResource || isInitialResource))
+                        _memory.MemorizeToBeRenderedResource(resource, _scheduler.CancellationToken);
                 });
         }
     }

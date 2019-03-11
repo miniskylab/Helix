@@ -30,7 +30,8 @@ namespace Helix.Crawler
                     _resourceProcessor.Enrich(new Resource
                     {
                         ParentUri = htmlDocument.Uri,
-                        OriginalUrl = extractedUrl
+                        OriginalUrl = extractedUrl,
+                        IsExtracted = true
                     })
                 );
 
