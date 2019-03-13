@@ -84,7 +84,7 @@ namespace Helix.Crawler
                     var httpResponseMessage = _sendingGETRequestTask.Result;
                     resource.StatusCode = (StatusCode) httpResponseMessage.StatusCode;
                     resource.Size = httpResponseMessage.Content.Headers.ContentLength;
-                    _resourceProcessor.Categorize(resource, httpResponseMessage.Content.Headers.ContentType.ToString());
+                    _resourceProcessor.Categorize(resource, httpResponseMessage.Content.Headers.ContentType?.ToString());
                 }
                 catch (AggregateException aggregateException)
                 {

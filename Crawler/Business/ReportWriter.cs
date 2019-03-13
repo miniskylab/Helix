@@ -70,6 +70,7 @@ namespace Helix.Crawler
         public void WriteReport(VerificationResult verificationResult)
         {
             lock (_publicApiLockMap[nameof(WriteReport)])
+            lock (_publicApiLockMap[nameof(UpdateStatusCode)])
             {
                 if (_objectDisposed) throw new ObjectDisposedException(nameof(ReportWriter));
                 if (_verificationResults.Count >= 300) FlushMemoryBufferToDisk();
