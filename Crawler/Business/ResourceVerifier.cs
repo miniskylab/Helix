@@ -28,7 +28,8 @@ namespace Helix.Crawler
             _objectDisposed = false;
             _publicApiLockMap = new Dictionary<string, object> { { $"{nameof(TryVerify)}", new object() } };
 
-            _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(configurations.RequestTimeoutDuration) };
+            // TODO: [WinHttpHandler] will be removed in the future. See #16 on GitHub
+            _httpClient = new HttpClient(new WinHttpHandler()) { Timeout = TimeSpan.FromSeconds(configurations.RequestTimeoutDuration) };
             _httpClient.DefaultRequestHeaders.Accept.ParseAdd("*/*");
             _httpClient.DefaultRequestHeaders.AcceptEncoding.ParseAdd("*");
             _httpClient.DefaultRequestHeaders.AcceptLanguage.ParseAdd("*");
