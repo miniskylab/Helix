@@ -63,18 +63,21 @@ namespace Helix.Crawler
                 var parentUri = _webBrowser.CurrentUri;
                 var request = networkTraffic.WebSession.Request;
                 var response = networkTraffic.WebSession.Response;
+                var uriBeingRendered = _resourceBeingRendered.Uri;
                 return Task.Factory.StartNew(() =>
                 {
                     Interlocked.Increment(ref _activeHttpTrafficCount);
                     try
                     {
+                        if (request.Method.ToUpperInvariant() != "GET") return;
+                        if (TryFollowRedirects()) return;
                         if (ParentUriWasFound())
                         {
-                            UpdateStatusCodeIfNotMatch(); // TODO: Bug when redirect happens
+                            UpdateStatusCodeIfNotMatch();
                             TakeScreenshotIfNecessary();
                         }
 
-                        if (request.Method.ToUpperInvariant() != "GET" || _resourceBeingRendered.IsBroken) return;
+                        if (_resourceBeingRendered.IsBroken) return;
                         var resource = new Resource
                         {
                             ParentUri = parentUri,
@@ -90,11 +93,20 @@ namespace Helix.Crawler
                     finally { Interlocked.Decrement(ref _activeHttpTrafficCount); }
                 }, _cancellationTokenSource.Token, TaskCreationOptions.None, PriorityTaskScheduler.Highest);
 
+                bool TryFollowRedirects()
+                {
+                    if (response.StatusCode < 300 || 400 <= response.StatusCode) return false;
+                    if (!response.Headers.Headers.TryGetValue("Location", out var locationHeader)) return false;
+                    if (!Uri.TryCreate(locationHeader.Value, UriKind.RelativeOrAbsolute, out var redirectUri)) return false;
+                    uriBeingRendered = redirectUri.IsAbsoluteUri ? redirectUri : new Uri(_resourceBeingRendered.ParentUri, redirectUri);
+                    return true;
+                }
+
                 bool ParentUriWasFound()
                 {
                     if (request.Method.ToUpperInvariant() != "GET") return false;
+
                     var capturedUri = request.RequestUri;
-                    var uriBeingRendered = _resourceBeingRendered.Uri;
                     var bothSchemesAreNotEqual = !capturedUri.Scheme.Equals(uriBeingRendered.Scheme);
                     var strictTransportSecurity = uriBeingRendered.Scheme == "http" && capturedUri.Scheme == "https";
                     if (bothSchemesAreNotEqual && !strictTransportSecurity) return false;
@@ -106,12 +118,9 @@ namespace Helix.Crawler
                 void UpdateStatusCodeIfNotMatch()
                 {
                     if (response.StatusCode == (int) _resourceBeingRendered.StatusCode) return;
-                    if (response.StatusCode < 300 && 400 <= response.StatusCode)
-                    {
-                        var newStatusCode = response.StatusCode;
-                        var oldStatusCode = (int) _resourceBeingRendered.StatusCode;
-                        logger.LogInfo($"StatusCode changed from [{oldStatusCode}] to [{newStatusCode}] at [{_resourceBeingRendered.Uri}]");
-                    }
+                    var newStatusCode = response.StatusCode;
+                    var oldStatusCode = (int) _resourceBeingRendered.StatusCode;
+                    logger.LogInfo($"StatusCode changed from [{oldStatusCode}] to [{newStatusCode}] at [{_resourceBeingRendered.Uri}]");
 
                     _resourceBeingRendered.StatusCode = (StatusCode) response.StatusCode;
                     reportWriter.UpdateStatusCode(_resourceBeingRendered.Id, (StatusCode) response.StatusCode);
