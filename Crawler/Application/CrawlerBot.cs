@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Helix.Core;
 using Helix.Crawler.Abstractions;
 using Helix.Persistence.Abstractions;
+using Helix.WebBrowser.Abstractions;
 
 namespace Helix.Crawler
 {
@@ -76,11 +77,18 @@ namespace Helix.Crawler
 
         public static void StartWorking(Configurations configurations)
         {
-            ServiceLocator.AddSingleton(configurations);
+            var webBrowser = ServiceLocator.Get<IWebBrowserProvider>().GetWebBrowser(
+                configurations.PathToChromiumExecutable,
+                configurations.WorkingDirectory
+            );
+            configurations.UserAgent = webBrowser.GetUserAgentString();
+            webBrowser.Dispose();
+
+            ServiceLocator.RebuildUsingNew(configurations);
             Statistics = ServiceLocator.Get<IStatistics>();
+            _memory = ServiceLocator.Get<IMemory>();
             _scheduler = ServiceLocator.Get<IScheduler>();
             _servicePool = ServiceLocator.Get<IServicePool>();
-            _memory = ServiceLocator.Get<IMemory>();
             _resourceScope = ServiceLocator.Get<IResourceScope>();
             _resourceProcessor = ServiceLocator.Get<IResourceProcessor>();
 
@@ -178,6 +186,7 @@ namespace Helix.Crawler
                     }
                     else _logger.LogException(new InvalidConstraintException(ErrorMessage.SuccessfulRenderWithoutPageLoadTime));
 
+                    if (toBeRenderedResource.IsBroken) return;
                     _memory.MemorizeToBeExtractedHtmlDocument(new HtmlDocument
                     {
                         Uri = toBeRenderedResource.Uri,

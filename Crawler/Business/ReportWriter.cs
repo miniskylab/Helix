@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Helix.Crawler.Abstractions;
@@ -18,19 +17,18 @@ namespace Helix.Crawler
         IList<VerificationResult> _verificationResults;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public ReportWriter(IPersistenceProvider persistenceProvider)
+        public ReportWriter(Configurations configurations, IPersistenceProvider persistenceProvider)
         {
-            var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
-            var pathToDatabaseFile = Path.Combine(workingDirectory, "report.sqlite3");
-
             _objectDisposed = false;
             _verificationResults = new List<VerificationResult>();
-            _sqLitePersistence = persistenceProvider.GetSQLitePersistence<VerificationResult>(pathToDatabaseFile);
             _publicApiLockMap = new Dictionary<string, object>
             {
                 { $"{nameof(WriteReport)}", new object() },
                 { $"{nameof(UpdateStatusCode)}", new object() }
             };
+
+            var pathToDatabaseFile = Path.Combine(configurations.WorkingDirectory, "report.sqlite3");
+            _sqLitePersistence = persistenceProvider.GetSQLitePersistence<VerificationResult>(pathToDatabaseFile);
         }
 
         public void Dispose()

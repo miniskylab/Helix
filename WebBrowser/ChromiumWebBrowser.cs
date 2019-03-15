@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Management;
 using System.Net;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Helix.WebBrowser.Abstractions;
@@ -29,8 +28,24 @@ namespace Helix.WebBrowser
         readonly Stopwatch _stopwatch;
         readonly bool _useHeadlessWebBrowser;
         readonly bool _useIncognitoWebBrowser;
+        static string _userAgentString;
 
         public Uri CurrentUri { get; private set; }
+
+        IEnumerable<string> StartArguments
+        {
+            get
+            {
+                var arguments = new List<string>
+                {
+                    $"--window-size={_browserWindowSize.width},{_browserWindowSize.height}",
+                    $"--user-agent={_userAgentString}"
+                };
+                if (_useIncognitoWebBrowser) arguments.Add("--incognito");
+                if (_useHeadlessWebBrowser) arguments.Add("--headless");
+                return arguments;
+            }
+        }
 
         public event AsyncEventHandler<SessionEventArgs> BeforeRequest;
         public event AsyncEventHandler<SessionEventArgs> BeforeResponse;
@@ -46,9 +61,15 @@ namespace Helix.WebBrowser
             _browserWindowSize = browserWindowSize == default ? (1024, 630) : browserWindowSize;
             _useIncognitoWebBrowser = useIncognitoWebBrowser;
             _useHeadlessWebBrowser = useHeadlessWebBrowser;
-            _publicApiLockMap = new Dictionary<string, object> { { $"{nameof(TryRender)}", new object() } };
+            _publicApiLockMap = new Dictionary<string, object>
+            {
+                { $"{nameof(TryRender)}", new object() },
+                { $"{nameof(TryTakeScreenshot)}", new object() },
+                { $"{nameof(GetUserAgentString)}", new object() }
+            };
             SetupHttpProxyServer();
-            Restart();
+            GetUserAgentString();
+            OpenWebBrowser(StartArguments);
         }
 
         public void Dispose()
@@ -64,6 +85,18 @@ namespace Helix.WebBrowser
             finally
             {
                 foreach (var lockObject in _publicApiLockMap.Values) Monitor.Exit(lockObject);
+            }
+        }
+
+        public string GetUserAgentString()
+        {
+            lock (_publicApiLockMap[nameof(GetUserAgentString)])
+            {
+                if (!string.IsNullOrEmpty(_userAgentString)) return _userAgentString;
+                OpenWebBrowser(new[] { "--window-position=0,-2000", "--window-size=1,1" });
+                _userAgentString = (string) _chromeDriver.ExecuteScript("return navigator.userAgent;");
+                CloseWebBrowser();
+                return _userAgentString;
             }
         }
 
@@ -132,7 +165,8 @@ namespace Helix.WebBrowser
                         catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
                         {
                             _stopwatch.Stop();
-                            Restart();
+                            CloseWebBrowser(true);
+                            OpenWebBrowser(StartArguments);
                             if (attemptNo < attemptCount) continue;
                             return false;
                         }
@@ -151,61 +185,51 @@ namespace Helix.WebBrowser
             }
         }
 
-        public bool TryTakeScreenshot(string screenshotFileName, Action<Exception> onFailed = null)
+        public bool TryTakeScreenshot(string pathToScreenshotFile, Action<Exception> onFailed = null)
         {
-            try
+            lock (_publicApiLockMap[nameof(TryTakeScreenshot)])
             {
-                if (CurrentUri == null) throw new InvalidOperationException();
-                var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
-                if (workingDirectory == null) throw new InvalidOperationException();
+                try
+                {
+                    if (CurrentUri == null) throw new InvalidOperationException();
+                    var pathToDirectoryContainsScreenshotFile = Directory.GetParent(pathToScreenshotFile);
+                    if (!pathToDirectoryContainsScreenshotFile.Exists) pathToDirectoryContainsScreenshotFile.Create();
 
-                var absolutePathToScreenshotFile = Path.Combine(workingDirectory, screenshotFileName);
-                var absolutePathToDirectoryContainsScreenshotFile = Directory.GetParent(absolutePathToScreenshotFile);
-                if (!absolutePathToDirectoryContainsScreenshotFile.Exists) absolutePathToDirectoryContainsScreenshotFile.Create();
-
-                var screenShot = _chromeDriver.GetScreenshot();
-                Task.Run(() => { screenShot.SaveAsFile(screenshotFileName, ScreenshotImageFormat.Png); });
-                return true;
-            }
-            catch (Exception exception)
-            {
-                onFailed?.Invoke(exception);
-                return false;
+                    var screenShot = _chromeDriver.GetScreenshot();
+                    Task.Run(() => { screenShot.SaveAsFile(pathToScreenshotFile, ScreenshotImageFormat.Png); });
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    onFailed?.Invoke(exception);
+                    return false;
+                }
             }
         }
 
-        void ForceQuit()
+        void CloseWebBrowser(bool forcibly = false)
         {
-            _processIds.ForEach(processId => Process.GetProcessById(processId).Kill());
-            _processIds.Clear();
-        }
-
-        void ReleaseUnmanagedResources()
-        {
-            _httpProxyServer?.Stop();
-            _httpProxyServer?.Dispose();
-            _httpProxyServer = null;
-
-            try { _chromeDriver?.Quit(); }
-            catch (WebDriverException webDriverException)
+            if (forcibly) KillAllRelatedProcesses();
+            else
             {
-                if (webDriverException.InnerException?.GetType() != typeof(WebException)) throw;
-                ForceQuit();
+                try { _chromeDriver?.Quit(); }
+                catch (WebDriverException webDriverException)
+                {
+                    if (webDriverException.InnerException?.GetType() != typeof(WebException)) throw;
+                    KillAllRelatedProcesses();
+                }
             }
             _chromeDriver = null;
+
+            void KillAllRelatedProcesses()
+            {
+                _processIds.ForEach(processId => Process.GetProcessById(processId).Kill());
+                _processIds.Clear();
+            }
         }
 
-        void Restart()
+        void OpenWebBrowser(IEnumerable<string> arguments)
         {
-            if (_chromeDriver != null)
-            {
-                ForceQuit();
-                _chromeDriver = null;
-            }
-
-            var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
-            if (workingDirectory == null) throw new InvalidOperationException();
-
             var chromeDriverService = ChromeDriverService.CreateDefaultService(_pathToChromeDriverExecutable);
             chromeDriverService.HideCommandPromptWindow = true;
 
@@ -219,9 +243,7 @@ namespace Helix.WebBrowser
                     SslProxy = $"http://{IPAddress.Loopback}:{_httpProxyServer.ProxyEndPoints[0].Port}"
                 }
             };
-            if (_useIncognitoWebBrowser) chromeOptions.AddArguments("--incognito");
-            if (_useHeadlessWebBrowser) chromeOptions.AddArguments("--headless");
-            chromeOptions.AddArguments($"--window-size={_browserWindowSize.width},{_browserWindowSize.height}");
+            foreach (var argument in arguments) chromeOptions.AddArguments(argument);
 
             _chromeDriver = new ChromeDriver(chromeDriverService, chromeOptions);
             _processIds.Add(chromeDriverService.ProcessId);
@@ -233,6 +255,14 @@ namespace Helix.WebBrowser
                 var processId = Convert.ToInt32(managementObject["ProcessID"]);
                 _processIds.Add(processId);
             }
+        }
+
+        void ReleaseUnmanagedResources()
+        {
+            _httpProxyServer?.Stop();
+            _httpProxyServer?.Dispose();
+            _httpProxyServer = null;
+            CloseWebBrowser();
         }
 
         void SetupHttpProxyServer()

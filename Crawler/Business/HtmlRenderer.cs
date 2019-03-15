@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Helix.Core;
@@ -30,11 +29,9 @@ namespace Helix.Crawler
         public HtmlRenderer(Configurations configurations, IWebBrowserProvider webBrowserProvider, IResourceScope resourceScope,
             IReportWriter reportWriter, IResourceProcessor resourceProcessor, ILogger logger)
         {
-            var workingDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
-            var pathToChromiumExecutable = Path.Combine(workingDirectory, "chromium/chrome.exe");
             _webBrowser = webBrowserProvider.GetWebBrowser(
-                pathToChromiumExecutable,
-                workingDirectory,
+                configurations.PathToChromiumExecutable,
+                configurations.WorkingDirectory,
                 configurations.UseIncognitoWebBrowser,
                 configurations.UseHeadlessWebBrowsers,
                 (1920, 1080)
@@ -73,11 +70,11 @@ namespace Helix.Crawler
                     {
                         if (ParentUriWasFound())
                         {
-                            UpdateStatusCodeIfNotMatch();
+                            UpdateStatusCodeIfNotMatch(); // TODO: Bug when redirect happens
                             TakeScreenshotIfNecessary();
                         }
 
-                        if (request.Method.ToUpperInvariant() != "GET") return;
+                        if (request.Method.ToUpperInvariant() != "GET" || _resourceBeingRendered.IsBroken) return;
                         var resource = new Resource
                         {
                             ParentUri = parentUri,
@@ -121,8 +118,8 @@ namespace Helix.Crawler
                 }
                 void TakeScreenshotIfNecessary()
                 {
-                    var resourceIsBroken = (int) _resourceBeingRendered.StatusCode >= 400;
-                    if (resourceIsBroken && configurations.TakeScreenshotEvidence) _takeScreenshot = true;
+                    if (_resourceBeingRendered.IsBroken && configurations.TakeScreenshotEvidence)
+                        _takeScreenshot = true;
                 }
             }
         }
