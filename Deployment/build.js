@@ -9,8 +9,8 @@ const yauzl = require("yauzl");
 const rimraf = require("rimraf");
 const asar = require("asar");
 
-const latestStableChromiumVersion = "72.0.3626.96-r612437";
-const latestChromeDriverVersion = "72.0.3626.69";
+const latestStableChromiumVersion = "73.0.3683.75-r625896";
+const latestChromeDriverVersion = "73.0.3683.68";
 
 (async () => {
     const commandLineArguments = process.argv.slice(2);
