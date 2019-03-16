@@ -95,7 +95,7 @@ function SendGETRequestOverHttps(destinationUrl) {
 }
 
 function ExtractLatestElectronJsBinaryDownloadUrl(latestElectronJsReleaseJson) {
-    const electronJsWindowsBinarySelector = /electron-.+-win32-x64.zip/g;
+    const electronJsWindowsBinarySelector = /electron-.+-win32-x64\.zip/g;
     const electronJsWindowsBinaryMetadata = latestElectronJsReleaseJson.assets
         .find(asset => electronJsWindowsBinarySelector.test(asset.browser_download_url));
     return electronJsWindowsBinaryMetadata.browser_download_url;

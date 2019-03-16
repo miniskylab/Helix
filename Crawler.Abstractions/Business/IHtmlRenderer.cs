@@ -8,6 +8,6 @@ namespace Helix.Crawler.Abstractions
         event Action<Resource> OnResourceCaptured;
 
         bool TryRender(Resource resource, out string html, out long? pageLoadTime, CancellationToken cancellationToken,
-            int attemptCount = 3, Action<Exception> onFailed = null);
+            int attemptCount = 2, Action<Exception> onFailed = null);
     }
 }

@@ -104,8 +104,6 @@ namespace Helix.Crawler
 
                 bool ParentUriWasFound()
                 {
-                    if (request.Method.ToUpperInvariant() != "GET") return false;
-
                     var capturedUri = request.RequestUri;
                     var bothSchemesAreNotEqual = !capturedUri.Scheme.Equals(uriBeingRendered.Scheme);
                     var strictTransportSecurity = uriBeingRendered.Scheme == "http" && capturedUri.Scheme == "https";
@@ -150,7 +148,7 @@ namespace Helix.Crawler
         }
 
         public bool TryRender(Resource resource, out string html, out long? pageLoadTime, CancellationToken cancellationToken,
-            int attemptCount = 3, Action<Exception> onFailed = null)
+            int attemptCount = 2, Action<Exception> onFailed = null)
         {
             lock (_publicApiLockMap[nameof(TryRender)])
             {

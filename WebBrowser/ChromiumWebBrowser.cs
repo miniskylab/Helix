@@ -100,7 +100,7 @@ namespace Helix.WebBrowser
             }
         }
 
-        public bool TryRender(Uri uri, out string html, out long? pageLoadTime, CancellationToken cancellationToken, int attemptCount = 3,
+        public bool TryRender(Uri uri, out string html, out long? pageLoadTime, CancellationToken cancellationToken, int attemptCount = 2,
             Action<Exception> onFailed = null)
         {
             CurrentUri = uri ?? throw new ArgumentNullException(nameof(uri));
@@ -148,7 +148,7 @@ namespace Helix.WebBrowser
                 bool TryGoToUri()
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    for (var attemptNo = 0; attemptNo < attemptCount; attemptNo++)
+                    for (var attemptNo = 1; attemptNo <= attemptCount; attemptNo++)
                     {
                         try
                         {
@@ -164,7 +164,7 @@ namespace Helix.WebBrowser
                         }
                         catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
                         {
-                            _stopwatch.Stop();
+                            _stopwatch.Reset();
                             CloseWebBrowser(true);
                             OpenWebBrowser(StartArguments);
                             if (attemptNo < attemptCount) continue;

@@ -47,6 +47,9 @@ namespace Helix.Crawler
 
         static CrawlerBot()
         {
+            // TODO: A workaround for .Net Core 2.x bug. Should be removed in the future.
+            AppContext.SetSwitch("System.Net.Http.UseSocketsHttpHandler", false);
+
             BackgroundTasks = new List<Task>();
             TransitionLock = new object();
             StateMachine = new StateMachine<CrawlerState, CrawlerCommand>(
