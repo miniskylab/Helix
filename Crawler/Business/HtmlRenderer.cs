@@ -148,7 +148,7 @@ namespace Helix.Crawler
         }
 
         public bool TryRender(Resource resource, out string html, out long? pageLoadTime, CancellationToken cancellationToken,
-            int attemptCount = 2, Action<Exception> onFailed = null)
+            Action<Exception> onFailed = null)
         {
             lock (_publicApiLockMap[nameof(TryRender)])
             {
@@ -160,7 +160,8 @@ namespace Helix.Crawler
                 _resourceBeingRendered = resource;
 
                 var uri = resource.Uri;
-                var renderingResult = _webBrowser.TryRender(uri, out html, out pageLoadTime, cancellationToken, attemptCount, onFailed);
+                var renderingResult = _webBrowser.TryRender(uri, out html, out pageLoadTime, cancellationToken, onFailed);
+                if (resource.IsBroken) pageLoadTime = null;
                 if (!_takeScreenshot) return renderingResult;
 
                 var pathToDirectoryContainsScreenshotFiles = _configurations.PathToDirectoryContainsScreenshotFiles;

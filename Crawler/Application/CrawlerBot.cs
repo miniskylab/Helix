@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data;
 using System.IO;
 using System.Threading.Tasks;
 using Helix.Core;
@@ -179,15 +178,19 @@ namespace Helix.Crawler
             while (!_scheduler.EverythingIsDone && !_scheduler.CancellationToken.IsCancellationRequested)
                 _scheduler.CreateTask((htmlRenderer, toBeRenderedResource) =>
                 {
-                    if (!htmlRenderer.TryRender(toBeRenderedResource, out var htmlText, out var pageLoadTime, _scheduler.CancellationToken,
-                        onFailed: _logger.LogException)) return;
-
+                    var renderingFailed = !htmlRenderer.TryRender(
+                        toBeRenderedResource,
+                        out var htmlText,
+                        out var pageLoadTime,
+                        _scheduler.CancellationToken,
+                        _logger.LogException
+                    );
+                    if (renderingFailed) return;
                     if (pageLoadTime.HasValue)
                     {
                         Statistics.SuccessfullyRenderedPageCount++;
                         Statistics.TotalPageLoadTime += pageLoadTime.Value;
                     }
-                    else _logger.LogException(new InvalidConstraintException(ErrorMessage.SuccessfulRenderWithoutPageLoadTime));
 
                     if (toBeRenderedResource.IsBroken) return;
                     _memory.MemorizeToBeExtractedHtmlDocument(new HtmlDocument

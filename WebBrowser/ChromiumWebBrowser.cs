@@ -99,7 +99,7 @@ namespace Helix.WebBrowser
             }
         }
 
-        public bool TryRender(Uri uri, out string html, out long? pageLoadTime, CancellationToken cancellationToken, int attemptCount = 2,
+        public bool TryRender(Uri uri, out string html, out long? pageLoadTime, CancellationToken cancellationToken,
             Action<Exception> onFailed = null)
         {
             CurrentUri = uri ?? throw new ArgumentNullException(nameof(uri));
@@ -146,31 +146,28 @@ namespace Helix.WebBrowser
                 }
                 bool TryGoToUri()
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    for (var attemptNo = 1; attemptNo <= attemptCount; attemptNo++)
+                    try
                     {
-                        try
-                        {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            _httpProxyServer.BeforeResponse += BeforeResponse;
-                            _httpProxyServer.BeforeRequest += BeforeRequest;
-                            _stopwatch.Start();
-                            _chromeDriver.Navigate().GoToUrl(uri);
-                            _stopwatch.Stop();
-                            _httpProxyServer.BeforeRequest -= BeforeRequest;
-                            _httpProxyServer.BeforeResponse -= BeforeResponse;
-                            break;
-                        }
-                        catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
-                        {
-                            _stopwatch.Reset();
-                            CloseWebBrowser(true);
-                            OpenWebBrowser(StartArguments);
-                            if (attemptNo < attemptCount) continue;
-                            return false;
-                        }
+                        cancellationToken.ThrowIfCancellationRequested();
+                        _httpProxyServer.BeforeResponse += BeforeResponse;
+                        _httpProxyServer.BeforeRequest += BeforeRequest;
+                        _stopwatch.Restart();
+                        _chromeDriver.Navigate().GoToUrl(uri);
+                        _stopwatch.Stop();
+                        return true;
                     }
-                    return true;
+                    catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
+                    {
+                        _stopwatch.Stop();
+                        CloseWebBrowser(true);
+                        OpenWebBrowser(StartArguments);
+                        return false;
+                    }
+                    finally
+                    {
+                        _httpProxyServer.BeforeRequest -= BeforeRequest;
+                        _httpProxyServer.BeforeResponse -= BeforeResponse;
+                    }
 
                     Task BeforeRequest(object sender, SessionEventArgs networkTraffic)
                     {
