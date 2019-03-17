@@ -12,7 +12,6 @@ namespace Helix.Persistence
         readonly List<Task> _backgroundTasks;
         CancellationTokenSource _cancellationTokenSource;
         bool _objectDisposed;
-        readonly Dictionary<string, object> _publicApiLockMap;
         TextWriter _textWriter;
 
         public FilePersistence(string filePath, TimeSpan? flushDataToDiskInterval = null)
@@ -20,7 +19,6 @@ namespace Helix.Persistence
             _objectDisposed = false;
             _backgroundTasks = new List<Task>();
             _cancellationTokenSource = new CancellationTokenSource();
-            _publicApiLockMap = new Dictionary<string, object> { { $"{nameof(WriteLineAsync)}", new object() } };
 
             EnsureFileIsRecreated();
             FlushDataToDiskEvery(flushDataToDiskInterval ?? TimeSpan.FromSeconds(3));
@@ -46,27 +44,16 @@ namespace Helix.Persistence
 
         public void Dispose()
         {
-            try
-            {
-                foreach (var lockObject in _publicApiLockMap.Values) Monitor.Enter(lockObject);
-                if (_objectDisposed) return;
-                ReleaseUnmanagedResources();
-                GC.SuppressFinalize(this);
-                _objectDisposed = true;
-            }
-            finally
-            {
-                foreach (var lockObject in _publicApiLockMap.Values) Monitor.Exit(lockObject);
-            }
+            if (_objectDisposed) return;
+            ReleaseUnmanagedResources();
+            GC.SuppressFinalize(this);
+            _objectDisposed = true;
         }
 
         public void WriteLineAsync(string text)
         {
-            lock (_publicApiLockMap[nameof(WriteLineAsync)])
-            {
-                if (_objectDisposed) throw new ObjectDisposedException(nameof(FilePersistence));
-                _textWriter?.WriteLineAsync(text);
-            }
+            if (_objectDisposed) throw new ObjectDisposedException(nameof(FilePersistence));
+            _textWriter?.WriteLineAsync(text);
         }
 
         void ReleaseUnmanagedResources()

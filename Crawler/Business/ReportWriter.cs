@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Helix.Crawler.Abstractions;
 using Helix.Persistence.Abstractions;
@@ -12,20 +11,16 @@ namespace Helix.Crawler
     public sealed class ReportWriter : IReportWriter
     {
         bool _objectDisposed;
-        readonly Dictionary<string, object> _publicApiLockMap;
         readonly ISQLitePersistence<VerificationResult> _sqLitePersistence;
         IList<VerificationResult> _verificationResults;
+        readonly object _writeLock;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public ReportWriter(Configurations configurations, IPersistenceProvider persistenceProvider)
         {
             _objectDisposed = false;
+            _writeLock = new object();
             _verificationResults = new List<VerificationResult>();
-            _publicApiLockMap = new Dictionary<string, object>
-            {
-                { $"{nameof(WriteReport)}", new object() },
-                { $"{nameof(UpdateStatusCode)}", new object() }
-            };
 
             var pathToDatabaseFile = Path.Combine(configurations.WorkingDirectory, "report.sqlite3");
             _sqLitePersistence = persistenceProvider.GetSQLitePersistence<VerificationResult>(pathToDatabaseFile);
@@ -33,42 +28,36 @@ namespace Helix.Crawler
 
         public void Dispose()
         {
-            try
+            lock (_writeLock)
             {
-                foreach (var lockObject in _publicApiLockMap.Values) Monitor.Enter(lockObject);
                 if (_objectDisposed) return;
                 FlushMemoryBufferToDisk();
                 _objectDisposed = true;
-            }
-            finally
-            {
-                foreach (var lockObject in _publicApiLockMap.Values) Monitor.Exit(lockObject);
             }
         }
 
         public void UpdateStatusCode(int resourceId, StatusCode newStatusCode)
         {
-            lock (_publicApiLockMap[nameof(UpdateStatusCode)])
+            lock (_writeLock)
             {
                 if (_objectDisposed) throw new ObjectDisposedException(nameof(ReportWriter));
-                var verificationResult = _sqLitePersistence.GetByPrimaryKey(resourceId);
+                var verificationResult = _verificationResults.FirstOrDefault(v => v.Id == resourceId);
                 if (verificationResult != null)
                 {
                     verificationResult.StatusCode = newStatusCode;
-                    _sqLitePersistence.Update(verificationResult);
                     return;
                 }
 
-                verificationResult = _verificationResults.FirstOrDefault(dto => dto.Id == resourceId);
+                verificationResult = _sqLitePersistence.GetByPrimaryKey(resourceId);
                 if (verificationResult == null) throw new KeyNotFoundException();
                 verificationResult.StatusCode = newStatusCode;
+                _sqLitePersistence.Update(verificationResult);
             }
         }
 
         public void WriteReport(VerificationResult verificationResult)
         {
-            lock (_publicApiLockMap[nameof(WriteReport)])
-            lock (_publicApiLockMap[nameof(UpdateStatusCode)])
+            lock (_writeLock)
             {
                 if (_objectDisposed) throw new ObjectDisposedException(nameof(ReportWriter));
                 if (_verificationResults.Count >= 300) FlushMemoryBufferToDisk();

@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using Helix.Persistence.Abstractions;
 using JetBrains.Annotations;
 using Microsoft.Data.Sqlite;
@@ -9,16 +8,10 @@ namespace Helix.Persistence
     class SQLitePersistence<TDataTransferObject> : ISQLitePersistence<TDataTransferObject> where TDataTransferObject : class
     {
         readonly string _pathToDatabaseFile;
-        readonly Dictionary<string, object> _publicApiLockMap;
 
         public SQLitePersistence(string pathToDatabaseFile)
         {
             _pathToDatabaseFile = pathToDatabaseFile;
-            _publicApiLockMap = new Dictionary<string, object>
-            {
-                { $"{nameof(Save)}", new object() },
-                { $"{nameof(Update)}", new object() }
-            };
             EnsureDatabaseIsRecreated();
 
             void EnsureDatabaseIsRecreated()
@@ -39,25 +32,19 @@ namespace Helix.Persistence
 
         public void Save(params TDataTransferObject[] dataTransferObjects)
         {
-            lock (_publicApiLockMap[nameof(Save)])
+            using (var sqLiteDbContext = new SQLiteDbContext(_pathToDatabaseFile))
             {
-                using (var sqLiteDbContext = new SQLiteDbContext(_pathToDatabaseFile))
-                {
-                    sqLiteDbContext.DataTransferObjects.AddRange(dataTransferObjects);
-                    sqLiteDbContext.SaveChanges();
-                }
+                sqLiteDbContext.DataTransferObjects.AddRange(dataTransferObjects);
+                sqLiteDbContext.SaveChanges();
             }
         }
 
         public void Update(params TDataTransferObject[] dataTransferObjects)
         {
-            lock (_publicApiLockMap[nameof(Update)])
+            using (var sqLiteDbContext = new SQLiteDbContext(_pathToDatabaseFile))
             {
-                using (var sqLiteDbContext = new SQLiteDbContext(_pathToDatabaseFile))
-                {
-                    sqLiteDbContext.DataTransferObjects.UpdateRange(dataTransferObjects);
-                    sqLiteDbContext.SaveChanges();
-                }
+                sqLiteDbContext.DataTransferObjects.UpdateRange(dataTransferObjects);
+                sqLiteDbContext.SaveChanges();
             }
         }
 

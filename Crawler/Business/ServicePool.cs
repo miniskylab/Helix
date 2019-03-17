@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,7 +19,6 @@ namespace Helix.Crawler
         readonly ILogger _logger;
         readonly IMemory _memory;
         bool _objectDisposed;
-        readonly Dictionary<string, object> _publicApiLockMap;
         BlockingCollection<IResourceExtractor> _resourceExtractorPool;
         BlockingCollection<IResourceVerifier> _resourceVerifierPool;
 
@@ -33,153 +31,114 @@ namespace Helix.Crawler
             _resourceExtractorPool = new BlockingCollection<IResourceExtractor>();
             _resourceVerifierPool = new BlockingCollection<IResourceVerifier>();
             _htmlRendererPool = new BlockingCollection<IHtmlRenderer>();
-            _publicApiLockMap = new Dictionary<string, object>
-            {
-                { $"{nameof(EnsureEnoughResources)}", new object() },
-                { $"{nameof(GetHtmlRenderer)}", new object() },
-                { $"{nameof(GetResourceExtractor)}", new object() },
-                { $"{nameof(GetResourceVerifier)}", new object() },
-                { $"{nameof(Return)}{nameof(ResourceExtractor)}", new object() },
-                { $"{nameof(Return)}{nameof(ResourceVerifier)}", new object() },
-                { $"{nameof(Return)}{nameof(HtmlRenderer)}", new object() }
-            };
         }
 
         public void Dispose()
         {
-            try
-            {
-                foreach (var lockObject in _publicApiLockMap.Values) Monitor.Enter(lockObject);
-                if (_objectDisposed) return;
-                ReleaseUnmanagedResources();
-                GC.SuppressFinalize(this);
-                _objectDisposed = true;
-            }
-            finally
-            {
-                foreach (var lockObject in _publicApiLockMap.Values) Monitor.Exit(lockObject);
-            }
+            if (_objectDisposed) return;
+            ReleaseUnmanagedResources();
+            GC.SuppressFinalize(this);
+            _objectDisposed = true;
         }
 
         public void EnsureEnoughResources(CancellationToken cancellationToken)
         {
-            lock (_publicApiLockMap[nameof(EnsureEnoughResources)])
-            {
-                if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
-                InitializeResourceExtractorPool();
-                InitializeResourceVerifierPool();
-                InitializeHtmlRendererPool();
+            if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
+            InitializeResourceExtractorPool();
+            InitializeResourceVerifierPool();
+            InitializeHtmlRendererPool();
 
-                void InitializeResourceExtractorPool()
+            void InitializeResourceExtractorPool()
+            {
+                for (var resourceExtractorId = 0; resourceExtractorId < ResourceExtractorCount; resourceExtractorId++)
                 {
-                    for (var resourceExtractorId = 0; resourceExtractorId < ResourceExtractorCount; resourceExtractorId++)
+                    if (cancellationToken.IsCancellationRequested)
                     {
-                        if (cancellationToken.IsCancellationRequested)
-                        {
-                            while (_resourceExtractorPool.Any()) _resourceExtractorPool.Take();
-                            _createdResourceExtractorCount = 0;
-                        }
-                        else
-                        {
-                            var resourceExtractor = ServiceLocator.Get<IResourceExtractor>();
-                            _resourceExtractorPool.Add(resourceExtractor, CancellationToken.None);
-                            _createdResourceExtractorCount++;
-                        }
+                        while (_resourceExtractorPool.Any()) _resourceExtractorPool.Take();
+                        _createdResourceExtractorCount = 0;
+                    }
+                    else
+                    {
+                        var resourceExtractor = ServiceLocator.Get<IResourceExtractor>();
+                        _resourceExtractorPool.Add(resourceExtractor, CancellationToken.None);
+                        _createdResourceExtractorCount++;
                     }
                 }
-                void InitializeResourceVerifierPool()
+            }
+            void InitializeResourceVerifierPool()
+            {
+                for (var resourceVerifierId = 0; resourceVerifierId < ResourceVerifierCount; resourceVerifierId++)
                 {
-                    for (var resourceVerifierId = 0; resourceVerifierId < ResourceVerifierCount; resourceVerifierId++)
+                    if (cancellationToken.IsCancellationRequested)
                     {
-                        if (cancellationToken.IsCancellationRequested)
-                        {
-                            while (_resourceVerifierPool.Any()) _resourceVerifierPool.Take().Dispose();
-                            _createdResourceVerifierCount = 0;
-                        }
-                        else
-                        {
-                            var resourceVerifier = ServiceLocator.Get<IResourceVerifier>();
-                            _resourceVerifierPool.Add(resourceVerifier, CancellationToken.None);
-                            _createdResourceVerifierCount++;
-                        }
+                        while (_resourceVerifierPool.Any()) _resourceVerifierPool.Take().Dispose();
+                        _createdResourceVerifierCount = 0;
+                    }
+                    else
+                    {
+                        var resourceVerifier = ServiceLocator.Get<IResourceVerifier>();
+                        _resourceVerifierPool.Add(resourceVerifier, CancellationToken.None);
+                        _createdResourceVerifierCount++;
                     }
                 }
-                void InitializeHtmlRendererPool()
+            }
+            void InitializeHtmlRendererPool()
+            {
+                Parallel.For(0, _memory.Configurations.HtmlRendererCount, htmlRendererId =>
                 {
-                    Parallel.For(0, _memory.Configurations.HtmlRendererCount, htmlRendererId =>
+                    if (cancellationToken.IsCancellationRequested)
                     {
-                        if (cancellationToken.IsCancellationRequested)
+                        while (_htmlRendererPool.Any()) _htmlRendererPool.Take().Dispose();
+                        Interlocked.Exchange(ref _createdHtmlRendererCount, 0);
+                    }
+                    else
+                    {
+                        var htmlRenderer = ServiceLocator.Get<IHtmlRenderer>();
+                        htmlRenderer.OnResourceCaptured += resource =>
                         {
-                            while (_htmlRendererPool.Any()) _htmlRendererPool.Take().Dispose();
-                            Interlocked.Exchange(ref _createdHtmlRendererCount, 0);
-                        }
-                        else
-                        {
-                            var htmlRenderer = ServiceLocator.Get<IHtmlRenderer>();
-                            htmlRenderer.OnResourceCaptured += resource =>
-                            {
-                                _memory.MemorizeToBeVerifiedResource(resource, cancellationToken);
-                            };
-                            _htmlRendererPool.Add(htmlRenderer, CancellationToken.None);
-                            Interlocked.Increment(ref _createdHtmlRendererCount);
-                        }
-                    });
-                }
+                            _memory.MemorizeToBeVerifiedResource(resource, cancellationToken);
+                        };
+                        _htmlRendererPool.Add(htmlRenderer, CancellationToken.None);
+                        Interlocked.Increment(ref _createdHtmlRendererCount);
+                    }
+                });
             }
         }
 
         public IHtmlRenderer GetHtmlRenderer(CancellationToken cancellationToken)
         {
-            lock (_publicApiLockMap[nameof(GetHtmlRenderer)])
-            {
-                if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
-                return _htmlRendererPool.Take(cancellationToken);
-            }
+            if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
+            return _htmlRendererPool.Take(cancellationToken);
         }
 
         public IResourceExtractor GetResourceExtractor(CancellationToken cancellationToken)
         {
-            lock (_publicApiLockMap[nameof(GetResourceExtractor)])
-            {
-                if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
-                return _resourceExtractorPool.Take(cancellationToken);
-            }
+            if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
+            return _resourceExtractorPool.Take(cancellationToken);
         }
 
         public IResourceVerifier GetResourceVerifier(CancellationToken cancellationToken)
         {
-            lock (_publicApiLockMap[nameof(GetResourceVerifier)])
-            {
-                if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
-                return _resourceVerifierPool.Take(cancellationToken);
-            }
+            if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
+            return _resourceVerifierPool.Take(cancellationToken);
         }
 
         public void Return(IResourceExtractor resourceExtractor)
         {
-            lock (_publicApiLockMap[$"{nameof(Return)}{nameof(ResourceExtractor)}"])
-            {
-                if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
-                _resourceExtractorPool.Add(resourceExtractor);
-            }
+            if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
+            _resourceExtractorPool.Add(resourceExtractor);
         }
 
         public void Return(IResourceVerifier resourceVerifier)
         {
-            lock (_publicApiLockMap[$"{nameof(Return)}{nameof(ResourceVerifier)}"])
-            {
-                if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
-                _resourceVerifierPool.Add(resourceVerifier);
-            }
+            if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
+            _resourceVerifierPool.Add(resourceVerifier);
         }
 
         public void Return(IHtmlRenderer htmlRenderer)
         {
-            lock (_publicApiLockMap[$"{nameof(Return)}{nameof(HtmlRenderer)}"])
-            {
-                if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
-                _htmlRendererPool.Add(htmlRenderer);
-            }
+            if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
+            _htmlRendererPool.Add(htmlRenderer);
         }
 
         void ReleaseUnmanagedResources()

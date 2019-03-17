@@ -1,4 +1,6 @@
 using System;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using Helix.Crawler.Abstractions;
 using Helix.Persistence;
 using Helix.Persistence.Abstractions;
@@ -16,7 +18,7 @@ namespace Helix.Crawler
         static ServiceLocator()
         {
             _objectDisposed = false;
-            _serviceProvider = GetNewServiceCollection().BuildServiceProvider();
+            _serviceProvider = GetInfrastructureServiceCollection().BuildServiceProvider();
         }
 
         public static void Dispose()
@@ -38,7 +40,7 @@ namespace Helix.Crawler
             if (_objectDisposed) throw new ObjectDisposedException(nameof(ServiceLocator));
             if (_serviceProvider?.GetService<Configurations>() != null) return;
             _serviceProvider?.Dispose();
-            _serviceProvider = GetNewServiceCollection()
+            _serviceProvider = GetInfrastructureServiceCollection()
                 .AddTransient<IHtmlRenderer, HtmlRenderer>()
                 .AddTransient<IResourceExtractor, ResourceExtractor>()
                 .AddTransient<IResourceVerifier, ResourceVerifier>()
@@ -51,11 +53,25 @@ namespace Helix.Crawler
                 .AddSingleton<IReportWriter, ReportWriter>()
                 .AddSingleton<IMemory, Memory>()
                 .AddSingleton<IScheduler, Scheduler>()
+                .AddSingleton(GetHttpClient(configurations))
                 .AddSingleton(configurations)
                 .BuildServiceProvider();
         }
 
-        static IServiceCollection GetNewServiceCollection()
+        static HttpClient GetHttpClient(Configurations configurations)
+        {
+            var httpClient = new HttpClient() { Timeout = TimeSpan.FromSeconds(configurations.RequestTimeoutDuration) };
+            httpClient.DefaultRequestHeaders.Accept.ParseAdd("*/*");
+            httpClient.DefaultRequestHeaders.AcceptEncoding.ParseAdd("*");
+            httpClient.DefaultRequestHeaders.AcceptLanguage.ParseAdd("*");
+            httpClient.DefaultRequestHeaders.CacheControl = CacheControlHeaderValue.Parse("no-cache");
+            httpClient.DefaultRequestHeaders.Pragma.ParseAdd("no-cache");
+            httpClient.DefaultRequestHeaders.Upgrade.ParseAdd("1");
+            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(configurations.UserAgent);
+            return httpClient;
+        }
+
+        static IServiceCollection GetInfrastructureServiceCollection()
         {
             return new ServiceCollection()
                 .AddSingleton<IPersistenceProvider, PersistenceProvider>()
