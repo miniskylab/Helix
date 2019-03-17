@@ -19,11 +19,11 @@ namespace Helix.WebBrowser
     {
         readonly (int width, int height) _browserWindowSize;
         ChromeDriver _chromeDriver;
+        ChromeDriverService _chromeDriverService;
         ProxyServer _httpProxyServer;
         bool _objectDisposed;
         readonly string _pathToChromeDriverExecutable;
         readonly string _pathToChromiumExecutable;
-        readonly List<int> _processIds;
         readonly Dictionary<string, object> _publicApiLockMap;
         readonly Stopwatch _stopwatch;
         readonly bool _useHeadlessWebBrowser;
@@ -54,7 +54,6 @@ namespace Helix.WebBrowser
             bool useHeadlessWebBrowser = true, (int width, int height) browserWindowSize = default)
         {
             _objectDisposed = false;
-            _processIds = new List<int>();
             _stopwatch = new Stopwatch();
             _pathToChromiumExecutable = pathToChromiumExecutable;
             _pathToChromeDriverExecutable = pathToChromeDriverExecutable;
@@ -220,18 +219,25 @@ namespace Helix.WebBrowser
                 }
             }
             _chromeDriver = null;
+            _chromeDriverService = null;
 
             void KillAllRelatedProcesses()
             {
-                _processIds.ForEach(processId => Process.GetProcessById(processId).Kill());
-                _processIds.Clear();
+                var childProcessQueryString = $"Select * From Win32_Process Where ParentProcessID={_chromeDriverService.ProcessId}";
+                var managementObjectSearcher = new ManagementObjectSearcher(childProcessQueryString);
+                foreach (var managementObject in managementObjectSearcher.Get())
+                {
+                    var processId = Convert.ToInt32(managementObject["ProcessID"]);
+                    Process.GetProcessById(processId).Kill();
+                }
+                Process.GetProcessById(_chromeDriverService.ProcessId).Kill();
             }
         }
 
         void OpenWebBrowser(IEnumerable<string> arguments)
         {
-            var chromeDriverService = ChromeDriverService.CreateDefaultService(_pathToChromeDriverExecutable);
-            chromeDriverService.HideCommandPromptWindow = true;
+            _chromeDriverService = ChromeDriverService.CreateDefaultService(_pathToChromeDriverExecutable);
+            _chromeDriverService.HideCommandPromptWindow = true;
 
             var chromeOptions = new ChromeOptions
             {
@@ -244,17 +250,7 @@ namespace Helix.WebBrowser
                 }
             };
             foreach (var argument in arguments) chromeOptions.AddArguments(argument);
-
-            _chromeDriver = new ChromeDriver(chromeDriverService, chromeOptions);
-            _processIds.Add(chromeDriverService.ProcessId);
-
-            var childProcessQueryString = $"Select * From Win32_Process Where ParentProcessID={chromeDriverService.ProcessId}";
-            var managementObjectSearcher = new ManagementObjectSearcher(childProcessQueryString);
-            foreach (var managementObject in managementObjectSearcher.Get())
-            {
-                var processId = Convert.ToInt32(managementObject["ProcessID"]);
-                _processIds.Add(processId);
-            }
+            _chromeDriver = new ChromeDriver(_chromeDriverService, chromeOptions);
         }
 
         void ReleaseUnmanagedResources()
