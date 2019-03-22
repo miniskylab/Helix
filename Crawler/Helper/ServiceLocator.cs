@@ -60,7 +60,7 @@ namespace Helix.Crawler
 
         static HttpClient GetHttpClient(Configurations configurations)
         {
-            var httpClient = new HttpClient() { Timeout = TimeSpan.FromSeconds(configurations.RequestTimeoutDuration) };
+            var httpClient = new HttpClient();
             httpClient.DefaultRequestHeaders.Accept.ParseAdd("*/*");
             httpClient.DefaultRequestHeaders.AcceptEncoding.ParseAdd("*");
             httpClient.DefaultRequestHeaders.AcceptLanguage.ParseAdd("*");

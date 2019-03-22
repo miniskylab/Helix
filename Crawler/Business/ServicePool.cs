@@ -41,14 +41,32 @@ namespace Helix.Crawler
             _objectDisposed = true;
         }
 
-        public void EnsureEnoughResources(CancellationToken cancellationToken)
+        public IHtmlRenderer GetHtmlRenderer(CancellationToken cancellationToken)
         {
             if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
-            InitializeResourceExtractorPool();
-            InitializeResourceVerifierPool();
-            InitializeHtmlRendererPool();
+            return _htmlRendererPool.Take(cancellationToken);
+        }
 
-            void InitializeResourceExtractorPool()
+        public IResourceExtractor GetResourceExtractor(CancellationToken cancellationToken)
+        {
+            if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
+            return _resourceExtractorPool.Take(cancellationToken);
+        }
+
+        public IResourceVerifier GetResourceVerifier(CancellationToken cancellationToken)
+        {
+            if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
+            return _resourceVerifierPool.Take(cancellationToken);
+        }
+
+        public void PreCreateServices(CancellationToken cancellationToken)
+        {
+            if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
+            PreCreateResourceExtractors();
+            PreCreateResourceVerifiers();
+            PreCreateHtmlRenderers();
+
+            void PreCreateResourceExtractors()
             {
                 for (var resourceExtractorId = 0; resourceExtractorId < ResourceExtractorCount; resourceExtractorId++)
                 {
@@ -65,7 +83,7 @@ namespace Helix.Crawler
                     }
                 }
             }
-            void InitializeResourceVerifierPool()
+            void PreCreateResourceVerifiers()
             {
                 for (var resourceVerifierId = 0; resourceVerifierId < ResourceVerifierCount; resourceVerifierId++)
                 {
@@ -82,7 +100,7 @@ namespace Helix.Crawler
                     }
                 }
             }
-            void InitializeHtmlRendererPool()
+            void PreCreateHtmlRenderers()
             {
                 Parallel.For(0, _memory.Configurations.HtmlRendererCount, htmlRendererId =>
                 {
@@ -103,24 +121,6 @@ namespace Helix.Crawler
                     }
                 });
             }
-        }
-
-        public IHtmlRenderer GetHtmlRenderer(CancellationToken cancellationToken)
-        {
-            if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
-            return _htmlRendererPool.Take(cancellationToken);
-        }
-
-        public IResourceExtractor GetResourceExtractor(CancellationToken cancellationToken)
-        {
-            if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
-            return _resourceExtractorPool.Take(cancellationToken);
-        }
-
-        public IResourceVerifier GetResourceVerifier(CancellationToken cancellationToken)
-        {
-            if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
-            return _resourceVerifierPool.Take(cancellationToken);
         }
 
         public void Return(IResourceExtractor resourceExtractor)

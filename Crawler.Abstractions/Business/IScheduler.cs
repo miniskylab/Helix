@@ -9,7 +9,7 @@ namespace Helix.Crawler.Abstractions
 
         bool EverythingIsDone { get; }
 
-        int RemainingUrlCount { get; }
+        int RemainingWorkload { get; }
 
         void CancelEverything();
 

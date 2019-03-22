@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 using Helix.Core;
 using Helix.Crawler.Abstractions;
@@ -32,11 +34,11 @@ namespace Helix.Crawler
             }
         }
 
-        public static int RemainingUrlCount
+        public static int RemainingWorkload
         {
             get
             {
-                try { return _scheduler?.RemainingUrlCount ?? 0; }
+                try { return _scheduler?.RemainingWorkload ?? 0; }
                 catch (ObjectDisposedException) { return 0; }
             }
         }
@@ -48,6 +50,10 @@ namespace Helix.Crawler
         {
             // TODO: A workaround for .Net Core 2.x bug. Should be removed in the future.
             AppContext.SetSwitch("System.Net.Http.UseSocketsHttpHandler", false);
+
+            ServicePointManager.DefaultConnectionLimit = int.MaxValue;
+            ThreadPool.GetMinThreads(out _, out var completionPortThreads);
+            ThreadPool.SetMinThreads(64, completionPortThreads);
 
             BackgroundTasks = new List<Task>();
             TransitionLock = new object();
@@ -102,7 +108,7 @@ namespace Helix.Crawler
                     EnsureErrorLogFileIsRecreated();
                     EnsureDirectoryContainsScreenshotFilesIsRecreated();
                     _reportWriter = ServiceLocator.Get<IReportWriter>();
-                    _servicePool.EnsureEnoughResources(_scheduler.CancellationToken);
+                    _servicePool.PreCreateServices(_scheduler.CancellationToken);
                     _memory.MemorizeToBeVerifiedResource(
                         _resourceProcessor.Enrich(new Resource
                         {

@@ -49,7 +49,7 @@ namespace Helix.Crawler
             }
         }
 
-        public int RemainingUrlCount
+        public int RemainingWorkload
         {
             get
             {

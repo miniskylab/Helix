@@ -15,8 +15,6 @@ namespace Helix.Crawler.Abstractions
 
         public string PathToDirectoryContainsScreenshotFiles { get; }
 
-        public int RequestTimeoutDuration { get; }
-
         public Uri StartUri { get; }
 
         public bool TakeScreenshotEvidence { get; }
@@ -31,16 +29,14 @@ namespace Helix.Crawler.Abstractions
 
         public string WorkingDirectory { get; }
 
-        public Configurations(Uri startUri = null, string domainName = "", int htmlRendererCount = 4, int requestTimeoutDuration = 30,
-            bool verifyExternalUrls = true, bool useHeadlessWebBrowsers = true, bool useIncognitoWebBrowser = true,
-            bool takeScreenshotEvidence = false, string pathToDirectoryContainsScreenshotFiles = "",
-            string pathToChromiumExecutable = "")
+        public Configurations(Uri startUri = null, string domainName = "", int htmlRendererCount = 4, bool verifyExternalUrls = true,
+            bool useHeadlessWebBrowsers = true, bool useIncognitoWebBrowser = true, bool takeScreenshotEvidence = false,
+            string pathToDirectoryContainsScreenshotFiles = "", string pathToChromiumExecutable = "")
         {
             StartUri = startUri;
             DomainName = domainName;
             HtmlRendererCount = htmlRendererCount;
             VerifyExternalUrls = verifyExternalUrls;
-            RequestTimeoutDuration = requestTimeoutDuration;
             UseHeadlessWebBrowsers = useHeadlessWebBrowsers;
             UseIncognitoWebBrowser = useIncognitoWebBrowser;
             TakeScreenshotEvidence = takeScreenshotEvidence;
@@ -62,7 +58,6 @@ namespace Helix.Crawler.Abstractions
             PathToChromiumExecutable = Path.Combine(WorkingDirectory, "chromium/chrome.exe");
             TakeScreenshotEvidence = true;
             UseIncognitoWebBrowser = true;
-            RequestTimeoutDuration = 30;
 
             DomainName = ((string) tokens.SelectToken(nameof(DomainName)) ?? string.Empty).ToLower();
             if (string.IsNullOrWhiteSpace(DomainName)) DomainName = "_";

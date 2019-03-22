@@ -106,7 +106,7 @@ namespace Helix.Gui
                             ValidUrlCount = CrawlerBot.Statistics?.ValidUrlCount,
                             BrokenUrlCount = CrawlerBot.Statistics?.BrokenUrlCount,
                             AveragePageLoadTime = CrawlerBot.Statistics?.AveragePageLoadTime,
-                            RemainingUrlCount = CrawlerBot.RemainingUrlCount,
+                            RemainingWorkload = CrawlerBot.RemainingWorkload,
                             ElapsedTime = Stopwatch.Elapsed.ToString("hh' : 'mm' : 'ss"),
                             StatusText = statusText
                         }

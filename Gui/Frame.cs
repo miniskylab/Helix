@@ -16,7 +16,7 @@ namespace Helix.Gui
 
         public string ElapsedTime { [UsedImplicitly] get; set; }
 
-        public int? RemainingUrlCount { [UsedImplicitly] get; set; }
+        public int? RemainingWorkload { [UsedImplicitly] get; set; }
 
         public string StatusText { [UsedImplicitly] get; set; }
 
