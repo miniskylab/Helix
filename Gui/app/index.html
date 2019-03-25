@@ -9,8 +9,18 @@
         <link href="styles/controls.css" rel="stylesheet" />
         <link href="styles/status-bar.css" rel="stylesheet" />
         <link href="styles/field.css" rel="stylesheet" />
+        <link href="styles/loading-spinner.css" rel="stylesheet" />
+        <link href="styles/shutdown-overlay.css" rel="stylesheet" />
     </head>
     <body>
+        <div class="overlay">
+            <div class="shutdown-overlay__title">SHUTTING DOWN</div>
+            <div class="shutdown-overlay__sub-title">(Please allow up to 120 seconds)</div>
+            <div class="loading-spinner shutdown-overlay__loading-spinner">
+                <div class="outer-circle"></div>
+                <div class="inner-circle"></div>
+            </div>
+        </div>
         <div class="title-bar">HELIX - 2.1</div>
         <div id="configuration-panel">
             <div class="field-group">
