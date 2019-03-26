@@ -8,11 +8,10 @@
 }
 
 .shutdown-overlay__subtitle {
-    margin-top: 10px;
+    margin-top: 5px;
     font-size: 15px;
     font-weight: bold;
     text-align: center;
-    font-style: italic;
 }
 
 .shutdown-overlay__loading-spinner { margin-top: 25px; }

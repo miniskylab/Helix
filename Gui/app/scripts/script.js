@@ -10,6 +10,7 @@ const ckbShowWebBrowsers = document.getElementById("ckb-show-web-browsers");
 const configurationPanel = document.getElementById("configuration-panel");
 const shutdownOverlay = document.getElementById("shutdown-overlay");
 const shutdownOverlaySubtitle = document.getElementById("shutdown-overlay-subtitle");
+const shutdownFailureOverlay = document.getElementById("shutdown-failure-overlay");
 
 const lblVerified = document.getElementById("lbl-verified");
 const lblValid = document.getElementById("lbl-valid");
@@ -48,7 +49,11 @@ socket.connect(18880, "127.0.0.1", () => {
         const shutdownCountdown = setInterval(() => {
             waitingTime--;
             shutdownOverlaySubtitle.innerHTML = getShutdownOverlaySubTitle(waitingTime);
-            if (waitingTime === 0) clearInterval(shutdownCountdown);
+            if (waitingTime === 0) {
+                shutdownFailureOverlay.style.display = "block";
+                shutdownOverlay.style.display = "none";
+                clearInterval(shutdownCountdown);
+            }
         }, 1000);
 
         socket.end(JSON.stringify({ text: "btn-close-clicked" }));
