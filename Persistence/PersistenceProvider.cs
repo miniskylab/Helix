@@ -10,9 +10,9 @@ namespace Helix.Persistence
             return new FilePersistence(filePath, flushDataToDiskInterval);
         }
 
-        public ISQLitePersistence<TDto> GetSQLitePersistence<TDto>(string pathToDatabaseFile) where TDto : class
+        public ISqLitePersistence<TDto> GetSqLitePersistence<TDto>(string pathToDatabaseFile) where TDto : class
         {
-            return new SQLitePersistence<TDto>(pathToDatabaseFile);
+            return new SqLitePersistence<TDto>(pathToDatabaseFile);
         }
     }
 }

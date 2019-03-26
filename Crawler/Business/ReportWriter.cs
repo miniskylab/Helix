@@ -11,7 +11,7 @@ namespace Helix.Crawler
     public sealed class ReportWriter : IReportWriter
     {
         bool _objectDisposed;
-        readonly ISQLitePersistence<VerificationResult> _sqLitePersistence;
+        readonly ISqLitePersistence<VerificationResult> _sqLitePersistence;
         IList<VerificationResult> _verificationResults;
         readonly object _writeLock;
 
@@ -23,7 +23,7 @@ namespace Helix.Crawler
             _verificationResults = new List<VerificationResult>();
 
             var pathToDatabaseFile = Path.Combine(configurations.WorkingDirectory, "report.sqlite3");
-            _sqLitePersistence = persistenceProvider.GetSQLitePersistence<VerificationResult>(pathToDatabaseFile);
+            _sqLitePersistence = persistenceProvider.GetSqLitePersistence<VerificationResult>(pathToDatabaseFile);
         }
 
         public void Dispose()

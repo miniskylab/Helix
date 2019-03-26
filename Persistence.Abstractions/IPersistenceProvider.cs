@@ -6,6 +6,6 @@ namespace Helix.Persistence.Abstractions
     {
         IFilePersistence GetFilePersistence(string filePath, TimeSpan? flushDataToDiskInterval = null);
 
-        ISQLitePersistence<TDto> GetSQLitePersistence<TDto>(string pathToDatabaseFile) where TDto : class;
+        ISqLitePersistence<TDto> GetSqLitePersistence<TDto>(string pathToDatabaseFile) where TDto : class;
     }
 }

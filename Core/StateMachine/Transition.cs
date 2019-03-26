@@ -5,26 +5,27 @@ namespace Helix.Core
 {
     public sealed class Transition<TState, TCommand> where TState : Enum where TCommand : Enum
     {
-        readonly TCommand Command;
-        readonly TState CurrentState;
+        readonly TCommand _command;
+        readonly TState _currentState;
 
         public Transition(TState currentState, TCommand command)
         {
-            CurrentState = currentState;
-            Command = command;
+            _currentState = currentState;
+            _command = command;
         }
 
         public override bool Equals(object obj)
         {
-            return obj is Transition<TState, TCommand> other && CurrentState.Equals(other.CurrentState) && Command.Equals(other.Command);
+            return obj is Transition<TState, TCommand> other && _currentState.Equals(other._currentState) &&
+                   _command.Equals(other._command);
         }
 
         public override int GetHashCode()
         {
             unchecked
             {
-                return (EqualityComparer<TCommand>.Default.GetHashCode(Command) * 397) ^
-                       EqualityComparer<TState>.Default.GetHashCode(CurrentState);
+                return (EqualityComparer<TCommand>.Default.GetHashCode(_command) * 397) ^
+                       EqualityComparer<TState>.Default.GetHashCode(_currentState);
             }
         }
     }

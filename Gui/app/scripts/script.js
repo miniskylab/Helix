@@ -66,7 +66,7 @@ socket.connect(18880, "127.0.0.1", () => {
         const ipcMessage = JSON.parse(ipcMessageJson);
         switch (ipcMessage.Text) {
             case "redraw":
-                redraw(JSON.parse(ipcMessage.Payload))
+                redraw(JSON.parse(ipcMessage.Payload));
                 break;
         }
     });

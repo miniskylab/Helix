@@ -5,13 +5,13 @@ namespace Helix.Crawler.Abstractions
 {
     public interface IServicePool : IDisposable
     {
-        void PreCreateServices(CancellationToken cancellationToken);
-
         IHtmlRenderer GetHtmlRenderer(CancellationToken cancellationToken);
 
         IResourceExtractor GetResourceExtractor(CancellationToken cancellationToken);
 
         IResourceVerifier GetResourceVerifier(CancellationToken cancellationToken);
+
+        void PreCreateServices(CancellationToken cancellationToken);
 
         void Return(IResourceExtractor resourceExtractor);
 
