@@ -69,7 +69,6 @@ namespace Helix.Gui
                 try
                 {
                     CrawlerBot.OnResourceVerified -= OnResourceVerified;
-                    RedrawGui("Shutting down ...");
                     CrawlerBot.StopWorking();
                     if (!Task.WhenAll(BackgroundTasks).Wait(TimeSpan.FromMinutes(2)))
                         File.AppendAllText(

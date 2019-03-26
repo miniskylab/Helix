@@ -43,6 +43,7 @@ body {
 }
 
 .overlay {
+    display: none;
     position: absolute;
     top: 0; left: 0;
     width: 100%;
@@ -50,4 +51,5 @@ body {
     background-color: #000000;
     opacity: .94;
     z-index: 999999;
+    user-select: none;
 }

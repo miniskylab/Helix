@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
-using System.Threading;
 using System.Threading.Tasks;
 using Helix.Core;
 using Helix.Crawler.Abstractions;
@@ -50,10 +49,7 @@ namespace Helix.Crawler
         {
             // TODO: A workaround for .Net Core 2.x bug. Should be removed in the future.
             AppContext.SetSwitch("System.Net.Http.UseSocketsHttpHandler", false);
-
             ServicePointManager.DefaultConnectionLimit = int.MaxValue;
-            ThreadPool.GetMinThreads(out _, out var completionPortThreads);
-            ThreadPool.SetMinThreads(64, completionPortThreads);
 
             BackgroundTasks = new List<Task>();
             TransitionLock = new object();
