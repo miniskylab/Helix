@@ -53,6 +53,7 @@ namespace Helix.Crawler
                 .AddSingleton<IReportWriter, ReportWriter>()
                 .AddSingleton<IMemory, Memory>()
                 .AddSingleton<IScheduler, Scheduler>()
+                .AddSingleton<IEventBroadcaster, EventBroadcaster>()
                 .AddSingleton(GetHttpClient(configurations))
                 .AddSingleton(configurations)
                 .BuildServiceProvider();

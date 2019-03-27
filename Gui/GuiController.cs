@@ -32,10 +32,6 @@ namespace Helix.Gui
              * TODO: Will be removed and replaced with built-in .Net Core 3.0 feature. */
             ShowWindow(GetConsoleWindow(), 0);
 
-            void OnResourceVerified(VerificationResult verificationResult)
-            {
-                RedrawGui($"{verificationResult.StatusCode:D} - {verificationResult.VerifiedUrl}");
-            }
             IpcSocket.On("btn-start-clicked", configurationJsonString =>
             {
                 if (CrawlerBot.CrawlerState != CrawlerState.WaitingToRun) return;
@@ -59,7 +55,7 @@ namespace Helix.Gui
                             throw new InvalidConstraintException();
                     }
                 };
-                CrawlerBot.OnResourceVerified += OnResourceVerified;
+                CrawlerBot.OnEventBroadcast += OnResourceVerified;
                 CrawlerBot.StartWorking(configurations);
                 RedrawGuiEvery(TimeSpan.FromSeconds(1));
                 Stopwatch.Restart();
@@ -68,7 +64,7 @@ namespace Helix.Gui
             {
                 try
                 {
-                    CrawlerBot.OnResourceVerified -= OnResourceVerified;
+                    CrawlerBot.OnEventBroadcast -= OnResourceVerified;
                     CrawlerBot.StopWorking();
                     if (!Task.WhenAll(BackgroundTasks).Wait(TimeSpan.FromMinutes(2)))
                         File.AppendAllText(
@@ -88,6 +84,12 @@ namespace Helix.Gui
             Stopwatch.Stop();
             IpcSocket.Dispose();
             GuiProcess.Close();
+
+            void OnResourceVerified(Event @event)
+            {
+                if (@event.EventType != EventType.ResourceVerified) return;
+                RedrawGui(@event.Message);
+            }
         }
 
         static void RedrawGui(string statusText = null)

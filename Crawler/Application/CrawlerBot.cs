@@ -12,6 +12,7 @@ namespace Helix.Crawler
 {
     public static class CrawlerBot
     {
+        static IEventBroadcaster _eventBroadcaster;
         static ILogger _logger;
         static IMemory _memory;
         static IReportWriter _reportWriter;
@@ -42,7 +43,7 @@ namespace Helix.Crawler
             }
         }
 
-        public static event Action<VerificationResult> OnResourceVerified;
+        public static event Action<Event> OnEventBroadcast;
         public static event Action OnStopped;
 
         static CrawlerBot()
@@ -94,7 +95,9 @@ namespace Helix.Crawler
             _scheduler = ServiceLocator.Get<IScheduler>();
             _servicePool = ServiceLocator.Get<IServicePool>();
             _resourceScope = ServiceLocator.Get<IResourceScope>();
+            _eventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
             _resourceProcessor = ServiceLocator.Get<IResourceProcessor>();
+            _eventBroadcaster.OnEventBroadcast += OnEventBroadcast;
 
             if (!TryTransit(CrawlerCommand.StartWorking)) return;
             BackgroundTasks.Add(Task.Run(() =>
@@ -229,7 +232,11 @@ namespace Helix.Crawler
                     else Statistics.ValidUrlCount++;
 
                     _reportWriter.WriteReport(verificationResult);
-                    OnResourceVerified?.Invoke(verificationResult);
+                    OnEventBroadcast?.Invoke(new Event
+                    {
+                        EventType = EventType.ResourceVerified,
+                        Message = $"{verificationResult.StatusCode:D} - {verificationResult.VerifiedUrl}"
+                    });
 
                     var resourceSizeInMb = resource.Size / 1024f / 1024f;
                     var resourceIsTooBig = resourceSizeInMb > 10;
