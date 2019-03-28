@@ -236,7 +236,6 @@ namespace Helix.Crawler
                     if (isOrphanedUri || uriSchemeNotSupported) return;
                     // TODO: We should log these orphaned uri-s somewhere
 
-                    Statistics.VerifiedUrlCount++;
                     if (resource.IsBroken) Statistics.BrokenUrlCount++;
                     else Statistics.ValidUrlCount++;
 

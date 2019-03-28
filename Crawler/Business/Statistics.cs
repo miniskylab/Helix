@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using Helix.Crawler.Abstractions;
 
 namespace Helix.Crawler
@@ -11,7 +10,7 @@ namespace Helix.Crawler
         int _successfullyRenderedPageCount;
         double _totalPageLoadTime;
         int _validUrlCount;
-        int _verifiedUrlCount;
+        readonly object _verifiedUrlCalculationLock = new object();
 
         public double AveragePageLoadTime
         {
@@ -26,38 +25,58 @@ namespace Helix.Crawler
 
         public int BrokenUrlCount
         {
-            get => Interlocked.CompareExchange(ref _brokenUrlCount, 0, 0);
-            set => Interlocked.Exchange(ref _brokenUrlCount, value);
+            get
+            {
+                lock (_verifiedUrlCalculationLock) return _brokenUrlCount;
+            }
+            set
+            {
+                lock (_verifiedUrlCalculationLock) _brokenUrlCount = value;
+            }
         }
 
         public int SuccessfullyRenderedPageCount
         {
-            get => Interlocked.CompareExchange(ref _successfullyRenderedPageCount, 0, 0);
+            get
+            {
+                lock (_averagePageLoadTimeCalculationLock) return _successfullyRenderedPageCount;
+            }
             set
             {
-                lock (_averagePageLoadTimeCalculationLock) Interlocked.Exchange(ref _successfullyRenderedPageCount, value);
+                lock (_averagePageLoadTimeCalculationLock) _successfullyRenderedPageCount = value;
             }
         }
 
         public double TotalPageLoadTime
         {
-            get => Interlocked.CompareExchange(ref _totalPageLoadTime, 0, 0);
+            get
+            {
+                lock (_averagePageLoadTimeCalculationLock) return _totalPageLoadTime;
+            }
             set
             {
-                lock (_averagePageLoadTimeCalculationLock) Interlocked.Exchange(ref _totalPageLoadTime, value);
+                lock (_averagePageLoadTimeCalculationLock) _totalPageLoadTime = value;
             }
         }
 
         public int ValidUrlCount
         {
-            get => Interlocked.CompareExchange(ref _validUrlCount, 0, 0);
-            set => Interlocked.Exchange(ref _validUrlCount, value);
+            get
+            {
+                lock (_verifiedUrlCalculationLock) return _validUrlCount;
+            }
+            set
+            {
+                lock (_verifiedUrlCalculationLock) _validUrlCount = value;
+            }
         }
 
         public int VerifiedUrlCount
         {
-            get => Interlocked.CompareExchange(ref _verifiedUrlCount, 0, 0);
-            set => Interlocked.Exchange(ref _verifiedUrlCount, value);
+            get
+            {
+                lock (_verifiedUrlCalculationLock) return _validUrlCount + _brokenUrlCount;
+            }
         }
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]

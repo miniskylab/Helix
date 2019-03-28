@@ -12,6 +12,6 @@ namespace Helix.Crawler.Abstractions
 
         int ValidUrlCount { get; set; }
 
-        int VerifiedUrlCount { get; set; }
+        int VerifiedUrlCount { get; }
     }
 }
