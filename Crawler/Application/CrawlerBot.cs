@@ -12,7 +12,6 @@ namespace Helix.Crawler
 {
     public static class CrawlerBot
     {
-        static IEventBroadcaster _eventBroadcaster;
         static ILogger _logger;
         static IMemory _memory;
         static IReportWriter _reportWriter;
@@ -21,6 +20,7 @@ namespace Helix.Crawler
         static IScheduler _scheduler;
         static IServicePool _servicePool;
         static readonly List<Task> BackgroundTasks;
+        static readonly IEventBroadcaster EventBroadcaster;
         static readonly StateMachine<CrawlerState, CrawlerCommand> StateMachine;
         static readonly object TransitionLock;
 
@@ -51,6 +51,9 @@ namespace Helix.Crawler
             // TODO: A workaround for .Net Core 2.x bug. Should be removed in the future.
             AppContext.SetSwitch("System.Net.Http.UseSocketsHttpHandler", false);
             ServicePointManager.DefaultConnectionLimit = int.MaxValue;
+
+            EventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
+            EventBroadcaster.OnEventBroadcast += @event => { OnEventBroadcast?.Invoke(@event); };
 
             BackgroundTasks = new List<Task>();
             TransitionLock = new object();
@@ -95,9 +98,7 @@ namespace Helix.Crawler
             _scheduler = ServiceLocator.Get<IScheduler>();
             _servicePool = ServiceLocator.Get<IServicePool>();
             _resourceScope = ServiceLocator.Get<IResourceScope>();
-            _eventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
             _resourceProcessor = ServiceLocator.Get<IResourceProcessor>();
-            _eventBroadcaster.OnEventBroadcast += OnEventBroadcast;
 
             if (!TryTransit(CrawlerCommand.StartWorking)) return;
             BackgroundTasks.Add(Task.Run(() =>
@@ -149,16 +150,24 @@ namespace Helix.Crawler
         public static void StopWorking()
         {
             if (!TryTransit(CrawlerCommand.StopWorking)) return;
-            var crawlerCommand = CrawlerCommand.MarkAsRanToCompletion;
-            if (_scheduler == null || !_scheduler.EverythingIsDone) crawlerCommand = CrawlerCommand.MarkAsCancelled;
-
-            _logger.LogInfo("Stopping ...");
-            _scheduler?.CancelEverything();
-            try { Task.WhenAll(BackgroundTasks).Wait(); }
-            catch (Exception exception)
+            var crawlerCommand = CrawlerCommand.MarkAsCancelled;
+            if (_scheduler != null)
             {
-                _logger.LogException(exception);
-                crawlerCommand = CrawlerCommand.MarkAsFaulted;
+                _logger.LogInfo("Initialize stop sequence ...");
+                _scheduler.CancelEverything();
+                if (_scheduler.EverythingIsDone) crawlerCommand = CrawlerCommand.MarkAsRanToCompletion;
+
+                EventBroadcaster.Broadcast(new Event
+                {
+                    EventType = EventType.ShutdownStepChanged,
+                    Message = "Waiting for background tasks to complete ..."
+                });
+                try { Task.WhenAll(BackgroundTasks).Wait(); }
+                catch (Exception exception)
+                {
+                    _logger.LogException(exception);
+                    crawlerCommand = CrawlerCommand.MarkAsFaulted;
+                }
             }
 
             ServiceLocator.Dispose();
@@ -232,7 +241,7 @@ namespace Helix.Crawler
                     else Statistics.ValidUrlCount++;
 
                     _reportWriter.WriteReport(verificationResult);
-                    OnEventBroadcast?.Invoke(new Event
+                    EventBroadcaster.Broadcast(new Event
                     {
                         EventType = EventType.ResourceVerified,
                         Message = $"{verificationResult.StatusCode:D} - {verificationResult.VerifiedUrl}"

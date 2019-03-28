@@ -14,10 +14,12 @@ namespace Helix.Crawler
     {
         static bool _objectDisposed;
         static ServiceProvider _serviceProvider;
+        static readonly IEventBroadcaster EventBroadcaster;
 
         static ServiceLocator()
         {
             _objectDisposed = false;
+            EventBroadcaster = Activator.CreateInstance<EventBroadcaster>();
             _serviceProvider = GetInfrastructureServiceCollection().BuildServiceProvider();
         }
 
@@ -53,7 +55,6 @@ namespace Helix.Crawler
                 .AddSingleton<IReportWriter, ReportWriter>()
                 .AddSingleton<IMemory, Memory>()
                 .AddSingleton<IScheduler, Scheduler>()
-                .AddSingleton<IEventBroadcaster, EventBroadcaster>()
                 .AddSingleton(GetHttpClient(configurations))
                 .AddSingleton(configurations)
                 .BuildServiceProvider();
@@ -76,7 +77,8 @@ namespace Helix.Crawler
         {
             return new ServiceCollection()
                 .AddSingleton<IPersistenceProvider, PersistenceProvider>()
-                .AddSingleton<IWebBrowserProvider, WebBrowserProvider>();
+                .AddSingleton<IWebBrowserProvider, WebBrowserProvider>()
+                .AddSingleton(EventBroadcaster);
         }
     }
 }

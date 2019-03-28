@@ -10,6 +10,7 @@ namespace Helix.Crawler
     public sealed class Scheduler : IScheduler
     {
         CancellationTokenSource _cancellationTokenSource;
+        readonly IEventBroadcaster _eventBroadcaster;
         readonly object _extractionLock;
         readonly ILogger _logger;
         readonly IMemory _memory;
@@ -68,11 +69,12 @@ namespace Helix.Crawler
         }
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public Scheduler(IMemory memory, ILogger logger, IServicePool servicePool)
+        public Scheduler(IMemory memory, ILogger logger, IServicePool servicePool, IEventBroadcaster eventBroadcaster)
         {
             _memory = memory;
             _logger = logger;
             _servicePool = servicePool;
+            _eventBroadcaster = eventBroadcaster;
             _objectDisposed = false;
             _renderingLock = new object();
             _extractionLock = new object();
@@ -84,8 +86,19 @@ namespace Helix.Crawler
         {
             if (_objectDisposed) throw new ObjectDisposedException(nameof(Scheduler));
             _cancellationTokenSource.Cancel();
-            while (_pendingExtractionTaskCount + _pendingRenderingTaskCount + _pendingVerificationTaskCount > 0) Thread.Sleep(100);
+
+            while (GetPendingTaskCount() > 0)
+            {
+                Thread.Sleep(100);
+                _eventBroadcaster.Broadcast(new Event
+                {
+                    EventType = EventType.ShutdownStepChanged,
+                    Message = $"Cancelling pending tasks ({GetPendingTaskCount()} remaining) ..."
+                });
+            }
             _memory.Clear();
+
+            int GetPendingTaskCount() { return _pendingExtractionTaskCount + _pendingRenderingTaskCount + _pendingVerificationTaskCount; }
         }
 
         public void CreateTask(Action<IResourceExtractor, HtmlDocument> taskDescription)

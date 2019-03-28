@@ -65,12 +65,15 @@ namespace Helix.Gui
                 try
                 {
                     CrawlerBot.OnEventBroadcast -= OnResourceVerified;
+                    CrawlerBot.OnEventBroadcast += OnShutdownStepChanged;
                     CrawlerBot.StopWorking();
-                    if (!Task.WhenAll(BackgroundTasks).Wait(TimeSpan.FromMinutes(2)))
+                    RedrawGui("Waiting for background tasks to complete ...");
+                    if (!Task.WhenAll(BackgroundTasks).Wait(TimeSpan.FromMinutes(1)))
                         File.AppendAllText(
                             Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "debug.log"),
                             $"\r\n[{DateTime.Now:yyyy/MM/dd HH:mm:ss}] Waiting for background tasks to complete timed out after 60 seconds."
                         );
+                    Thread.Sleep(TimeSpan.FromSeconds(1));
                 }
                 catch (Exception exception)
                 {
@@ -79,7 +82,6 @@ namespace Helix.Gui
                 finally { ManualResetEvent.Set(); }
             });
             GuiProcess.Start();
-
             ManualResetEvent.WaitOne();
             Stopwatch.Stop();
             IpcSocket.Dispose();
@@ -88,6 +90,11 @@ namespace Helix.Gui
             void OnResourceVerified(Event @event)
             {
                 if (@event.EventType != EventType.ResourceVerified) return;
+                RedrawGui(@event.Message);
+            }
+            void OnShutdownStepChanged(Event @event)
+            {
+                if (@event.EventType != EventType.ShutdownStepChanged) return;
                 RedrawGui(@event.Message);
             }
         }

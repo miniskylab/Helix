@@ -14,4 +14,12 @@
     text-align: center;
 }
 
+.shutdown-overlay__message {
+    margin-top: 32px;
+    font-size: 14px;
+    font-weight: bold;
+    text-align: center;
+    color: #00B7E5;
+}
+
 .shutdown-overlay__loading-spinner { margin-top: 25px; }

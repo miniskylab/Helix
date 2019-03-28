@@ -20,6 +20,7 @@ const lblAveragePageLoadTime = document.getElementById("lbl-average-page-load-ti
 const lblAveragePageLoadTimeUnitOfMeasure = document.getElementById("lbl-average-page-load-time-unit-of-measure");
 const lblElapsedTime = document.getElementById("lbl-elapsed-time");
 const lblStatusText = document.getElementById("lbl-status-text");
+const lblShutdownOverlayMessage = document.getElementById("shutdown-overlay-message");
 const btnStop = document.getElementById("btn-stop");
 
 socket.connect(18880, "127.0.0.1", () => {
@@ -44,6 +45,7 @@ socket.connect(18880, "127.0.0.1", () => {
         let waitingTime = 120;
         const getShutdownOverlaySubTitle = (remainingTime) => `(Please allow up to <div style='display:inline-block;color:#FF6347;'>${remainingTime}</div> seconds)`;
         shutdownOverlaySubtitle.innerHTML = getShutdownOverlaySubTitle(waitingTime);
+        lblShutdownOverlayMessage.textContent = "Initializing shutdown sequence ..."
         shutdownOverlay.style.display = "block";
 
         const shutdownCountdown = setInterval(() => {
@@ -85,7 +87,9 @@ function redraw(viewModel) {
         lblAveragePageLoadTimeUnitOfMeasure.style.visibility = "visible";
     }
     if (viewModel.ElapsedTime) lblElapsedTime.textContent = viewModel.ElapsedTime;
-    if (viewModel.StatusText) lblStatusText.textContent = viewModel.StatusText;
+    if (viewModel.StatusText) shutdownOverlay.style.display === "block"
+        ? lblShutdownOverlayMessage.textContent = viewModel.StatusText
+        : lblStatusText.textContent = viewModel.StatusText;
 
     const btnMainIsStartButton = btnMain.firstElementChild.className === "controls__play-icon";
     const btnMainIsPauseButton = btnMain.firstElementChild.className === "controls__pause-icon";

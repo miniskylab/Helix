@@ -15,6 +15,7 @@ namespace Helix.Crawler
         int _createdHtmlRendererCount;
         int _createdResourceExtractorCount;
         int _createdResourceVerifierCount;
+        readonly IEventBroadcaster _eventBroadcaster;
         BlockingCollection<IHtmlRenderer> _htmlRendererPool;
         readonly ILogger _logger;
         readonly IMemory _memory;
@@ -23,10 +24,11 @@ namespace Helix.Crawler
         BlockingCollection<IResourceVerifier> _resourceVerifierPool;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public ServicePool(IMemory memory, ILogger logger)
+        public ServicePool(IMemory memory, ILogger logger, IEventBroadcaster eventBroadcaster)
         {
             _memory = memory;
             _logger = logger;
+            _eventBroadcaster = eventBroadcaster;
             _objectDisposed = false;
             _resourceExtractorPool = new BlockingCollection<IResourceExtractor>();
             _resourceVerifierPool = new BlockingCollection<IResourceVerifier>();
@@ -182,6 +184,12 @@ namespace Helix.Crawler
                 {
                     _htmlRendererPool.Take().Dispose();
                     disposedHtmlRendererCount++;
+
+                    _eventBroadcaster.Broadcast(new Event
+                    {
+                        EventType = EventType.ShutdownStepChanged,
+                        Message = $"Closing web browser ({disposedHtmlRendererCount}/{_createdHtmlRendererCount})"
+                    });
                 }
             }
             void CheckForOrphanedResources()

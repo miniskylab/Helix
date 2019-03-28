@@ -7,6 +7,7 @@ namespace Helix.Crawler
     {
         public event Action<Event> OnEventBroadcast;
 
+        [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public void Broadcast(Event @event) { OnEventBroadcast?.Invoke(@event); }
     }
 }
