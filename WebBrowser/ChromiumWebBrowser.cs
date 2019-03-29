@@ -99,13 +99,13 @@ namespace Helix.WebBrowser
             }
         }
 
-        public bool TryRender(Uri uri, out string html, out long? pageLoadTime, CancellationToken cancellationToken,
+        public bool TryRender(Uri uri, out string html, out long? millisecondsPageLoadTime, CancellationToken cancellationToken,
             Action<Exception> onFailed = null)
         {
             CurrentUri = uri ?? throw new ArgumentNullException(nameof(uri));
 
             html = null;
-            pageLoadTime = null;
+            millisecondsPageLoadTime = null;
             var renderingFailedErrorMessage = $"Chromium web browser failed to render the URI: {uri}";
             lock (_publicApiLockMap[nameof(TryRender)])
             {
@@ -120,7 +120,7 @@ namespace Helix.WebBrowser
 
                     if (TryGetPageSource(out html))
                     {
-                        pageLoadTime = _stopwatch.ElapsedMilliseconds;
+                        millisecondsPageLoadTime = _stopwatch.ElapsedMilliseconds;
                         return true;
                     }
                     onFailed?.Invoke(new MemberAccessException($"Chromium web browser failed to obtain page source of the URI: {uri}"));

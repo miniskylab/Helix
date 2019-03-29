@@ -7,14 +7,14 @@ namespace Helix.Gui
 {
     public class Frame
     {
-        public double? AveragePageLoadTime { [UsedImplicitly] get; set; }
-
         public int? BrokenUrlCount { [UsedImplicitly] get; set; }
 
         [JsonConverter(typeof(StringEnumConverter))]
         public CrawlerState CrawlerState { [UsedImplicitly] get; set; }
 
         public string ElapsedTime { [UsedImplicitly] get; set; }
+
+        public double? MillisecondsAveragePageLoadTime { [UsedImplicitly] get; set; }
 
         public int? RemainingWorkload { [UsedImplicitly] get; set; }
 

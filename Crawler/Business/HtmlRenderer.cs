@@ -147,7 +147,7 @@ namespace Helix.Crawler
             }
         }
 
-        public bool TryRender(Resource resource, out string html, out long? pageLoadTime, CancellationToken cancellationToken,
+        public bool TryRender(Resource resource, out string html, out long? millisecondsPageLoadTime, CancellationToken cancellationToken,
             Action<Exception> onFailed = null)
         {
             lock (_publicApiLockMap[nameof(TryRender)])
@@ -160,8 +160,8 @@ namespace Helix.Crawler
                 _resourceBeingRendered = resource;
 
                 var uri = resource.Uri;
-                var renderingResult = _webBrowser.TryRender(uri, out html, out pageLoadTime, cancellationToken, onFailed);
-                if (resource.IsBroken) pageLoadTime = null;
+                var renderingResult = _webBrowser.TryRender(uri, out html, out millisecondsPageLoadTime, cancellationToken, onFailed);
+                if (resource.IsBroken) millisecondsPageLoadTime = null;
                 if (!_takeScreenshot) return renderingResult;
 
                 var pathToDirectoryContainsScreenshotFiles = _configurations.PathToDirectoryContainsScreenshotFiles;

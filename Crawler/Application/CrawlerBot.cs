@@ -195,15 +195,15 @@ namespace Helix.Crawler
                     var renderingFailed = !htmlRenderer.TryRender(
                         toBeRenderedResource,
                         out var htmlText,
-                        out var pageLoadTime,
+                        out var millisecondsPageLoadTime,
                         _scheduler.CancellationToken,
                         _logger.LogException
                     );
                     if (renderingFailed) return;
-                    if (pageLoadTime.HasValue)
+                    if (millisecondsPageLoadTime.HasValue)
                     {
-                        Statistics.SuccessfullyRenderedPageCount++;
-                        Statistics.TotalPageLoadTime += pageLoadTime.Value;
+                        Statistics.IncrementSuccessfullyRenderedPageCount();
+                        Statistics.IncrementTotalPageLoadTimeBy(millisecondsPageLoadTime.Value);
                     }
 
                     if (toBeRenderedResource.IsBroken) return;
@@ -236,8 +236,8 @@ namespace Helix.Crawler
                     if (isOrphanedUri || uriSchemeNotSupported) return;
                     // TODO: We should log these orphaned uri-s somewhere
 
-                    if (resource.IsBroken) Statistics.BrokenUrlCount++;
-                    else Statistics.ValidUrlCount++;
+                    if (resource.IsBroken) Statistics.IncrementBrokenUrlCount();
+                    else Statistics.IncrementValidUrlCount();
 
                     _reportWriter.WriteReport(verificationResult);
                     EventBroadcaster.Broadcast(new Event

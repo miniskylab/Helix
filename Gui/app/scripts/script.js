@@ -45,7 +45,7 @@ socket.connect(18880, "127.0.0.1", () => {
         let waitingTime = 120;
         const getShutdownOverlaySubTitle = (remainingTime) => `(Please allow up to <div style='display:inline-block;color:#FF6347;'>${remainingTime}</div> seconds)`;
         shutdownOverlaySubtitle.innerHTML = getShutdownOverlaySubTitle(waitingTime);
-        lblShutdownOverlayMessage.textContent = "Initializing shutdown sequence ..."
+        lblShutdownOverlayMessage.textContent = "Initializing shutdown sequence ...";
         shutdownOverlay.style.display = "block";
 
         const shutdownCountdown = setInterval(() => {
@@ -82,8 +82,8 @@ function redraw(viewModel) {
     if (isNumeric(viewModel.ValidUrlCount)) lblValid.textContent = viewModel.ValidUrlCount.toLocaleString("en-US", { maximumFractionDigits: 2 });
     if (isNumeric(viewModel.BrokenUrlCount)) lblBroken.textContent = viewModel.BrokenUrlCount.toLocaleString("en-US", { maximumFractionDigits: 2 });
     if (isNumeric(viewModel.RemainingWorkload)) lblRemaining.textContent = viewModel.RemainingWorkload.toLocaleString("en-US", { maximumFractionDigits: 2 });
-    if (isNumeric(viewModel.AveragePageLoadTime)) {
-        lblAveragePageLoadTime.textContent = viewModel.AveragePageLoadTime.toLocaleString("en-US", { maximumFractionDigits: 0 });
+    if (isNumeric(viewModel.MillisecondsAveragePageLoadTime)) {
+        lblAveragePageLoadTime.textContent = viewModel.MillisecondsAveragePageLoadTime.toLocaleString("en-US", { maximumFractionDigits: 0 });
         lblAveragePageLoadTimeUnitOfMeasure.style.visibility = "visible";
     }
     if (viewModel.ElapsedTime) lblElapsedTime.textContent = viewModel.ElapsedTime;

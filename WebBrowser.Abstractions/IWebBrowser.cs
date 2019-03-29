@@ -13,7 +13,7 @@ namespace Helix.WebBrowser.Abstractions
 
         string GetUserAgentString();
 
-        bool TryRender(Uri uri, out string html, out long? pageLoadTime, CancellationToken cancellationToken,
+        bool TryRender(Uri uri, out string html, out long? millisecondsPageLoadTime, CancellationToken cancellationToken,
             Action<Exception> onFailed = null);
 
         bool TryTakeScreenshot(string pathToScreenshotFile, Action<Exception> onFailed = null);

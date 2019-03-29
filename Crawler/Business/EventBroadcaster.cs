@@ -1,8 +1,10 @@
 ﻿using System;
 using Helix.Crawler.Abstractions;
+using JetBrains.Annotations;
 
 namespace Helix.Crawler
 {
+    [UsedImplicitly]
     public class EventBroadcaster : IEventBroadcaster
     {
         public event Action<Event> OnEventBroadcast;
