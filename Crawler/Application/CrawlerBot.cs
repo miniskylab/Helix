@@ -12,6 +12,7 @@ namespace Helix.Crawler
 {
     public static class CrawlerBot
     {
+        static IEventBroadcaster _eventBroadcaster;
         static ILogger _logger;
         static IMemory _memory;
         static IReportWriter _reportWriter;
@@ -20,7 +21,6 @@ namespace Helix.Crawler
         static IScheduler _scheduler;
         static IServicePool _servicePool;
         static readonly List<Task> BackgroundTasks;
-        static readonly IEventBroadcaster EventBroadcaster;
         static readonly StateMachine<CrawlerState, CrawlerCommand> StateMachine;
         static readonly object TransitionLock;
 
@@ -52,9 +52,6 @@ namespace Helix.Crawler
             AppContext.SetSwitch("System.Net.Http.UseSocketsHttpHandler", false);
             ServicePointManager.DefaultConnectionLimit = int.MaxValue;
 
-            EventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
-            EventBroadcaster.OnEventBroadcast += @event => { OnEventBroadcast?.Invoke(@event); };
-
             BackgroundTasks = new List<Task>();
             TransitionLock = new object();
             StateMachine = new StateMachine<CrawlerState, CrawlerCommand>(
@@ -85,6 +82,10 @@ namespace Helix.Crawler
 
         public static void StartWorking(Configurations configurations)
         {
+            ServiceLocator.PreCreateBackboneServices();
+            _eventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
+            _eventBroadcaster.OnEventBroadcast += @event => { OnEventBroadcast?.Invoke(@event); };
+
             var webBrowser = ServiceLocator.Get<IWebBrowserProvider>().GetWebBrowser(
                 configurations.PathToChromiumExecutable,
                 configurations.WorkingDirectory
@@ -153,13 +154,13 @@ namespace Helix.Crawler
             var crawlerCommand = CrawlerCommand.MarkAsCancelled;
             if (_scheduler != null)
             {
-                _logger.LogInfo("Initialize stop sequence ...");
+                _logger.LogInfo("Initialized stop sequence ...");
                 _scheduler.CancelEverything();
                 if (_scheduler.EverythingIsDone) crawlerCommand = CrawlerCommand.MarkAsRanToCompletion;
 
-                EventBroadcaster.Broadcast(new Event
+                _eventBroadcaster.Broadcast(new Event
                 {
-                    EventType = EventType.ShutdownStepChanged,
+                    EventType = EventType.StopProgressUpdated,
                     Message = "Waiting for background tasks to complete ..."
                 });
                 try { Task.WhenAll(BackgroundTasks).Wait(); }
@@ -173,6 +174,9 @@ namespace Helix.Crawler
             ServiceLocator.Dispose();
             TryTransit(crawlerCommand);
             OnStopped?.Invoke();
+
+            OnStopped = null;
+            OnEventBroadcast = null;
         }
 
         static void Extract()
@@ -240,7 +244,7 @@ namespace Helix.Crawler
                     else Statistics.IncrementValidUrlCount();
 
                     _reportWriter.WriteReport(verificationResult);
-                    EventBroadcaster.Broadcast(new Event
+                    _eventBroadcaster.Broadcast(new Event
                     {
                         EventType = EventType.ResourceVerified,
                         Message = $"{verificationResult.StatusCode:D} - {verificationResult.VerifiedUrl}"

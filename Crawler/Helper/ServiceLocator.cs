@@ -1,4 +1,5 @@
 using System;
+using System.Data;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using Helix.Crawler.Abstractions;
@@ -12,22 +13,18 @@ namespace Helix.Crawler
 {
     static class ServiceLocator
     {
+        static IEventBroadcaster _eventBroadcaster;
         static bool _objectDisposed;
         static ServiceProvider _serviceProvider;
-        static readonly IEventBroadcaster EventBroadcaster;
 
-        static ServiceLocator()
-        {
-            _objectDisposed = false;
-            EventBroadcaster = Activator.CreateInstance<EventBroadcaster>();
-            _serviceProvider = GetInfrastructureServiceCollection().BuildServiceProvider();
-        }
+        static ServiceLocator() { _objectDisposed = true; }
 
         public static void Dispose()
         {
             if (_objectDisposed) return;
             _serviceProvider?.Dispose();
             _serviceProvider = null;
+            _eventBroadcaster = null;
             _objectDisposed = true;
         }
 
@@ -37,12 +34,20 @@ namespace Helix.Crawler
             return _serviceProvider.GetService<TService>();
         }
 
+        public static void PreCreateBackboneServices()
+        {
+            if (!_objectDisposed) throw new InvalidConstraintException();
+            _objectDisposed = false;
+            _eventBroadcaster = Activator.CreateInstance<EventBroadcaster>();
+            _serviceProvider = GetNonDisposableServiceCollection().BuildServiceProvider();
+        }
+
         public static void RebuildUsingNew(Configurations configurations)
         {
             if (_objectDisposed) throw new ObjectDisposedException(nameof(ServiceLocator));
             if (_serviceProvider?.GetService<Configurations>() != null) return;
             _serviceProvider?.Dispose();
-            _serviceProvider = GetInfrastructureServiceCollection()
+            _serviceProvider = GetNonDisposableServiceCollection()
                 .AddTransient<IHtmlRenderer, HtmlRenderer>()
                 .AddTransient<IResourceExtractor, ResourceExtractor>()
                 .AddTransient<IResourceVerifier, ResourceVerifier>()
@@ -73,12 +78,12 @@ namespace Helix.Crawler
             return httpClient;
         }
 
-        static IServiceCollection GetInfrastructureServiceCollection()
+        static IServiceCollection GetNonDisposableServiceCollection()
         {
             return new ServiceCollection()
                 .AddSingleton<IPersistenceProvider, PersistenceProvider>()
                 .AddSingleton<IWebBrowserProvider, WebBrowserProvider>()
-                .AddSingleton(EventBroadcaster);
+                .AddSingleton(_eventBroadcaster);
         }
     }
 }

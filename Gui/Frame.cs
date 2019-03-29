@@ -18,6 +18,8 @@ namespace Helix.Gui
 
         public int? RemainingWorkload { [UsedImplicitly] get; set; }
 
+        public bool? RestrictHumanInteraction { [UsedImplicitly] get; set; }
+
         public string StatusText { [UsedImplicitly] get; set; }
 
         public int? ValidUrlCount { [UsedImplicitly] get; set; }

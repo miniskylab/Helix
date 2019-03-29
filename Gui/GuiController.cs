@@ -34,38 +34,39 @@ namespace Helix.Gui
 
             IpcSocket.On("btn-start-clicked", configurationJsonString =>
             {
-                if (CrawlerBot.CrawlerState != CrawlerState.WaitingToRun) return;
-                var configurations = new Configurations(configurationJsonString);
-                RedrawGui("Initializing ...");
+                if (!(CrawlerState.WaitingToRun | CrawlerState.Completed).HasFlag(CrawlerBot.CrawlerState)) return;
                 CrawlerBot.OnStopped += () =>
                 {
                     Stopwatch.Stop();
                     switch (CrawlerBot.CrawlerState)
                     {
                         case CrawlerState.RanToCompletion:
-                            RedrawGui("Done.");
+                            RedrawGui("Done.", false);
                             break;
                         case CrawlerState.Cancelled:
                             RedrawGui("Cancelled.");
                             break;
                         case CrawlerState.Faulted:
-                            RedrawGui("One or more errors occurred. Check the logs for more details.");
+                            RedrawGui("One or more errors occurred. Check the logs for more details.", false);
                             break;
                         default:
                             throw new InvalidConstraintException();
                     }
                 };
                 CrawlerBot.OnEventBroadcast += OnResourceVerified;
-                CrawlerBot.StartWorking(configurations);
+                BackgroundTasks.Clear();
+                Stopwatch.Reset();
+
+                CrawlerBot.StartWorking(new Configurations(configurationJsonString));
                 RedrawGuiEvery(TimeSpan.FromSeconds(1));
-                Stopwatch.Restart();
+                Stopwatch.Start();
             });
             IpcSocket.On("btn-close-clicked", _ =>
             {
                 try
                 {
                     CrawlerBot.OnEventBroadcast -= OnResourceVerified;
-                    CrawlerBot.OnEventBroadcast += OnShutdownStepChanged;
+                    CrawlerBot.OnEventBroadcast += StopProgressUpdated;
                     CrawlerBot.StopWorking();
                     RedrawGui("Waiting for background tasks to complete ...");
                     if (!Task.WhenAll(BackgroundTasks).Wait(TimeSpan.FromMinutes(1)))
@@ -92,21 +93,21 @@ namespace Helix.Gui
                 if (@event.EventType != EventType.ResourceVerified) return;
                 RedrawGui(@event.Message);
             }
-            void OnShutdownStepChanged(Event @event)
+            void StopProgressUpdated(Event @event)
             {
-                if (@event.EventType != EventType.ShutdownStepChanged) return;
+                if (@event.EventType != EventType.StopProgressUpdated) return;
                 RedrawGui(@event.Message);
             }
         }
 
-        static void RedrawGui(string statusText = null)
+        static void RedrawGui(string statusText = null, bool? restrictHumanInteraction = null)
         {
             IpcSocket.Send(new IpcMessage
             {
                 Text = "redraw",
                 Payload = JsonConvert.SerializeObject(
                     CrawlerBot.CrawlerState == CrawlerState.WaitingToRun
-                        ? new Frame { StatusText = statusText }
+                        ? new Frame { RestrictHumanInteraction = restrictHumanInteraction, StatusText = statusText }
                         : new Frame
                         {
                             CrawlerState = CrawlerBot.CrawlerState,
@@ -116,6 +117,7 @@ namespace Helix.Gui
                             MillisecondsAveragePageLoadTime = CrawlerBot.Statistics?.MillisecondsAveragePageLoadTime,
                             RemainingWorkload = CrawlerBot.RemainingWorkload,
                             ElapsedTime = Stopwatch.Elapsed.ToString("hh' : 'mm' : 'ss"),
+                            RestrictHumanInteraction = restrictHumanInteraction,
                             StatusText = statusText
                         }
                 )

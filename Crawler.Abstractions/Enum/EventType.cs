@@ -4,6 +4,6 @@
     {
         None,
         ResourceVerified,
-        ShutdownStepChanged
+        StopProgressUpdated
     }
 }

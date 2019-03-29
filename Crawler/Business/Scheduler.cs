@@ -92,7 +92,7 @@ namespace Helix.Crawler
                 Thread.Sleep(100);
                 _eventBroadcaster.Broadcast(new Event
                 {
-                    EventType = EventType.ShutdownStepChanged,
+                    EventType = EventType.StopProgressUpdated,
                     Message = $"Cancelling pending tasks ({GetPendingTaskCount()} remaining) ..."
                 });
             }

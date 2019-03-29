@@ -1,4 +1,4 @@
-﻿const { remote, ipcRenderer } = require("electron");
+﻿const {remote, ipcRenderer} = require("electron");
 const socket = new require("net").Socket();
 
 const btnMain = document.getElementById("btn-main");
@@ -28,6 +28,14 @@ socket.connect(18880, "127.0.0.1", () => {
     btnMain.addEventListener("click", () => {
         if (!btnMain.hasAttribute("disabled")) btnMain.setAttribute("disabled", "");
         if (!configurationPanel.hasAttribute("disabled")) configurationPanel.setAttribute("disabled", "");
+        redraw({
+            VerifiedUrlCount: 0,
+            ValidUrlCount: 0,
+            BrokenUrlCount: 0,
+            RemainingWorkload: 0,
+            MillisecondsAveragePageLoadTime: 0,
+            ElapsedTime: "00 : 00 : 00"
+        });
         socket.write(JSON.stringify({
             text: "btn-start-clicked",
             payload: JSON.stringify({
@@ -35,8 +43,7 @@ socket.connect(18880, "127.0.0.1", () => {
                 DomainName: txtDomainName.value,
                 HtmlRendererCount: txtHtmlRendererCount.value,
                 VerifyExternalUrls: ckbVerifyExternalUrls.checked,
-                UseHeadlessWebBrowsers: !ckbShowWebBrowsers.checked,
-                UserAgent: "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36"
+                UseHeadlessWebBrowsers: !ckbShowWebBrowsers.checked
             })
         }));
     });
@@ -58,7 +65,7 @@ socket.connect(18880, "127.0.0.1", () => {
             }
         }, 1000);
 
-        socket.end(JSON.stringify({ text: "btn-close-clicked" }));
+        socket.end(JSON.stringify({text: "btn-close-clicked"}));
         socket.on("end", () => { ipcRenderer.send("btn-close-clicked"); });
     });
 
@@ -77,23 +84,30 @@ socket.connect(18880, "127.0.0.1", () => {
 
 function isNumeric(number) { return !isNaN(number) && typeof (number) === "number"; }
 
-function redraw(viewModel) {
-    if (isNumeric(viewModel.VerifiedUrlCount)) lblVerified.textContent = viewModel.VerifiedUrlCount.toLocaleString("en-US", { maximumFractionDigits: 2 });
-    if (isNumeric(viewModel.ValidUrlCount)) lblValid.textContent = viewModel.ValidUrlCount.toLocaleString("en-US", { maximumFractionDigits: 2 });
-    if (isNumeric(viewModel.BrokenUrlCount)) lblBroken.textContent = viewModel.BrokenUrlCount.toLocaleString("en-US", { maximumFractionDigits: 2 });
-    if (isNumeric(viewModel.RemainingWorkload)) lblRemaining.textContent = viewModel.RemainingWorkload.toLocaleString("en-US", { maximumFractionDigits: 2 });
-    if (isNumeric(viewModel.MillisecondsAveragePageLoadTime)) {
-        lblAveragePageLoadTime.textContent = viewModel.MillisecondsAveragePageLoadTime.toLocaleString("en-US", { maximumFractionDigits: 0 });
+function redraw(frame) {
+    if (isNumeric(frame.VerifiedUrlCount)) lblVerified.textContent = frame.VerifiedUrlCount.toLocaleString("en-US", {maximumFractionDigits: 2});
+    if (isNumeric(frame.ValidUrlCount)) lblValid.textContent = frame.ValidUrlCount.toLocaleString("en-US", {maximumFractionDigits: 2});
+    if (isNumeric(frame.BrokenUrlCount)) lblBroken.textContent = frame.BrokenUrlCount.toLocaleString("en-US", {maximumFractionDigits: 2});
+    if (isNumeric(frame.RemainingWorkload)) lblRemaining.textContent = frame.RemainingWorkload.toLocaleString("en-US", {maximumFractionDigits: 2});
+    if (isNumeric(frame.MillisecondsAveragePageLoadTime)) {
+        lblAveragePageLoadTime.textContent = frame.MillisecondsAveragePageLoadTime.toLocaleString("en-US", {maximumFractionDigits: 0});
         lblAveragePageLoadTimeUnitOfMeasure.style.visibility = "visible";
     }
-    if (viewModel.ElapsedTime) lblElapsedTime.textContent = viewModel.ElapsedTime;
-    if (viewModel.StatusText) shutdownOverlay.style.display === "block"
-        ? lblShutdownOverlayMessage.textContent = viewModel.StatusText
-        : lblStatusText.textContent = viewModel.StatusText;
+    if (frame.ElapsedTime) lblElapsedTime.textContent = frame.ElapsedTime;
+    if (frame.StatusText) shutdownOverlay.style.display === "block"
+        ? lblShutdownOverlayMessage.textContent = frame.StatusText
+        : lblStatusText.textContent = frame.StatusText;
+    if (frame.RestrictHumanInteraction === true) {
+        if (!btnMain.hasAttribute("disabled")) btnMain.setAttribute("disabled", "");
+        if (!configurationPanel.hasAttribute("disabled")) configurationPanel.setAttribute("disabled", "");
+    } else if (frame.RestrictHumanInteraction === false) {
+        if (btnMain.hasAttribute("disabled")) btnMain.removeAttribute("disabled");
+        if (configurationPanel.hasAttribute("disabled")) configurationPanel.removeAttribute("disabled");
+    }
 
     const btnMainIsStartButton = btnMain.firstElementChild.className === "controls__play-icon";
     const btnMainIsPauseButton = btnMain.firstElementChild.className === "controls__pause-icon";
-    switch (viewModel.CrawlerState) {
+    switch (frame.CrawlerState) {
         case "Ready":
             if (btnMainIsStartButton) break;
             btnMain.firstElementChild.className = "controls__play-icon";

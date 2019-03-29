@@ -187,7 +187,7 @@ namespace Helix.Crawler
 
                     _eventBroadcaster.Broadcast(new Event
                     {
-                        EventType = EventType.ShutdownStepChanged,
+                        EventType = EventType.StopProgressUpdated,
                         Message = $"Closing web browser ({disposedHtmlRendererCount}/{_createdHtmlRendererCount})"
                     });
                 }
