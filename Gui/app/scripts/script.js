@@ -28,13 +28,15 @@ socket.connect(18880, "127.0.0.1", () => {
     btnMain.addEventListener("click", () => {
         if (!btnMain.hasAttribute("disabled")) btnMain.setAttribute("disabled", "");
         if (!configurationPanel.hasAttribute("disabled")) configurationPanel.setAttribute("disabled", "");
+        lblAveragePageLoadTimeUnitOfMeasure.style.visibility = "hidden";
         redraw({
-            VerifiedUrlCount: 0,
-            ValidUrlCount: 0,
-            BrokenUrlCount: 0,
-            RemainingWorkload: 0,
-            MillisecondsAveragePageLoadTime: 0,
-            ElapsedTime: "00 : 00 : 00"
+            VerifiedUrlCount: "-",
+            ValidUrlCount: "-",
+            BrokenUrlCount: "-",
+            RemainingWorkload: "-",
+            MillisecondsAveragePageLoadTime: "-",
+            ElapsedTime: "-- : -- : --",
+            StatusText: "Initializing start sequence ..."
         });
         socket.write(JSON.stringify({
             text: "btn-start-clicked",
@@ -82,19 +84,19 @@ socket.connect(18880, "127.0.0.1", () => {
 
 });
 
-function isNumeric(number) { return !isNaN(number) && typeof (number) === "number"; }
+function notNullAndUndefined(variable) { return variable !== null && variable !== undefined; }
+
+function isNumeric(variable) { return !isNaN(variable) && typeof (variable) === "number"; }
 
 function redraw(frame) {
-    if (isNumeric(frame.VerifiedUrlCount)) lblVerified.textContent = frame.VerifiedUrlCount.toLocaleString("en-US", {maximumFractionDigits: 2});
-    if (isNumeric(frame.ValidUrlCount)) lblValid.textContent = frame.ValidUrlCount.toLocaleString("en-US", {maximumFractionDigits: 2});
-    if (isNumeric(frame.BrokenUrlCount)) lblBroken.textContent = frame.BrokenUrlCount.toLocaleString("en-US", {maximumFractionDigits: 2});
-    if (isNumeric(frame.RemainingWorkload)) lblRemaining.textContent = frame.RemainingWorkload.toLocaleString("en-US", {maximumFractionDigits: 2});
-    if (isNumeric(frame.MillisecondsAveragePageLoadTime)) {
-        lblAveragePageLoadTime.textContent = frame.MillisecondsAveragePageLoadTime.toLocaleString("en-US", {maximumFractionDigits: 0});
-        lblAveragePageLoadTimeUnitOfMeasure.style.visibility = "visible";
-    }
-    if (frame.ElapsedTime) lblElapsedTime.textContent = frame.ElapsedTime;
-    if (frame.StatusText) shutdownOverlay.style.display === "block"
+    if (notNullAndUndefined(frame.VerifiedUrlCount)) lblVerified.textContent = frame.VerifiedUrlCount.toLocaleString("en-US", {maximumFractionDigits: 2});
+    if (notNullAndUndefined(frame.ValidUrlCount)) lblValid.textContent = frame.ValidUrlCount.toLocaleString("en-US", {maximumFractionDigits: 2});
+    if (notNullAndUndefined(frame.BrokenUrlCount)) lblBroken.textContent = frame.BrokenUrlCount.toLocaleString("en-US", {maximumFractionDigits: 2});
+    if (notNullAndUndefined(frame.RemainingWorkload)) lblRemaining.textContent = frame.RemainingWorkload.toLocaleString("en-US", {maximumFractionDigits: 2});
+    if (notNullAndUndefined(frame.MillisecondsAveragePageLoadTime)) lblAveragePageLoadTime.textContent = frame.MillisecondsAveragePageLoadTime.toLocaleString("en-US", {maximumFractionDigits: 0});
+    if (isNumeric(frame.MillisecondsAveragePageLoadTime)) lblAveragePageLoadTimeUnitOfMeasure.style.visibility = "visible";
+    if (notNullAndUndefined(frame.ElapsedTime)) lblElapsedTime.textContent = frame.ElapsedTime;
+    if (notNullAndUndefined(frame.StatusText)) shutdownOverlay.style.display === "block"
         ? lblShutdownOverlayMessage.textContent = frame.StatusText
         : lblStatusText.textContent = frame.StatusText;
     if (frame.RestrictHumanInteraction === true) {
@@ -108,20 +110,19 @@ function redraw(frame) {
     const btnMainIsStartButton = btnMain.firstElementChild.className === "controls__play-icon";
     const btnMainIsPauseButton = btnMain.firstElementChild.className === "controls__pause-icon";
     switch (frame.CrawlerState) {
-        case "Ready":
+        case "WaitingToRun":
+        case "RanToCompletion":
+        case "Cancelled":
+        case "Faulted":
             if (btnMainIsStartButton) break;
             btnMain.firstElementChild.className = "controls__play-icon";
             if (btnMain.classList.contains("controls__main-button--amber")) btnMain.classList.remove("controls__main-button--amber");
-            if (btnMain.hasAttribute("disabled")) btnMain.removeAttribute("disabled");
-            if (configurationPanel.hasAttribute("disabled")) configurationPanel.removeAttribute("disabled");
             // if (!btnStop.hasAttribute("disabled")) btnStop.setAttribute("disabled", "");
             break;
-        case "Working":
+        case "Running":
             if (btnMainIsPauseButton) break;
             btnMain.firstElementChild.className = "controls__pause-icon";
             if (!btnMain.classList.contains("controls__main-button--amber")) btnMain.classList.add("controls__main-button--amber");
-            if (btnMain.hasAttribute("disabled")) btnMain.removeAttribute("disabled");
-            if (!configurationPanel.hasAttribute("disabled")) configurationPanel.setAttribute("disabled", "");
         // if (btnStop.hasAttribute("disabled")) btnStop.removeAttribute("disabled");
     }
 }

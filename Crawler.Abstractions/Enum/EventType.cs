@@ -4,6 +4,8 @@
     {
         None,
         ResourceVerified,
-        StopProgressUpdated
+        StartProgressUpdated,
+        StopProgressUpdated,
+        Stopped
     }
 }

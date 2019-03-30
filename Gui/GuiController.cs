@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Data;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
@@ -17,7 +15,7 @@ namespace Helix.Gui
 {
     public static class GuiController
     {
-        static readonly List<Task> BackgroundTasks = new List<Task>();
+        static Task _constantRedrawTask;
         static readonly Process GuiProcess = new Process { StartInfo = { FileName = "ui/electron.exe" } };
         static readonly IIpcSocket IpcSocket = new IpcSocket("127.0.0.1", 18880); // TODO: Dependency Injection?
         static readonly ManualResetEvent ManualResetEvent = new ManualResetEvent(false);
@@ -34,81 +32,89 @@ namespace Helix.Gui
 
             IpcSocket.On("btn-start-clicked", configurationJsonString =>
             {
-                if (!(CrawlerState.WaitingToRun | CrawlerState.Completed).HasFlag(CrawlerBot.CrawlerState)) return;
-                CrawlerBot.OnStopped += () =>
+                try
                 {
-                    Stopwatch.Stop();
-                    switch (CrawlerBot.CrawlerState)
-                    {
-                        case CrawlerState.RanToCompletion:
-                            RedrawGui("Done.", false);
-                            break;
-                        case CrawlerState.Cancelled:
-                            RedrawGui("Cancelled.");
-                            break;
-                        case CrawlerState.Faulted:
-                            RedrawGui("One or more errors occurred. Check the logs for more details.", false);
-                            break;
-                        default:
-                            throw new InvalidConstraintException();
-                    }
-                };
-                CrawlerBot.OnEventBroadcast += OnResourceVerified;
-                BackgroundTasks.Clear();
-                Stopwatch.Reset();
-
-                CrawlerBot.StartWorking(new Configurations(configurationJsonString));
-                RedrawGuiEvery(TimeSpan.FromSeconds(1));
-                Stopwatch.Start();
+                    CrawlerBot.EventBroadcast += OnStartProgressUpdated;
+                    CrawlerBot.EventBroadcast += OnResourceVerified;
+                    CrawlerBot.EventBroadcast += OnStopped;
+                    CrawlerBot.StartWorking(new Configurations(configurationJsonString));
+                    RedrawEvery(TimeSpan.FromSeconds(1));
+                }
+                catch (Exception exception) { Redraw(exception.Message, false); }
             });
             IpcSocket.On("btn-close-clicked", _ =>
             {
+                StopWorking();
+                ManualResetEvent.Set();
+            });
+            GuiProcess.Start();
+            ManualResetEvent.WaitOne();
+            IpcSocket.Dispose();
+            GuiProcess.Close();
+
+            void StopWorking()
+            {
                 try
                 {
-                    CrawlerBot.OnEventBroadcast -= OnResourceVerified;
-                    CrawlerBot.OnEventBroadcast += StopProgressUpdated;
+                    CrawlerBot.EventBroadcast -= OnResourceVerified;
+                    CrawlerBot.EventBroadcast += OnStopProgressUpdated;
                     CrawlerBot.StopWorking();
-                    RedrawGui("Waiting for background tasks to complete ...");
-                    if (!Task.WhenAll(BackgroundTasks).Wait(TimeSpan.FromMinutes(1)))
-                        File.AppendAllText(
-                            Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "debug.log"),
-                            $"\r\n[{DateTime.Now:yyyy/MM/dd HH:mm:ss}] Waiting for background tasks to complete timed out after 60 seconds."
-                        );
-                    Thread.Sleep(TimeSpan.FromSeconds(1));
+
+                    var waitingTime = TimeSpan.FromMinutes(1);
+                    if (_constantRedrawTask == null || _constantRedrawTask.Wait(waitingTime)) return;
+
+                    var errorMessage = $"Waiting for constant redrawing task to finish timed out after {waitingTime.TotalSeconds} seconds.";
+                    File.AppendAllText(
+                        Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "debug.log"),
+                        $"\r\n[{DateTime.Now:yyyy/MM/dd HH:mm:ss}] {errorMessage}"
+                    );
                 }
                 catch (Exception exception)
                 {
                     File.AppendAllText("debug.log", $"\r\n[{DateTime.Now:yyyy/MM/dd HH:mm:ss}] {exception}");
                 }
-                finally { ManualResetEvent.Set(); }
-            });
-            GuiProcess.Start();
-            ManualResetEvent.WaitOne();
-            Stopwatch.Stop();
-            IpcSocket.Dispose();
-            GuiProcess.Close();
-
+            }
+            void OnStopped(Event @event)
+            {
+                if (@event.EventType != EventType.Stopped) return;
+                Redraw(@event.Message);
+                switch (CrawlerBot.CrawlerState)
+                {
+                    case CrawlerState.RanToCompletion:
+                    case CrawlerState.Faulted:
+                        Redraw(restrictHumanInteraction: false);
+                        break;
+                }
+            }
+            void OnStartProgressUpdated(Event @event)
+            {
+                if (@event.EventType != EventType.StartProgressUpdated)
+                {
+                    CrawlerBot.EventBroadcast -= OnStartProgressUpdated;
+                    return;
+                }
+                Redraw(@event.Message, redrawEverything: false);
+            }
+            void OnStopProgressUpdated(Event @event)
+            {
+                if (@event.EventType != EventType.StopProgressUpdated) return;
+                Redraw(@event.Message);
+            }
             void OnResourceVerified(Event @event)
             {
                 if (@event.EventType != EventType.ResourceVerified) return;
-                RedrawGui(@event.Message);
-            }
-            void StopProgressUpdated(Event @event)
-            {
-                if (@event.EventType != EventType.StopProgressUpdated) return;
-                RedrawGui(@event.Message);
+                Redraw(@event.Message);
             }
         }
 
-        static void RedrawGui(string statusText = null, bool? restrictHumanInteraction = null)
+        static void Redraw(string statusText = null, bool? restrictHumanInteraction = null, bool redrawEverything = true)
         {
             IpcSocket.Send(new IpcMessage
             {
                 Text = "redraw",
                 Payload = JsonConvert.SerializeObject(
-                    CrawlerBot.CrawlerState == CrawlerState.WaitingToRun
-                        ? new Frame { RestrictHumanInteraction = restrictHumanInteraction, StatusText = statusText }
-                        : new Frame
+                    redrawEverything
+                        ? new Frame
                         {
                             CrawlerState = CrawlerBot.CrawlerState,
                             VerifiedUrlCount = CrawlerBot.Statistics?.VerifiedUrlCount,
@@ -120,20 +126,23 @@ namespace Helix.Gui
                             RestrictHumanInteraction = restrictHumanInteraction,
                             StatusText = statusText
                         }
+                        : new Frame { RestrictHumanInteraction = restrictHumanInteraction, StatusText = statusText }
                 )
             });
         }
 
-        static void RedrawGuiEvery(TimeSpan timeSpan)
+        static void RedrawEvery(TimeSpan timeSpan)
         {
-            BackgroundTasks.Add(Task.Run(() =>
+            Stopwatch.Restart();
+            _constantRedrawTask = Task.Run(() =>
             {
-                while (!(CrawlerState.WaitingToRun | CrawlerState.Completed).HasFlag(CrawlerBot.CrawlerState))
+                while (!(CrawlerState.Completed).HasFlag(CrawlerBot.CrawlerState))
                 {
-                    RedrawGui();
+                    Redraw();
                     Thread.Sleep(timeSpan);
                 }
-            }));
+                Stopwatch.Stop();
+            });
         }
 
         [DllImport("user32.dll")]

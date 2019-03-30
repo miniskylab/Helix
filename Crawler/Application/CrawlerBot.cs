@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.IO;
 using System.Net;
 using System.Threading.Tasks;
@@ -43,14 +44,19 @@ namespace Helix.Crawler
             }
         }
 
-        public static event Action<Event> OnEventBroadcast;
-        public static event Action OnStopped;
+        public static event Action<Event> EventBroadcast;
 
         static CrawlerBot()
         {
             // TODO: A workaround for .Net Core 2.x bug. Should be removed in the future.
             AppContext.SetSwitch("System.Net.Http.UseSocketsHttpHandler", false);
             ServicePointManager.DefaultConnectionLimit = int.MaxValue;
+
+            if (ServiceLocator.TryCreateSupportServices())
+            {
+                _logger = ServiceLocator.Get<ILogger>();
+                _eventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
+            }
 
             BackgroundTasks = new List<Task>();
             TransitionLock = new object();
@@ -82,10 +88,16 @@ namespace Helix.Crawler
 
         public static void StartWorking(Configurations configurations)
         {
-            ServiceLocator.PreCreateBackboneServices();
-            _eventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
-            _eventBroadcaster.OnEventBroadcast += @event => { OnEventBroadcast?.Invoke(@event); };
+            if (!TryTransit(CrawlerCommand.StartWorking)) return;
+            if (ServiceLocator.TryCreateSupportServices())
+            {
+                _logger = ServiceLocator.Get<ILogger>();
+                _eventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
+            }
 
+            _eventBroadcaster.OnEventBroadcast += OnEventBroadcast;
+            _eventBroadcaster.Broadcast(Event("Initializing start sequence ..."));
+            _eventBroadcaster.Broadcast(Event("Extracting [User-Agent] string from web browser ..."));
             var webBrowser = ServiceLocator.Get<IWebBrowserProvider>().GetWebBrowser(
                 configurations.PathToChromiumExecutable,
                 configurations.WorkingDirectory
@@ -93,7 +105,8 @@ namespace Helix.Crawler
             configurations.UserAgent = webBrowser.GetUserAgentString();
             webBrowser.Dispose();
 
-            ServiceLocator.RebuildUsingNew(configurations);
+            _eventBroadcaster.Broadcast(Event("Connecting services ..."));
+            ServiceLocator.CreateSessionScopedServices(configurations);
             Statistics = ServiceLocator.Get<IStatistics>();
             _memory = ServiceLocator.Get<IMemory>();
             _scheduler = ServiceLocator.Get<IScheduler>();
@@ -101,15 +114,20 @@ namespace Helix.Crawler
             _resourceScope = ServiceLocator.Get<IResourceScope>();
             _resourceProcessor = ServiceLocator.Get<IResourceProcessor>();
 
-            if (!TryTransit(CrawlerCommand.StartWorking)) return;
             BackgroundTasks.Add(Task.Run(() =>
             {
                 try
                 {
-                    EnsureErrorLogFileIsRecreated();
+                    _eventBroadcaster.Broadcast(Event("Re-creating directory containing screenshot files ..."));
                     EnsureDirectoryContainsScreenshotFilesIsRecreated();
+
+                    _eventBroadcaster.Broadcast(Event("Re-creating report database ..."));
                     _reportWriter = ServiceLocator.Get<IReportWriter>();
+
+                    _eventBroadcaster.Broadcast(Event("Pre-creating services ..."));
                     _servicePool.PreCreateServices(_scheduler.CancellationToken);
+
+                    _eventBroadcaster.Broadcast(Event("Activating main workflow ..."));
                     _memory.MemorizeToBeVerifiedResource(
                         _resourceProcessor.Enrich(new Resource
                         {
@@ -118,13 +136,14 @@ namespace Helix.Crawler
                         }),
                         _scheduler.CancellationToken
                     );
-
                     var renderingTask = Task.Run(Render, _scheduler.CancellationToken);
                     var extractionTask = Task.Run(Extract, _scheduler.CancellationToken);
                     var verificationTask = Task.Run(Verify, _scheduler.CancellationToken);
                     BackgroundTasks.Add(renderingTask);
                     BackgroundTasks.Add(extractionTask);
                     BackgroundTasks.Add(verificationTask);
+
+                    _logger.LogInfo("Working ...");
                     Task.WhenAll(renderingTask, extractionTask, verificationTask).Wait();
                 }
                 catch (Exception exception)
@@ -135,34 +154,35 @@ namespace Helix.Crawler
                 finally { Task.Run(StopWorking); }
             }, _scheduler.CancellationToken));
 
-            void EnsureErrorLogFileIsRecreated()
-            {
-                _logger = ServiceLocator.Get<ILogger>();
-                _logger.LogInfo("Started working ...");
-            }
             void EnsureDirectoryContainsScreenshotFilesIsRecreated()
             {
                 if (Directory.Exists(configurations.PathToDirectoryContainsScreenshotFiles))
                     Directory.Delete(configurations.PathToDirectoryContainsScreenshotFiles, true);
                 Directory.CreateDirectory(configurations.PathToDirectoryContainsScreenshotFiles);
             }
+            Event Event(string message)
+            {
+                return new Event
+                {
+                    EventType = EventType.StartProgressUpdated,
+                    Message = message
+                };
+            }
         }
 
         public static void StopWorking()
         {
             if (!TryTransit(CrawlerCommand.StopWorking)) return;
+            _eventBroadcaster.Broadcast(Event("Initializing stop sequence ..."));
+
             var crawlerCommand = CrawlerCommand.MarkAsCancelled;
             if (_scheduler != null)
             {
-                _logger.LogInfo("Initialized stop sequence ...");
+                _eventBroadcaster.Broadcast(Event("De-activating main workflow ..."));
                 _scheduler.CancelEverything();
                 if (_scheduler.EverythingIsDone) crawlerCommand = CrawlerCommand.MarkAsRanToCompletion;
 
-                _eventBroadcaster.Broadcast(new Event
-                {
-                    EventType = EventType.StopProgressUpdated,
-                    Message = "Waiting for background tasks to complete ..."
-                });
+                _eventBroadcaster.Broadcast(Event("Waiting for background tasks to complete ..."));
                 try { Task.WhenAll(BackgroundTasks).Wait(); }
                 catch (Exception exception)
                 {
@@ -171,12 +191,40 @@ namespace Helix.Crawler
                 }
             }
 
-            ServiceLocator.Dispose();
-            TryTransit(crawlerCommand);
-            OnStopped?.Invoke();
+            _eventBroadcaster.Broadcast(Event("Releasing resources ..."));
+            ServiceLocator.DisposeSessionScopedAndSupportServices();
 
-            OnStopped = null;
-            OnEventBroadcast = null;
+            TryTransit(crawlerCommand);
+            _eventBroadcaster.Broadcast(new Event
+            {
+                EventType = EventType.Stopped,
+                Message = GetStopEventMessage()
+            });
+            _eventBroadcaster.OnEventBroadcast -= OnEventBroadcast;
+            EventBroadcast = null;
+
+            string GetStopEventMessage()
+            {
+                switch (CrawlerState)
+                {
+                    case CrawlerState.RanToCompletion:
+                        return "Done.";
+                    case CrawlerState.Cancelled:
+                        return "Cancelled.";
+                    case CrawlerState.Faulted:
+                        return "One or more errors occurred. Check the logs for more details.";
+                    default:
+                        throw new InvalidConstraintException();
+                }
+            }
+            Event Event(string message = "")
+            {
+                return new Event
+                {
+                    EventType = EventType.StopProgressUpdated,
+                    Message = message
+                };
+            }
         }
 
         static void Extract()
@@ -189,6 +237,13 @@ namespace Helix.Crawler
                         resource => _memory.MemorizeToBeVerifiedResource(resource, _scheduler.CancellationToken)
                     );
                 });
+        }
+
+        static void OnEventBroadcast(Event @event)
+        {
+            EventBroadcast?.Invoke(@event);
+            if (@event.EventType != EventType.ResourceVerified && !string.IsNullOrWhiteSpace(@event.Message))
+                _logger.LogInfo(@event.Message);
         }
 
         static void Render()

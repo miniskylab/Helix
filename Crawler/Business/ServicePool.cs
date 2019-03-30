@@ -120,6 +120,11 @@ namespace Helix.Crawler
                         };
                         _htmlRendererPool.Add(htmlRenderer, CancellationToken.None);
                         Interlocked.Increment(ref _createdHtmlRendererCount);
+                        _eventBroadcaster.Broadcast(new Event
+                        {
+                            EventType = EventType.StartProgressUpdated,
+                            Message = $"Opening web browsers ({_createdHtmlRendererCount}/{_memory.Configurations.HtmlRendererCount})"
+                        });
                     }
                 });
             }
@@ -188,7 +193,7 @@ namespace Helix.Crawler
                     _eventBroadcaster.Broadcast(new Event
                     {
                         EventType = EventType.StopProgressUpdated,
-                        Message = $"Closing web browser ({disposedHtmlRendererCount}/{_createdHtmlRendererCount})"
+                        Message = $"Closing web browsers ({disposedHtmlRendererCount}/{_createdHtmlRendererCount})"
                     });
                 }
             }
