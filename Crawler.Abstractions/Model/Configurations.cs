@@ -11,6 +11,8 @@ namespace Helix.Crawler.Abstractions
 
         public int HtmlRendererCount { get; }
 
+        public TimeSpan HttpRequestTimeout { get; }
+
         public string PathToChromiumExecutable { get; }
 
         public string PathToDirectoryContainsScreenshotFiles { get; }
@@ -31,7 +33,8 @@ namespace Helix.Crawler.Abstractions
 
         public Configurations(Uri startUri = null, string domainName = "", int htmlRendererCount = 4, bool verifyExternalUrls = true,
             bool useHeadlessWebBrowsers = true, bool useIncognitoWebBrowser = true, bool takeScreenshotEvidence = false,
-            string pathToDirectoryContainsScreenshotFiles = "", string pathToChromiumExecutable = "")
+            string pathToDirectoryContainsScreenshotFiles = "", string pathToChromiumExecutable = "",
+            double httpRequestTimeoutInSecond = 180)
         {
             StartUri = startUri;
             DomainName = domainName;
@@ -41,6 +44,7 @@ namespace Helix.Crawler.Abstractions
             UseIncognitoWebBrowser = useIncognitoWebBrowser;
             TakeScreenshotEvidence = takeScreenshotEvidence;
             PathToChromiumExecutable = pathToChromiumExecutable;
+            HttpRequestTimeout = TimeSpan.FromSeconds(httpRequestTimeoutInSecond);
             PathToDirectoryContainsScreenshotFiles = pathToDirectoryContainsScreenshotFiles;
         }
 
@@ -56,6 +60,7 @@ namespace Helix.Crawler.Abstractions
             StartUri = ValidateStartUri((string) tokens.SelectToken(nameof(StartUri)) ?? string.Empty);
             PathToDirectoryContainsScreenshotFiles = Path.Combine(WorkingDirectory, "screenshots");
             PathToChromiumExecutable = Path.Combine(WorkingDirectory, "chromium/chrome.exe");
+            HttpRequestTimeout = TimeSpan.FromMinutes(3);
             TakeScreenshotEvidence = true;
             UseIncognitoWebBrowser = true;
 

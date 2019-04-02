@@ -94,6 +94,7 @@ namespace Helix.Crawler
             _httpClient.DefaultRequestHeaders.Pragma.ParseAdd("no-cache");
             _httpClient.DefaultRequestHeaders.Upgrade.ParseAdd("1");
             _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(configurations.UserAgent);
+            _httpClient.Timeout = configurations.HttpRequestTimeout;
             return _httpClient;
         }
 

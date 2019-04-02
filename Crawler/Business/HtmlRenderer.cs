@@ -32,6 +32,7 @@ namespace Helix.Crawler
             _webBrowser = webBrowserProvider.GetWebBrowser(
                 configurations.PathToChromiumExecutable,
                 configurations.WorkingDirectory,
+                configurations.HttpRequestTimeout.TotalSeconds,
                 configurations.UseIncognitoWebBrowser,
                 configurations.UseHeadlessWebBrowsers,
                 (1920, 1080)

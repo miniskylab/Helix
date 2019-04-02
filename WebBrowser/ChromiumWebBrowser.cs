@@ -20,6 +20,7 @@ namespace Helix.WebBrowser
         readonly (int width, int height) _browserWindowSize;
         ChromeDriver _chromeDriver;
         ChromeDriverService _chromeDriverService;
+        readonly TimeSpan _commandTimeout;
         ProxyServer _httpProxyServer;
         bool _objectDisposed;
         readonly string _pathToChromeDriverExecutable;
@@ -50,8 +51,8 @@ namespace Helix.WebBrowser
         public event AsyncEventHandler<SessionEventArgs> BeforeRequest;
         public event AsyncEventHandler<SessionEventArgs> BeforeResponse;
 
-        public ChromiumWebBrowser(string pathToChromiumExecutable, string pathToChromeDriverExecutable, bool useIncognitoWebBrowser = false,
-            bool useHeadlessWebBrowser = true, (int width, int height) browserWindowSize = default)
+        public ChromiumWebBrowser(string pathToChromiumExecutable, string pathToChromeDriverExecutable, double commandTimeoutInSecond = 60,
+            bool useIncognitoWebBrowser = false, bool useHeadlessWebBrowser = true, (int width, int height) browserWindowSize = default)
         {
             _objectDisposed = false;
             _stopwatch = new Stopwatch();
@@ -60,6 +61,7 @@ namespace Helix.WebBrowser
             _browserWindowSize = browserWindowSize == default ? (1024, 630) : browserWindowSize;
             _useIncognitoWebBrowser = useIncognitoWebBrowser;
             _useHeadlessWebBrowser = useHeadlessWebBrowser;
+            _commandTimeout = TimeSpan.FromSeconds(commandTimeoutInSecond);
             _publicApiLockMap = new Dictionary<string, object>
             {
                 { $"{nameof(TryRender)}", new object() },
@@ -247,7 +249,7 @@ namespace Helix.WebBrowser
                 }
             };
             foreach (var argument in arguments) chromeOptions.AddArguments(argument);
-            _chromeDriver = new ChromeDriver(_chromeDriverService, chromeOptions);
+            _chromeDriver = new ChromeDriver(_chromeDriverService, chromeOptions, _commandTimeout);
         }
 
         void ReleaseUnmanagedResources()
