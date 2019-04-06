@@ -13,36 +13,14 @@ namespace Helix.Crawler
 {
     static class ServiceLocator
     {
-        static IEventBroadcaster _eventBroadcaster;
         static HttpClient _httpClient;
-        static ILogger _logger;
-        static bool _objectDisposed;
-        static ServiceProvider _serviceProvider;
+        static readonly ServiceProvider _singletonServiceProvider;
+        static readonly IServiceCollection _transientServiceCollection;
+        static ServiceProvider _transientServiceProvider;
 
         static ServiceLocator()
         {
-            _objectDisposed = true;
-            SetupApplicationWideSingletonServices();
-
-            void SetupApplicationWideSingletonServices()
-            {
-                _logger = Activator.CreateInstance<Logger>();
-                _eventBroadcaster = Activator.CreateInstance<EventBroadcaster>();
-                AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
-                {
-                    _logger.Dispose();
-                    _logger = null;
-                    _eventBroadcaster = null;
-                };
-            }
-        }
-
-        public static void CreateSessionScopedServices(Configurations configurations)
-        {
-            if (_objectDisposed) throw new ObjectDisposedException(nameof(ServiceLocator));
-            if (_serviceProvider?.GetService<Configurations>() != null) throw new InvalidConstraintException();
-            _serviceProvider?.Dispose();
-            _serviceProvider = GetSupportServiceCollection()
+            _transientServiceCollection = new ServiceCollection()
                 .AddTransient<IHtmlRenderer, HtmlRenderer>()
                 .AddTransient<IResourceExtractor, ResourceExtractor>()
                 .AddTransient<IResourceVerifier, ResourceVerifier>()
@@ -53,58 +31,64 @@ namespace Helix.Crawler
                 .AddSingleton<IServicePool, ServicePool>()
                 .AddSingleton<IReportWriter, ReportWriter>()
                 .AddSingleton<IMemory, Memory>()
-                .AddSingleton<IScheduler, Scheduler>()
-                .AddSingleton(GetHttpClient(configurations))
-                .AddSingleton(configurations)
-                .BuildServiceProvider();
-        }
+                .AddSingleton<IScheduler, Scheduler>();
 
-        public static void DisposeSessionScopedAndSupportServices()
-        {
-            if (_objectDisposed) return;
-            _serviceProvider?.Dispose();
-            _serviceProvider = null;
-            _httpClient.Dispose();
-            _httpClient = null;
-            _objectDisposed = true;
-        }
-
-        public static TService Get<TService>()
-        {
-            if (_objectDisposed) throw new ObjectDisposedException(nameof(ServiceLocator));
-            return _serviceProvider.GetService<TService>();
-        }
-
-        public static bool TryCreateSupportServices()
-        {
-            if (!_objectDisposed) return false;
-            _objectDisposed = false;
-            _serviceProvider = GetSupportServiceCollection().BuildServiceProvider();
-            return true;
-        }
-
-        static HttpClient GetHttpClient(Configurations configurations)
-        {
-            if (_httpClient != null) return _httpClient;
-            _httpClient = new HttpClient();
-            _httpClient.DefaultRequestHeaders.Accept.ParseAdd("*/*");
-            _httpClient.DefaultRequestHeaders.AcceptEncoding.ParseAdd("*");
-            _httpClient.DefaultRequestHeaders.AcceptLanguage.ParseAdd("*");
-            _httpClient.DefaultRequestHeaders.CacheControl = CacheControlHeaderValue.Parse("no-cache");
-            _httpClient.DefaultRequestHeaders.Pragma.ParseAdd("no-cache");
-            _httpClient.DefaultRequestHeaders.Upgrade.ParseAdd("1");
-            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(configurations.UserAgent);
-            _httpClient.Timeout = configurations.HttpRequestTimeout;
-            return _httpClient;
-        }
-
-        static IServiceCollection GetSupportServiceCollection()
-        {
-            return new ServiceCollection()
+            var singletonServiceCollection = new ServiceCollection()
                 .AddSingleton<IPersistenceProvider, PersistenceProvider>()
                 .AddSingleton<IWebBrowserProvider, WebBrowserProvider>()
-                .AddSingleton(_eventBroadcaster)
-                .AddSingleton(_logger);
+                .AddSingleton<IEventBroadcaster, EventBroadcaster>()
+                .AddSingleton<ILogger, Logger>();
+            _singletonServiceProvider = singletonServiceCollection.BuildServiceProvider();
+
+            foreach (var singletonServiceDescriptor in singletonServiceCollection)
+                _transientServiceCollection.AddSingleton(
+                    singletonServiceDescriptor.ServiceType,
+                    _singletonServiceProvider.GetService(singletonServiceDescriptor.ServiceType)
+                );
+
+            AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
+            {
+                _singletonServiceProvider.GetService<ILogger>().LogInfo("Disposing application-wide singleton services ...");
+                _singletonServiceProvider.Dispose();
+            };
+        }
+
+        public static void CreateTransientServices(Configurations configurations)
+        {
+            if (_transientServiceProvider?.GetService<Configurations>() != null) throw new InvalidConstraintException();
+            _transientServiceProvider?.Dispose();
+            _transientServiceProvider = _transientServiceCollection
+                .AddSingleton(CreateAndConfigureHttpClient())
+                .AddSingleton(configurations)
+                .BuildServiceProvider();
+
+            HttpClient CreateAndConfigureHttpClient()
+            {
+                if (_httpClient != null) return _httpClient;
+                _httpClient = new HttpClient();
+                _httpClient.DefaultRequestHeaders.Accept.ParseAdd("*/*");
+                _httpClient.DefaultRequestHeaders.AcceptEncoding.ParseAdd("*");
+                _httpClient.DefaultRequestHeaders.AcceptLanguage.ParseAdd("*");
+                _httpClient.DefaultRequestHeaders.CacheControl = CacheControlHeaderValue.Parse("no-cache");
+                _httpClient.DefaultRequestHeaders.Pragma.ParseAdd("no-cache");
+                _httpClient.DefaultRequestHeaders.Upgrade.ParseAdd("1");
+                _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(configurations.UserAgent);
+                _httpClient.Timeout = configurations.HttpRequestTimeout;
+                return _httpClient;
+            }
+        }
+
+        public static void DisposeTransientServices()
+        {
+            _transientServiceProvider?.Dispose();
+            _transientServiceProvider = null;
+            _httpClient?.Dispose();
+            _httpClient = null;
+        }
+
+        public static TService Get<TService>() where TService : class
+        {
+            return _transientServiceProvider?.GetService<TService>() ?? _singletonServiceProvider.GetService<TService>();
         }
     }
 }
