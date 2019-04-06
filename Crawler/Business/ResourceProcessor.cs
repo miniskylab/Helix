@@ -18,6 +18,7 @@ namespace Helix.Crawler
 
         public Resource Categorize(Resource resource, string contentType)
         {
+            if (resource == null) throw new ArgumentNullException();
             if (contentType == null) return resource;
             const StringComparison ordinalIgnoreCase = StringComparison.OrdinalIgnoreCase;
             if (contentType.StartsWith("text/css", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Css;
