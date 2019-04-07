@@ -11,21 +11,11 @@ namespace Helix.Crawler.Specifications
     {
         [Theory]
         [ClassData(typeof(ResourceExtractionDefinition))]
-        void CouldExtractResourcesFromHtmlDocument(HtmlDocument htmlDocument, IList<Resource> expectedOutputResources,
+        void ExtractResourcesFromHtmlDocument(HtmlDocument htmlDocument, IList<Resource> expectedOutputResources,
             Type expectedExceptionType)
         {
             var resourceExtractedEventRaiseCount = 0;
             var resourceExtractor = ServiceLocator.Get<IResourceExtractor>();
-            void OnResourceExtracted(Resource extractedResource)
-            {
-                Assert.Single(
-                    expectedOutputResources ?? new List<Resource>(),
-                    expectedOutputResource => expectedOutputResource?.ParentUri == extractedResource?.ParentUri &&
-                                              expectedOutputResource?.OriginalUrl == extractedResource?.OriginalUrl
-                );
-                Interlocked.Increment(ref resourceExtractedEventRaiseCount);
-            }
-
             if (expectedExceptionType != null)
             {
                 Assert.True(resourceExtractedEventRaiseCount == 0);
@@ -38,6 +28,16 @@ namespace Helix.Crawler.Specifications
             {
                 resourceExtractor.ExtractResourcesFrom(htmlDocument, OnResourceExtracted);
                 Assert.Equal(expectedOutputResources.Count, resourceExtractedEventRaiseCount);
+            }
+
+            void OnResourceExtracted(Resource extractedResource)
+            {
+                Assert.Single(
+                    expectedOutputResources ?? new List<Resource>(),
+                    expectedOutputResource => expectedOutputResource?.ParentUri == extractedResource?.ParentUri &&
+                                              expectedOutputResource?.OriginalUrl == extractedResource?.OriginalUrl
+                );
+                Interlocked.Increment(ref resourceExtractedEventRaiseCount);
             }
         }
 

@@ -37,9 +37,9 @@ namespace Helix.Crawler
         {
             if (resource == null) throw new ArgumentNullException();
             if (resource.StatusCode != default && resource.Uri == null) throw new InvalidConstraintException();
+            if (resource.StatusCode != default) return resource;
 
             resource.Id = _incrementalIdGenerator.GetNext();
-            if (resource.StatusCode != default) return resource;
             if (!TryCreateAbsoluteUri()) resource.StatusCode = StatusCode.MalformedUri;
             else if (UriSchemeIsNotSupported()) resource.StatusCode = StatusCode.UriSchemeNotSupported;
             else if (IsOrphanedUri()) resource.StatusCode = StatusCode.OrphanedUri;

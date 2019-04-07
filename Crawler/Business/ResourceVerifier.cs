@@ -39,9 +39,7 @@ namespace Helix.Crawler
             if (_objectDisposed) throw new ObjectDisposedException(nameof(ResourceVerifier));
             verificationResult = null;
 
-            _resourceProcessor.Enrich(resource);
             if (!resource.IsInternal && !_configurations.VerifyExternalUrls) return false;
-
             verificationResult = new VerificationResult
             {
                 Id = resource.Id,

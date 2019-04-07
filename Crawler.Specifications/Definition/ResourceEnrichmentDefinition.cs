@@ -4,19 +4,19 @@ using Helix.Specifications;
 
 namespace Helix.Crawler.Specifications
 {
-    class ResourceProcessingDefinition : TheoryDescription<Resource, Resource, Type>
+    class ResourceEnrichmentDefinition : TheoryDescription<Resource, Resource, Type>
     {
-        public ResourceProcessingDefinition()
+        public ResourceEnrichmentDefinition()
         {
-            EnrichResource();
+            CreateUriFromOriginalUrl();
             DetectMalformedUris();
-            ConvertRelativeUrlToAbsoluteUrl();
-            OnlySupportHttpAndHttpsSchemes();
-            FragmentsAreStrippedFromTheCreatedResource();
+            ConvertRelativeToAbsoluteUrl();
+            SupportOnlyHttpAndHttpsSchemes();
+            StripFragments();
             ThrowExceptionIfArgumentNull();
         }
 
-        void ConvertRelativeUrlToAbsoluteUrl()
+        void ConvertRelativeToAbsoluteUrl()
         {
             var parentUri = new Uri("http://www.helix.com");
             var relativeUrl = "without-leading-slash";
@@ -41,17 +41,7 @@ namespace Helix.Crawler.Specifications
             );
         }
 
-        void DetectMalformedUris()
-        {
-            var parentUri = new Uri("http://www.helix.com");
-            const string originalUrl = "http:///malformed-uri";
-            AddTheoryDescription(
-                new Resource { ParentUri = parentUri, OriginalUrl = originalUrl },
-                new Resource { ParentUri = parentUri, OriginalUrl = originalUrl, StatusCode = StatusCode.MalformedUri }
-            );
-        }
-
-        void EnrichResource()
+        void CreateUriFromOriginalUrl()
         {
             var parentUri = new Uri("http://www.helix.com");
             const string originalUrl = "http://www.helix.com/anything";
@@ -67,7 +57,17 @@ namespace Helix.Crawler.Specifications
             );
         }
 
-        void FragmentsAreStrippedFromTheCreatedResource()
+        void DetectMalformedUris()
+        {
+            var parentUri = new Uri("http://www.helix.com");
+            const string originalUrl = "http:///malformed-uri";
+            AddTheoryDescription(
+                new Resource { ParentUri = parentUri, OriginalUrl = originalUrl },
+                new Resource { ParentUri = parentUri, OriginalUrl = originalUrl, StatusCode = StatusCode.MalformedUri }
+            );
+        }
+
+        void StripFragments()
         {
             var parentUri = new Uri("http://www.helix.com");
             const string originalUrl = "http://www.helix.com/anything#fragment";
@@ -78,7 +78,7 @@ namespace Helix.Crawler.Specifications
             );
         }
 
-        void OnlySupportHttpAndHttpsSchemes()
+        void SupportOnlyHttpAndHttpsSchemes()
         {
             const StatusCode statusCode = StatusCode.UriSchemeNotSupported;
             var parentUri = new Uri("http://www.helix.com");

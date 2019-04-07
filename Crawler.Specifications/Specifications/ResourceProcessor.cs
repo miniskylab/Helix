@@ -8,8 +8,8 @@ namespace Helix.Crawler.Specifications
     public class ResourceProcessor : AbstractSpecifications
     {
         [Theory]
-        [ClassData(typeof(ResourceProcessingDefinition))]
-        void CouldProcessResource(Resource resource, Resource expectedOutputResource, Type expectedExceptionType)
+        [ClassData(typeof(ResourceEnrichmentDefinition))]
+        void EnrichResource(Resource resource, Resource expectedOutputResource, Type expectedExceptionType)
         {
             var resourceProcessor = ServiceLocator.Get<IResourceProcessor>();
             if (expectedExceptionType != null)
