@@ -105,6 +105,7 @@ function redraw(frame) {
     } else if (frame.RestrictHumanInteraction === false) {
         if (btnMain.hasAttribute("disabled")) btnMain.removeAttribute("disabled");
         if (configurationPanel.hasAttribute("disabled")) configurationPanel.removeAttribute("disabled");
+        socket.write(JSON.stringify({text: "human-interaction-restriction-removed"}));
     }
 
     const btnMainIsStartButton = btnMain.firstElementChild.className === "controls__play-icon";
