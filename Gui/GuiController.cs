@@ -16,7 +16,6 @@ namespace Helix.Gui
     public static class GuiController
     {
         static Task _constantRedrawTask;
-        static bool _humanInteractionRestrictionIsRemoved;
         static readonly Process GuiProcess = new Process { StartInfo = { FileName = "ui/electron.exe" } };
         static readonly IIpcSocket IpcSocket = new IpcSocket("127.0.0.1", 18880); // TODO: Dependency Injection?
         static readonly ManualResetEvent ManualResetEvent = new ManualResetEvent(false);
@@ -31,7 +30,6 @@ namespace Helix.Gui
              * TODO: Will be removed and replaced with built-in .Net Core 3.0 feature. */
             ShowWindow(GetConsoleWindow(), 0);
 
-            IpcSocket.On("human-interaction-restriction-removed", _ => { _humanInteractionRestrictionIsRemoved = true; });
             IpcSocket.On("btn-start-clicked", configurationJsonString =>
             {
                 try
@@ -53,12 +51,7 @@ namespace Helix.Gui
                     {
                         case CrawlerState.RanToCompletion:
                         case CrawlerState.Faulted:
-                            _humanInteractionRestrictionIsRemoved = false;
-                            while (!_humanInteractionRestrictionIsRemoved)
-                            {
-                                Redraw(restrictHumanInteraction: false);
-                                Thread.Sleep(500);
-                            }
+                            Redraw(restrictHumanInteraction: false);
                             break;
                     }
                 }
