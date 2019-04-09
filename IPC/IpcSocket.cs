@@ -12,6 +12,7 @@ namespace Helix.IPC
 {
     public class IpcSocket : IIpcSocket
     {
+        const char EndOfTransmissionCharacter = (char) 4;
         readonly Dictionary<string, Action<string>> _actions;
         readonly List<Task> _backgroundTasks;
         readonly CancellationTokenSource _cancellationTokenSource;
@@ -72,6 +73,10 @@ namespace Helix.IPC
 
         public void On(string ipcTextMessage, Action<string> action) { _actions[ipcTextMessage] = action; }
 
-        public void Send(IpcMessage ipcMessage) { _handlerSocket.Send(Encoding.ASCII.GetBytes(JsonConvert.SerializeObject(ipcMessage))); }
+        public void Send(IpcMessage ipcMessage)
+        {
+            var byteStream = Encoding.ASCII.GetBytes($"{JsonConvert.SerializeObject(ipcMessage)}{EndOfTransmissionCharacter}");
+            _handlerSocket.Send(byteStream);
+        }
     }
 }

@@ -1,6 +1,8 @@
 ﻿const {remote, ipcRenderer} = require("electron");
 const socket = new require("net").Socket();
 
+const endOfTransmissionCharacter = '\4';
+
 const btnMain = document.getElementById("btn-main");
 const txtStartUri = document.getElementById("txt-start-uri");
 const txtDomainName = document.getElementById("txt-domain-name");
@@ -73,11 +75,12 @@ socket.connect(18880, "127.0.0.1", () => {
 
     document.getElementById("btn-minimize").addEventListener("click", () => { remote.BrowserWindow.getFocusedWindow().minimize(); });
 
-    socket.on("data", ipcMessageJson => {
-        const ipcMessage = JSON.parse(ipcMessageJson);
-        switch (ipcMessage.Text) {
+    socket.on("data", byteStream => {
+        const jsonMessages = new TextDecoder("utf-8").decode(byteStream).split(endOfTransmissionCharacter);
+        const lastJsonMessage = JSON.parse(jsonMessages[jsonMessages.length - 2]);
+        switch (lastJsonMessage.Text) {
             case "redraw":
-                redraw(JSON.parse(ipcMessage.Payload));
+                redraw(JSON.parse(lastJsonMessage.Payload));
                 break;
         }
     });
