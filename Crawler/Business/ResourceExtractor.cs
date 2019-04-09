@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Threading.Tasks;
 using Helix.Crawler.Abstractions;
 using HtmlAgilityPackDocument = HtmlAgilityPack.HtmlDocument;
 
@@ -22,7 +21,7 @@ namespace Helix.Crawler
 
             var anchorTags = htmlAgilityPackDocument.DocumentNode.SelectNodes("//a[@href]");
             if (anchorTags == null) return;
-            Parallel.ForEach(anchorTags, anchorTag =>
+            foreach (var anchorTag in anchorTags)
             {
                 var extractedUrl = anchorTag.Attributes["href"].Value;
                 if (IsNullOrWhiteSpace() || IsJavaScriptCode()) return;
@@ -37,7 +36,7 @@ namespace Helix.Crawler
 
                 bool IsNullOrWhiteSpace() { return string.IsNullOrWhiteSpace(extractedUrl); }
                 bool IsJavaScriptCode() { return extractedUrl.StartsWith("javascript:", StringComparison.InvariantCultureIgnoreCase); }
-            });
+            }
         }
     }
 }

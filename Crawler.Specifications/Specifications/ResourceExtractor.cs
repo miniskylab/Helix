@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using Helix.Crawler.Abstractions;
 using Helix.Specifications;
 using Xunit;
@@ -37,7 +36,7 @@ namespace Helix.Crawler.Specifications
                     expectedOutputResource => expectedOutputResource?.ParentUri == extractedResource?.ParentUri &&
                                               expectedOutputResource?.OriginalUrl == extractedResource?.OriginalUrl
                 );
-                Interlocked.Increment(ref resourceExtractedEventRaiseCount);
+                resourceExtractedEventRaiseCount++;
             }
         }
 
