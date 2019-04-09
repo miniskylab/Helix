@@ -39,11 +39,11 @@ namespace Helix.IPC
                     {
                         Array.Clear(byteBuffer, 0, byteBuffer.Length);
                         var receivedByteCount = _handlerSocket.Receive(byteBuffer);
-                        var ipcRawMessageFromRemote = Encoding.ASCII.GetString(byteBuffer, 0, receivedByteCount);
-                        if (string.IsNullOrEmpty(ipcRawMessageFromRemote)) continue;
+                        var stringMessageFromClient = Encoding.ASCII.GetString(byteBuffer, 0, receivedByteCount);
+                        if (string.IsNullOrEmpty(stringMessageFromClient)) continue;
 
-                        var ipcMessageFromRemote = JsonConvert.DeserializeObject<IpcMessage>(ipcRawMessageFromRemote);
-                        if (_actions.TryGetValue(ipcMessageFromRemote.Text, out var action)) action(ipcMessageFromRemote.Payload);
+                        var messageFromClient = JsonConvert.DeserializeObject<IpcMessage>(stringMessageFromClient);
+                        if (_actions.TryGetValue(messageFromClient.Text, out var action)) action(messageFromClient.Payload);
                     }
                 }, _cancellationTokenSource.Token)
             };
