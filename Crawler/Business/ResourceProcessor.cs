@@ -39,15 +39,15 @@ namespace Helix.Crawler
             if (resource.StatusCode != default && resource.Uri == null) throw new InvalidConstraintException();
 
             resource.Id = _incrementalIdGenerator.GetNext();
-            if (resource.StatusCode != default) return resource;
-            if (!TryCreateAbsoluteUri()) resource.StatusCode = StatusCode.MalformedUri;
-            else if (UriSchemeIsNotSupported()) resource.StatusCode = StatusCode.UriSchemeNotSupported;
-            else if (IsOrphanedUri()) resource.StatusCode = StatusCode.OrphanedUri;
-            else
+            if (resource.StatusCode == default)
             {
-                StripFragment();
-                resource.IsInternal = _resourceScope.IsInternalResource(resource);
+                if (!TryCreateAbsoluteUri()) resource.StatusCode = StatusCode.MalformedUri;
+                else if (UriSchemeIsNotSupported()) resource.StatusCode = StatusCode.UriSchemeNotSupported;
+                else if (IsOrphanedUri()) resource.StatusCode = StatusCode.OrphanedUri;
+                else StripFragment();
             }
+
+            if (resource.Uri != null) resource.IsInternal = _resourceScope.IsInternalResource(resource);
             return resource;
 
             bool TryCreateAbsoluteUri()
