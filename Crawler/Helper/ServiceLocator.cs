@@ -31,7 +31,8 @@ namespace Helix.Crawler
                 .AddSingleton<IServicePool, ServicePool>()
                 .AddSingleton<IReportWriter, ReportWriter>()
                 .AddSingleton<IMemory, Memory>()
-                .AddSingleton<IScheduler, Scheduler>();
+                .AddSingleton<IScheduler, Scheduler>()
+                .AddSingleton<IHardwareMonitor, HardwareMonitor>();
 
             var singletonServiceCollection = new ServiceCollection()
                 .AddSingleton<IPersistenceProvider, PersistenceProvider>()
