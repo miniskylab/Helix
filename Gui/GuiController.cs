@@ -17,9 +17,9 @@ namespace Helix.Gui
     {
         static Task _constantRedrawTask;
         static readonly Process GuiProcess = new Process { StartInfo = { FileName = "ui/electron.exe" } };
-        static readonly IIpcSocket IpcSocket = new IpcSocket("127.0.0.1", 18880); // TODO: Dependency Injection?
         static readonly ManualResetEvent ManualResetEvent = new ManualResetEvent(false);
         static readonly Stopwatch Stopwatch = new Stopwatch();
+        static readonly ISynchronousServerSocket SynchronousServerSocket = new SynchronousServerSocket("127.0.0.1", 18880);
 
         [DllImport("kernel32.dll")]
         static extern IntPtr GetConsoleWindow();
@@ -30,7 +30,7 @@ namespace Helix.Gui
              * TODO: Will be removed and replaced with built-in .Net Core 3.0 feature. */
             ShowWindow(GetConsoleWindow(), 0);
 
-            IpcSocket.On("btn-start-clicked", configurationJsonString =>
+            SynchronousServerSocket.On("btn-start-clicked", configurationJsonString =>
             {
                 try
                 {
@@ -65,7 +65,7 @@ namespace Helix.Gui
                     Redraw(@event.Message, redrawEverything: false);
                 }
             });
-            IpcSocket.On("btn-close-clicked", _ =>
+            SynchronousServerSocket.On("btn-close-clicked", _ =>
             {
                 StopWorking();
                 ManualResetEvent.Set();
@@ -102,7 +102,7 @@ namespace Helix.Gui
             });
             GuiProcess.Start();
             ManualResetEvent.WaitOne();
-            IpcSocket.Dispose();
+            SynchronousServerSocket.Dispose();
             GuiProcess.Close();
 
             void OnResourceVerified(Event @event)
@@ -114,7 +114,7 @@ namespace Helix.Gui
 
         static void Redraw(string statusText = null, bool? restrictHumanInteraction = null, bool redrawEverything = true)
         {
-            IpcSocket.Send(new IpcMessage
+            SynchronousServerSocket.Send(new Message
             {
                 Text = "redraw",
                 Payload = JsonConvert.SerializeObject(
