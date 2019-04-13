@@ -17,8 +17,6 @@ namespace Helix.Crawler
         readonly BlockingCollection<Resource> _toBeTakenScreenshotResources;
         readonly BlockingCollection<Resource> _toBeVerifiedResources;
 
-        public Configurations Configurations { get; }
-
         public int ToBeExtractedHtmlDocumentCount => _toBeExtractedHtmlDocuments.Count;
 
         public int ToBeRenderedResourceCount => _toBeRenderedResources.Count + _toBeTakenScreenshotResources.Count;
@@ -26,9 +24,8 @@ namespace Helix.Crawler
         public int ToBeVerifiedResourceCount => _toBeVerifiedResources.Count;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public Memory(Configurations configurations)
+        public Memory()
         {
-            Configurations = configurations;
             _objectDisposed = false;
             _memorizationLock = new object();
             _toBeExtractedHtmlDocuments = new BlockingCollection<HtmlDocument>();

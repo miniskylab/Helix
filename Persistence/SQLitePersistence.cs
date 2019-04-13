@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Helix.Persistence
 {
-    class SqLitePersistence<TDataTransferObject> : ISqLitePersistence<TDataTransferObject> where TDataTransferObject : class
+    public class SqLitePersistence<TDataTransferObject> : ISqLitePersistence<TDataTransferObject> where TDataTransferObject : class
     {
         readonly string _pathToDatabaseFile;
 

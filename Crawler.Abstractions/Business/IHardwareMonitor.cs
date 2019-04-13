@@ -4,10 +4,10 @@ namespace Helix.Crawler.Abstractions
 {
     public interface IHardwareMonitor : IDisposable
     {
-        event Action OnHighCpuUsage;
-        event Action OnLowCpuUsage;
+        event Action<double> OnHighCpuUsage;
+        event Action<double> OnLowCpuUsage;
 
-        void StartMonitoring(double millisecondSampleDuration = 30000, float highCpuUsageThreshold = 0.8f,
+        void StartMonitoring(double millisecondSampleDuration = 10000, float highCpuUsageThreshold = 0.8f,
             float lowCpuUsageThreshold = 0.6f);
 
         void StopMonitoring();

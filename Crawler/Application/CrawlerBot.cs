@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Helix.Core;
 using Helix.Crawler.Abstractions;
 using Helix.Persistence.Abstractions;
-using Helix.WebBrowser.Abstractions;
 
 namespace Helix.Crawler
 {
@@ -87,14 +86,6 @@ namespace Helix.Crawler
             if (!TryTransit(CrawlerCommand.StartWorking)) return;
             EventBroadcaster.OnEventBroadcast += OnEventBroadcast;
             EventBroadcaster.Broadcast(Event("Initializing start sequence ..."));
-            EventBroadcaster.Broadcast(Event("Extracting [User-Agent] string from web browser ..."));
-            var webBrowser = ServiceLocator.Get<IWebBrowserProvider>().GetWebBrowser(
-                configurations.PathToChromiumExecutable,
-                configurations.WorkingDirectory
-            );
-            configurations.UserAgent = webBrowser.GetUserAgentString();
-            webBrowser.Dispose();
-
             EventBroadcaster.Broadcast(Event("Connecting services ..."));
             ServiceLocator.CreateTransientServices(configurations);
             Statistics = ServiceLocator.Get<IStatistics>();

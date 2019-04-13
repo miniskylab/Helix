@@ -5,8 +5,6 @@ namespace Helix.Crawler.Abstractions
 {
     public interface IMemory : IDisposable
     {
-        Configurations Configurations { get; }
-
         int ToBeExtractedHtmlDocumentCount { get; }
 
         int ToBeRenderedResourceCount { get; }

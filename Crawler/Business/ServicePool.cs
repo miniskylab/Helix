@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 using Helix.Crawler.Abstractions;
 using Helix.Persistence.Abstractions;
 
@@ -10,12 +9,12 @@ namespace Helix.Crawler
 {
     public class ServicePool : IServicePool
     {
-        const int ResourceExtractorCount = 300;
-        const int ResourceVerifierCount = 2500;
+        readonly Configurations _configurations;
         int _createdHtmlRendererCount;
         int _createdResourceExtractorCount;
         int _createdResourceVerifierCount;
         readonly IEventBroadcaster _eventBroadcaster;
+        readonly IHardwareMonitor _hardwareMonitor;
         BlockingCollection<IHtmlRenderer> _htmlRendererPool;
         readonly ILogger _logger;
         readonly IMemory _memory;
@@ -24,10 +23,13 @@ namespace Helix.Crawler
         BlockingCollection<IResourceVerifier> _resourceVerifierPool;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public ServicePool(IMemory memory, ILogger logger, IEventBroadcaster eventBroadcaster)
+        public ServicePool(Configurations configurations, ILogger logger, IEventBroadcaster eventBroadcaster, IMemory memory,
+            IHardwareMonitor hardwareMonitor)
         {
             _memory = memory;
             _logger = logger;
+            _configurations = configurations;
+            _hardwareMonitor = hardwareMonitor;
             _eventBroadcaster = eventBroadcaster;
             _objectDisposed = false;
             _resourceExtractorPool = new BlockingCollection<IResourceExtractor>();
@@ -38,6 +40,8 @@ namespace Helix.Crawler
         public void Dispose()
         {
             if (_objectDisposed) return;
+            _hardwareMonitor.StopMonitoring();
+            _hardwareMonitor.Dispose();
             ReleaseUnmanagedResources();
             GC.SuppressFinalize(this);
             _objectDisposed = true;
@@ -66,11 +70,11 @@ namespace Helix.Crawler
             if (_objectDisposed) throw new ObjectDisposedException(nameof(ServicePool));
             PreCreateResourceExtractors();
             PreCreateResourceVerifiers();
-            PreCreateHtmlRenderers();
+            CreateHtmlRenderersAdaptively();
 
             void PreCreateResourceExtractors()
             {
-                for (var resourceExtractorId = 0; resourceExtractorId < ResourceExtractorCount; resourceExtractorId++)
+                for (var resourceExtractorId = 0; resourceExtractorId < _configurations.ResourceExtractorCount; resourceExtractorId++)
                 {
                     if (cancellationToken.IsCancellationRequested)
                     {
@@ -87,7 +91,7 @@ namespace Helix.Crawler
             }
             void PreCreateResourceVerifiers()
             {
-                for (var resourceVerifierId = 0; resourceVerifierId < ResourceVerifierCount; resourceVerifierId++)
+                for (var resourceVerifierId = 0; resourceVerifierId < _configurations.ResourceVerifierCount; resourceVerifierId++)
                 {
                     if (cancellationToken.IsCancellationRequested)
                     {
@@ -102,31 +106,44 @@ namespace Helix.Crawler
                     }
                 }
             }
-            void PreCreateHtmlRenderers()
+            void CreateHtmlRenderersAdaptively()
             {
-                Parallel.For(0, _memory.Configurations.HtmlRendererCount, htmlRendererId =>
+                CreateHtmlRenderer();
+                _hardwareMonitor.OnLowCpuUsage += averageCpuUtilization =>
                 {
-                    if (cancellationToken.IsCancellationRequested)
+                    if (_htmlRendererPool.Count > 0 || _createdHtmlRendererCount == _configurations.MaxHtmlRendererCount) return;
+                    if (cancellationToken.IsCancellationRequested) return;
+
+                    CreateHtmlRenderer();
+                    _logger.LogInfo(
+                        $"Low CPU usage detected ({Math.Round(100 * averageCpuUtilization, 0)}%). " +
+                        $"Browser count increased from {_createdHtmlRendererCount - 1} to {_createdHtmlRendererCount}."
+                    );
+                };
+                _hardwareMonitor.OnHighCpuUsage += averageCpuUtilization =>
+                {
+                    if (_createdHtmlRendererCount == 1) return;
+                    if (cancellationToken.IsCancellationRequested) return;
+
+                    _htmlRendererPool.Take().Dispose();
+                    _createdHtmlRendererCount--;
+                    _logger.LogInfo(
+                        $"High CPU usage detected ({Math.Round(100 * averageCpuUtilization, 0)}%). " +
+                        $"Browser count decreased from {_createdHtmlRendererCount + 1} to {_createdHtmlRendererCount}."
+                    );
+                };
+                _hardwareMonitor.StartMonitoring();
+
+                void CreateHtmlRenderer()
+                {
+                    var htmlRenderer = ServiceLocator.Get<IHtmlRenderer>();
+                    htmlRenderer.OnResourceCaptured += resource =>
                     {
-                        while (_htmlRendererPool.Any()) _htmlRendererPool.Take().Dispose();
-                        Interlocked.Exchange(ref _createdHtmlRendererCount, 0);
-                    }
-                    else
-                    {
-                        var htmlRenderer = ServiceLocator.Get<IHtmlRenderer>();
-                        htmlRenderer.OnResourceCaptured += resource =>
-                        {
-                            _memory.MemorizeToBeVerifiedResource(resource, cancellationToken);
-                        };
-                        _htmlRendererPool.Add(htmlRenderer, CancellationToken.None);
-                        Interlocked.Increment(ref _createdHtmlRendererCount);
-                        _eventBroadcaster.Broadcast(new Event
-                        {
-                            EventType = EventType.StartProgressUpdated,
-                            Message = $"Opening web browsers ({_createdHtmlRendererCount}/{_memory.Configurations.HtmlRendererCount})"
-                        });
-                    }
-                });
+                        _memory.MemorizeToBeVerifiedResource(resource, cancellationToken);
+                    };
+                    _htmlRendererPool.Add(htmlRenderer, CancellationToken.None);
+                    _createdHtmlRendererCount++;
+                }
             }
         }
 
@@ -202,21 +219,21 @@ namespace Helix.Crawler
                 var orphanedResourceErrorMessage = string.Empty;
                 if (disposedResourceExtractorCount != _createdResourceExtractorCount)
                     orphanedResourceErrorMessage += GetErrorMessage(
-                        ResourceExtractorCount,
+                        _createdResourceExtractorCount,
                         nameof(ResourceExtractor),
                         disposedResourceExtractorCount
                     );
 
                 if (disposedResourceVerifierCount != _createdResourceVerifierCount)
                     orphanedResourceErrorMessage += GetErrorMessage(
-                        ResourceVerifierCount,
+                        _createdResourceVerifierCount,
                         nameof(ResourceVerifier),
                         disposedResourceVerifierCount
                     );
 
                 if (disposedHtmlRendererCount != _createdHtmlRendererCount)
                     orphanedResourceErrorMessage += GetErrorMessage(
-                        _memory.Configurations.HtmlRendererCount,
+                        _createdHtmlRendererCount,
                         nameof(HtmlRenderer),
                         disposedHtmlRendererCount
                     );

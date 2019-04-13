@@ -1,7 +1,6 @@
 using System;
-using System.IO;
 using System.Linq;
-using System.Reflection;
+using Helix.Crawler.Abstractions;
 using Helix.Persistence;
 
 namespace Helix.Crawler
@@ -9,7 +8,7 @@ namespace Helix.Crawler
     public class Logger : FileLogger
     {
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public Logger() : base(Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "helix.log")) { }
+        public Logger(Configurations configurations) : base(configurations.PathToLogFile) { }
 
         public override void LogException(Exception exception)
         {

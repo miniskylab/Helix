@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Helix.Crawler.Abstractions;
@@ -16,14 +15,12 @@ namespace Helix.Crawler
         readonly object _writeLock;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public ReportWriter(Configurations configurations, IPersistenceProvider persistenceProvider)
+        public ReportWriter(ISqLitePersistence<VerificationResult> sqLitePersistence)
         {
             _objectDisposed = false;
             _writeLock = new object();
+            _sqLitePersistence = sqLitePersistence;
             _verificationResults = new List<VerificationResult>();
-
-            var pathToDatabaseFile = Path.Combine(configurations.WorkingDirectory, "report.sqlite3");
-            _sqLitePersistence = persistenceProvider.GetSqLitePersistence<VerificationResult>(pathToDatabaseFile);
         }
 
         public void Dispose()

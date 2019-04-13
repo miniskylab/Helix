@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
@@ -13,16 +14,19 @@ namespace Helix.Crawler
         CancellationTokenSource _cancellationTokenSource;
         Task _samplingTask;
 
-        public event Action OnHighCpuUsage;
-        public event Action OnLowCpuUsage;
+        public event Action<double> OnHighCpuUsage;
+        public event Action<double> OnLowCpuUsage;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public HardwareMonitor() { }
 
-        public void Dispose() { StopMonitoring(); }
+        public void Dispose()
+        {
+            if (_samplingTask == null) return;
+            StopMonitoring();
+        }
 
-        public void StartMonitoring(double millisecondSampleDuration = 30000, float highCpuUsageThreshold = 0.8f,
-            float lowCpuUsageThreshold = 0.6f)
+        public void StartMonitoring(double millisecondSampleDuration, float highCpuUsageThreshold, float lowCpuUsageThreshold)
         {
             if (_samplingTask != null) throw new Exception($"{nameof(HardwareMonitor)} is already running.");
 
@@ -32,22 +36,22 @@ namespace Helix.Crawler
             {
                 while (!_cancellationTokenSource.IsCancellationRequested)
                 {
-                    var processes = Process.GetProcesses().Where(process => process.Id > 0).ToList();
                     var startTime = DateTime.UtcNow;
-                    var startProcessorTimeSamples = GetProcessorTimeSamples(processes);
+                    var startCpuUtilization = GetCpuUtilization(Process.GetProcesses());
                     Thread.Sleep(TimeSpan.FromSeconds(1));
                     var endTime = DateTime.UtcNow;
-                    var endProcessorTimeSamples = GetProcessorTimeSamples(processes);
+                    var endCpuUtilization = GetCpuUtilization(Process.GetProcesses());
 
                     var totalElapsedTime = endTime - startTime;
-                    var allProcessesTotalProcessorTime = endProcessorTimeSamples.Keys.Intersect(startProcessorTimeSamples.Keys)
+                    var totalCpuUtilization = endCpuUtilization.Keys.Intersect(startCpuUtilization.Keys)
                         .Aggregate(TimeSpan.Zero, (totalProcessorTime, processId) =>
                         {
-                            var processorTime = endProcessorTimeSamples[processId] - startProcessorTimeSamples[processId];
+                            var processorTime = endCpuUtilization[processId] - startCpuUtilization[processId];
                             return totalProcessorTime + processorTime;
                         });
 
-                    cpuUtilizationSamples.Add(allProcessesTotalProcessorTime / (Environment.ProcessorCount * totalElapsedTime));
+                    const float compensationRate = 1.3f;
+                    cpuUtilizationSamples.Add(totalCpuUtilization * compensationRate / (Environment.ProcessorCount * totalElapsedTime));
                     if (cpuUtilizationSamples.Count < TimeSpan.FromMilliseconds(millisecondSampleDuration).TotalSeconds) continue;
                     CheckCpuUtilization(cpuUtilizationSamples.Average(), highCpuUsageThreshold, lowCpuUsageThreshold);
                     cpuUtilizationSamples.Clear();
@@ -67,19 +71,23 @@ namespace Helix.Crawler
 
         void CheckCpuUtilization(double averageCpuUtilization, float highCpuUsageThreshold, float lowCpuUsageThreshold)
         {
-            if (averageCpuUtilization >= highCpuUsageThreshold) OnHighCpuUsage?.Invoke();
-            else if (averageCpuUtilization < lowCpuUsageThreshold) OnLowCpuUsage?.Invoke();
+            if (averageCpuUtilization >= highCpuUsageThreshold) OnHighCpuUsage?.Invoke(averageCpuUtilization);
+            else if (averageCpuUtilization < lowCpuUsageThreshold) OnLowCpuUsage?.Invoke(averageCpuUtilization);
         }
 
-        static IDictionary<int, TimeSpan> GetProcessorTimeSamples(IEnumerable<Process> processes)
+        static IDictionary<int, TimeSpan> GetCpuUtilization(IEnumerable<Process> processes)
         {
-            var processorTimeSamples = new Dictionary<int, TimeSpan>();
+            var cpuUtilization = new Dictionary<int, TimeSpan>();
             foreach (var process in processes)
             {
                 try
                 {
                     var totalProcessorTime = process.TotalProcessorTime;
-                    processorTimeSamples.Add(process.Id, totalProcessorTime);
+                    cpuUtilization.Add(process.Id, totalProcessorTime);
+                }
+                catch (Win32Exception)
+                {
+                    /* Ignore processes which we don't have permission to inspect. */
                 }
                 catch (InvalidOperationException)
                 {
@@ -87,7 +95,7 @@ namespace Helix.Crawler
                      * If that happens an InvalidOperationException will be thrown and such processes will be ignored. */
                 }
             }
-            return processorTimeSamples;
+            return cpuUtilization;
         }
     }
 }

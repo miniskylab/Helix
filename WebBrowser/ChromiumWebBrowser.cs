@@ -15,7 +15,7 @@ using Titanium.Web.Proxy.Models;
 
 namespace Helix.WebBrowser
 {
-    class ChromiumWebBrowser : IWebBrowser
+    public class ChromiumWebBrowser : IWebBrowser
     {
         readonly (int width, int height) _browserWindowSize;
         ChromeDriver _chromeDriver;

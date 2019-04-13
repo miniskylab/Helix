@@ -35,10 +35,8 @@ namespace Helix.Crawler
                 .AddSingleton<IHardwareMonitor, HardwareMonitor>();
 
             var singletonServiceCollection = new ServiceCollection()
-                .AddSingleton<IPersistenceProvider, PersistenceProvider>()
-                .AddSingleton<IWebBrowserProvider, WebBrowserProvider>()
                 .AddSingleton<IEventBroadcaster, EventBroadcaster>()
-                .AddSingleton<ILogger, Logger>();
+                .AddSingleton(_ => (ILogger) Activator.CreateInstance(typeof(Logger), new Configurations()));
             _singletonServiceProvider = singletonServiceCollection.BuildServiceProvider();
 
             foreach (var singletonServiceDescriptor in singletonServiceCollection)
@@ -50,6 +48,7 @@ namespace Helix.Crawler
             AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
             {
                 _singletonServiceProvider.GetService<ILogger>().LogInfo("Disposing application-wide singleton services ...");
+                _singletonServiceProvider.GetService<ILogger>().Dispose();
                 _singletonServiceProvider.Dispose();
             };
         }
@@ -57,15 +56,35 @@ namespace Helix.Crawler
         public static void CreateTransientServices(Configurations configurations)
         {
             if (_transientServiceProvider?.GetService<Configurations>() != null) throw new InvalidConstraintException();
-            _transientServiceProvider?.Dispose();
+            DisposeTransientServices();
             _transientServiceProvider = _transientServiceCollection
+                .AddTransient(_ => CreateAndConfigureWebBrowser())
+                .AddTransient(_ => CreateAndConfigureSqLitePersistence())
                 .AddSingleton(CreateAndConfigureHttpClient())
                 .AddSingleton(configurations)
                 .BuildServiceProvider();
 
+            IWebBrowser CreateAndConfigureWebBrowser()
+            {
+                return new ChromiumWebBrowser(
+                    configurations.PathToChromiumExecutable,
+                    configurations.WorkingDirectory,
+                    configurations.HttpRequestTimeout.TotalSeconds,
+                    configurations.UseIncognitoWebBrowser,
+                    configurations.UseHeadlessWebBrowsers,
+                    (1920, 1080)
+                );
+            }
             HttpClient CreateAndConfigureHttpClient()
             {
                 if (_httpClient != null) return _httpClient;
+                var webBrowser = new ChromiumWebBrowser(
+                    configurations.PathToChromiumExecutable,
+                    configurations.WorkingDirectory
+                );
+                var userAgentString = webBrowser.GetUserAgentString();
+                webBrowser.Dispose();
+
                 _httpClient = new HttpClient();
                 _httpClient.DefaultRequestHeaders.Accept.ParseAdd("*/*");
                 _httpClient.DefaultRequestHeaders.AcceptEncoding.ParseAdd("*");
@@ -73,9 +92,13 @@ namespace Helix.Crawler
                 _httpClient.DefaultRequestHeaders.CacheControl = CacheControlHeaderValue.Parse("no-cache");
                 _httpClient.DefaultRequestHeaders.Pragma.ParseAdd("no-cache");
                 _httpClient.DefaultRequestHeaders.Upgrade.ParseAdd("1");
-                _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(configurations.UserAgent);
+                _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(userAgentString);
                 _httpClient.Timeout = configurations.HttpRequestTimeout;
                 return _httpClient;
+            }
+            ISqLitePersistence<VerificationResult> CreateAndConfigureSqLitePersistence()
+            {
+                return new SqLitePersistence<VerificationResult>(configurations.PathToReportFile);
             }
         }
 

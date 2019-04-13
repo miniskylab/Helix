@@ -26,17 +26,10 @@ namespace Helix.Crawler
         public event Action<Resource> OnResourceCaptured;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public HtmlRenderer(Configurations configurations, IWebBrowserProvider webBrowserProvider, IResourceScope resourceScope,
-            IReportWriter reportWriter, IResourceProcessor resourceProcessor, ILogger logger)
+        public HtmlRenderer(Configurations configurations, IWebBrowser webBrowser, IResourceScope resourceScope, IReportWriter reportWriter,
+            IResourceProcessor resourceProcessor, ILogger logger)
         {
-            _webBrowser = webBrowserProvider.GetWebBrowser(
-                configurations.PathToChromiumExecutable,
-                configurations.WorkingDirectory,
-                configurations.HttpRequestTimeout.TotalSeconds,
-                configurations.UseIncognitoWebBrowser,
-                configurations.UseHeadlessWebBrowsers,
-                (1920, 1080)
-            );
+            _webBrowser = webBrowser;
             _webBrowser.BeforeRequest += EnsureInternal;
             _webBrowser.BeforeResponse += CaptureNetworkTraffic;
 
@@ -102,7 +95,6 @@ namespace Helix.Crawler
                     uriBeingRendered = redirectUri.IsAbsoluteUri ? redirectUri : new Uri(_resourceBeingRendered.ParentUri, redirectUri);
                     return true;
                 }
-
                 bool ParentUriWasFound()
                 {
                     var capturedUri = request.RequestUri;
@@ -149,7 +141,7 @@ namespace Helix.Crawler
         }
 
         public bool TryRender(Resource resource, out string html, out long? millisecondsPageLoadTime, CancellationToken cancellationToken,
-            Action<Exception> onFailed = null)
+            Action<Exception> onFailed)
         {
             lock (_publicApiLockMap[nameof(TryRender)])
             {
