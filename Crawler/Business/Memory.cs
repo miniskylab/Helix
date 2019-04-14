@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using Helix.Crawler.Abstractions;
 
 namespace Helix.Crawler
@@ -57,27 +56,27 @@ namespace Helix.Crawler
             }
         }
 
-        public void MemorizeToBeExtractedHtmlDocument(HtmlDocument toBeExtractedHtmlDocument, CancellationToken cancellationToken)
+        public void MemorizeToBeExtractedHtmlDocument(HtmlDocument toBeExtractedHtmlDocument)
         {
-            _toBeExtractedHtmlDocuments.Add(toBeExtractedHtmlDocument, cancellationToken);
+            _toBeExtractedHtmlDocuments.Add(toBeExtractedHtmlDocument);
         }
 
-        public void MemorizeToBeRenderedResource(Resource toBeRenderedResource, CancellationToken cancellationToken)
+        public void MemorizeToBeRenderedResource(Resource toBeRenderedResource)
         {
             var destinationCollection = (int) toBeRenderedResource.StatusCode >= 400
                 ? _toBeTakenScreenshotResources
                 : _toBeRenderedResources;
-            destinationCollection.Add(toBeRenderedResource, cancellationToken);
+            destinationCollection.Add(toBeRenderedResource);
         }
 
-        public void MemorizeToBeVerifiedResource(Resource toBeVerifiedResource, CancellationToken cancellationToken)
+        public void MemorizeToBeVerifiedResource(Resource toBeVerifiedResource)
         {
             lock (_memorizationLock)
             {
                 if (_alreadyVerifiedUrls.Contains(toBeVerifiedResource.AbsoluteUrl)) return;
                 _alreadyVerifiedUrls.Add(toBeVerifiedResource.AbsoluteUrl);
             }
-            _toBeVerifiedResources.Add(toBeVerifiedResource, cancellationToken);
+            _toBeVerifiedResources.Add(toBeVerifiedResource);
         }
 
         public bool TryTakeToBeExtractedHtmlDocument(out HtmlDocument toBeExtractedHtmlDocument)

@@ -28,7 +28,7 @@ namespace Helix.Crawler
                 .AddTransient<IResourceScope, ResourceScope>()
                 .AddSingleton<IIncrementalIdGenerator, IncrementalIdGenerator>()
                 .AddSingleton<IStatistics, Statistics>()
-                .AddSingleton<IServicePool, ServicePool>()
+                .AddSingleton<INetworkServicePool, NetworkServicePool>()
                 .AddSingleton<IReportWriter, ReportWriter>()
                 .AddSingleton<IMemory, Memory>()
                 .AddSingleton<IScheduler, Scheduler>()

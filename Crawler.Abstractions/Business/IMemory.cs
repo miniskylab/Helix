@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 
 namespace Helix.Crawler.Abstractions
 {
@@ -13,11 +12,11 @@ namespace Helix.Crawler.Abstractions
 
         void Clear();
 
-        void MemorizeToBeExtractedHtmlDocument(HtmlDocument toBeExtractedHtmlDocument, CancellationToken cancellationToken);
+        void MemorizeToBeExtractedHtmlDocument(HtmlDocument toBeExtractedHtmlDocument);
 
-        void MemorizeToBeRenderedResource(Resource toBeRenderedResource, CancellationToken cancellationToken);
+        void MemorizeToBeRenderedResource(Resource toBeRenderedResource);
 
-        void MemorizeToBeVerifiedResource(Resource toBeVerifiedResource, CancellationToken cancellationToken);
+        void MemorizeToBeVerifiedResource(Resource toBeVerifiedResource);
 
         bool TryTakeToBeExtractedHtmlDocument(out HtmlDocument toBeExtractedHtmlDocument);
 

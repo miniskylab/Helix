@@ -19,7 +19,7 @@ namespace Helix.Crawler
         int _pendingRenderingTaskCount;
         int _pendingVerificationTaskCount;
         readonly object _renderingLock;
-        readonly IServicePool _servicePool;
+        readonly INetworkServicePool _networkServicePool;
         readonly object _verificationLock;
 
         public CancellationToken CancellationToken
@@ -69,11 +69,11 @@ namespace Helix.Crawler
         }
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public Scheduler(IMemory memory, ILogger logger, IServicePool servicePool, IEventBroadcaster eventBroadcaster)
+        public Scheduler(IMemory memory, ILogger logger, INetworkServicePool networkServicePool, IEventBroadcaster eventBroadcaster)
         {
             _memory = memory;
             _logger = logger;
-            _servicePool = servicePool;
+            _networkServicePool = networkServicePool;
             _eventBroadcaster = eventBroadcaster;
             _objectDisposed = false;
             _renderingLock = new object();
@@ -154,7 +154,7 @@ namespace Helix.Crawler
                     }
                     Monitor.Exit(_extractionLock);
 
-                    try { resourceExtractor = _servicePool.GetResourceExtractor(CancellationToken); }
+                    try { resourceExtractor = _networkServicePool.GetResourceExtractor(CancellationToken); }
                     catch (OperationCanceledException)
                     {
                         _pendingExtractionTaskCount--;
@@ -168,12 +168,9 @@ namespace Helix.Crawler
             void ReleaseResourceExtractor()
             {
                 lock (_extractionLock) _pendingExtractionTaskCount--;
-                _servicePool.Return(resourceExtractor);
+                _networkServicePool.Return(resourceExtractor);
             }
-            void ReturnToBeExtractedHtmlDocument()
-            {
-                _memory.MemorizeToBeExtractedHtmlDocument(toBeExtractedHtmlDocument, CancellationToken.None);
-            }
+            void ReturnToBeExtractedHtmlDocument() { _memory.MemorizeToBeExtractedHtmlDocument(toBeExtractedHtmlDocument); }
         }
 
         public void CreateTask(Action<IHtmlRenderer, Resource> taskDescription)
@@ -239,7 +236,7 @@ namespace Helix.Crawler
                     }
                     Monitor.Exit(_renderingLock);
 
-                    try { htmlRenderer = _servicePool.GetHtmlRenderer(CancellationToken); }
+                    try { htmlRenderer = _networkServicePool.GetHtmlRenderer(CancellationToken); }
                     catch (OperationCanceledException)
                     {
                         _pendingRenderingTaskCount--;
@@ -253,9 +250,9 @@ namespace Helix.Crawler
             void ReleaseHtmlRenderer()
             {
                 lock (_renderingLock) _pendingRenderingTaskCount--;
-                _servicePool.Return(htmlRenderer);
+                _networkServicePool.Return(htmlRenderer);
             }
-            void ReturnToBeRenderedResource() { _memory.MemorizeToBeRenderedResource(toBeRenderedResource, CancellationToken.None); }
+            void ReturnToBeRenderedResource() { _memory.MemorizeToBeRenderedResource(toBeRenderedResource); }
         }
 
         public void CreateTask(Action<IResourceVerifier, Resource> taskDescription)
@@ -311,7 +308,7 @@ namespace Helix.Crawler
                     }
                     Monitor.Exit(_verificationLock);
 
-                    try { resourceVerifier = _servicePool.GetResourceVerifier(CancellationToken); }
+                    try { resourceVerifier = _networkServicePool.GetResourceVerifier(CancellationToken); }
                     catch (OperationCanceledException)
                     {
                         _pendingVerificationTaskCount--;
@@ -325,10 +322,10 @@ namespace Helix.Crawler
             void ReleaseResourceVerifier()
             {
                 lock (_verificationLock) _pendingVerificationTaskCount--;
-                _servicePool.Return(resourceVerifier);
+                _networkServicePool.Return(resourceVerifier);
             }
             // TODO: Not gonna work because of _alreadyVerifiedUrls in Memory.cs
-            void ReturnToBeVerifiedResource() { _memory.MemorizeToBeVerifiedResource(toBeVerifiedResource, CancellationToken.None); }
+            void ReturnToBeVerifiedResource() { _memory.MemorizeToBeVerifiedResource(toBeVerifiedResource); }
         }
 
         public void Dispose()

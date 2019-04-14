@@ -2,7 +2,7 @@
 
 namespace Helix.Crawler.Abstractions
 {
-    public interface IHardwareMonitor : IDisposable
+    public interface IHardwareMonitor
     {
         event Action<double> OnHighCpuUsage;
         event Action<double> OnLowCpuUsage;

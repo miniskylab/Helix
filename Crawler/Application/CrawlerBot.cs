@@ -12,12 +12,12 @@ namespace Helix.Crawler
 {
     public static class CrawlerBot
     {
+        static IHardwareMonitor _hardwareMonitor;
         static IMemory _memory;
         static IReportWriter _reportWriter;
         static IResourceProcessor _resourceProcessor;
         static IResourceScope _resourceScope;
         static IScheduler _scheduler;
-        static IServicePool _servicePool;
         static readonly List<Task> BackgroundTasks;
         static readonly IEventBroadcaster EventBroadcaster;
         static readonly ILogger Logger;
@@ -91,8 +91,8 @@ namespace Helix.Crawler
             Statistics = ServiceLocator.Get<IStatistics>();
             _memory = ServiceLocator.Get<IMemory>();
             _scheduler = ServiceLocator.Get<IScheduler>();
-            _servicePool = ServiceLocator.Get<IServicePool>();
             _resourceScope = ServiceLocator.Get<IResourceScope>();
+            _hardwareMonitor = ServiceLocator.Get<IHardwareMonitor>();
             _resourceProcessor = ServiceLocator.Get<IResourceProcessor>();
 
             BackgroundTasks.Add(Task.Run(() =>
@@ -105,8 +105,8 @@ namespace Helix.Crawler
                     EventBroadcaster.Broadcast(Event("Re-creating report database ..."));
                     _reportWriter = ServiceLocator.Get<IReportWriter>();
 
-                    EventBroadcaster.Broadcast(Event("Pre-creating services ..."));
-                    _servicePool.PreCreateServices(_scheduler.CancellationToken);
+                    EventBroadcaster.Broadcast(Event("Starting hardware monitor service ..."));
+                    _hardwareMonitor.StartMonitoring();
 
                     EventBroadcaster.Broadcast(Event("Activating main workflow ..."));
                     _memory.MemorizeToBeVerifiedResource(
@@ -114,8 +114,7 @@ namespace Helix.Crawler
                         {
                             ParentUri = null,
                             OriginalUrl = configurations.StartUri.AbsoluteUri
-                        }),
-                        _scheduler.CancellationToken
+                        })
                     );
                     var renderingTask = Task.Run(Render, _scheduler.CancellationToken);
                     var extractionTask = Task.Run(Extract, _scheduler.CancellationToken);
@@ -155,6 +154,8 @@ namespace Helix.Crawler
         {
             if (!TryTransit(CrawlerCommand.StopWorking)) return;
             EventBroadcaster.Broadcast(Event("Initializing stop sequence ..."));
+            EventBroadcaster.Broadcast(Event("Stopping hardware monitor service ..."));
+            _hardwareMonitor.StopMonitoring();
 
             var crawlerCommand = CrawlerCommand.MarkAsCancelled;
             if (_scheduler != null)
@@ -215,7 +216,7 @@ namespace Helix.Crawler
                 {
                     resourceExtractor.ExtractResourcesFrom(
                         toBeExtractedHtmlDocument,
-                        resource => _memory.MemorizeToBeVerifiedResource(resource, _scheduler.CancellationToken)
+                        resource => _memory.MemorizeToBeVerifiedResource(resource)
                     );
                 });
         }
@@ -247,11 +248,7 @@ namespace Helix.Crawler
                     }
 
                     if (toBeRenderedResource.IsBroken) return;
-                    _memory.MemorizeToBeExtractedHtmlDocument(new HtmlDocument
-                    {
-                        Uri = toBeRenderedResource.Uri,
-                        Text = htmlText
-                    }, _scheduler.CancellationToken);
+                    _memory.MemorizeToBeExtractedHtmlDocument(new HtmlDocument { Uri = toBeRenderedResource.Uri, Text = htmlText });
                 });
         }
 
@@ -297,7 +294,7 @@ namespace Helix.Crawler
                     var isInitialResource = _resourceScope.IsStartUri(resource.Uri);
                     var isNotStaticAsset = !ResourceType.StaticAsset.HasFlag(resource.ResourceType);
                     if (isInternalResource && isNotStaticAsset && !resourceIsTooBig && (isExtractedResource || isInitialResource))
-                        _memory.MemorizeToBeRenderedResource(resource, _scheduler.CancellationToken);
+                        _memory.MemorizeToBeRenderedResource(resource);
                 });
         }
     }

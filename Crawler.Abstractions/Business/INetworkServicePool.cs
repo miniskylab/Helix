@@ -3,15 +3,13 @@ using System.Threading;
 
 namespace Helix.Crawler.Abstractions
 {
-    public interface IServicePool : IDisposable
+    public interface INetworkServicePool : IDisposable
     {
         IHtmlRenderer GetHtmlRenderer(CancellationToken cancellationToken);
 
         IResourceExtractor GetResourceExtractor(CancellationToken cancellationToken);
 
         IResourceVerifier GetResourceVerifier(CancellationToken cancellationToken);
-
-        void PreCreateServices(CancellationToken cancellationToken);
 
         void Return(IResourceExtractor resourceExtractor);
 
