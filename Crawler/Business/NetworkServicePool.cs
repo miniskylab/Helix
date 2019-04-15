@@ -7,7 +7,6 @@ using Helix.Persistence.Abstractions;
 
 namespace Helix.Crawler
 {
-    // TODO: expose methods only, like Task.Run();
     public class NetworkServicePool : INetworkServicePool
     {
         readonly IEventBroadcaster _eventBroadcaster;

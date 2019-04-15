@@ -34,9 +34,9 @@ namespace Helix.Gui
             {
                 try
                 {
-                    CrawlerBot.EventBroadcast += OnStartProgressUpdated;
-                    CrawlerBot.EventBroadcast += OnResourceVerified;
-                    CrawlerBot.EventBroadcast += OnStopped;
+                    CrawlerBot.OnEventBroadcast += OnStartProgressUpdated;
+                    CrawlerBot.OnEventBroadcast += OnResourceVerified;
+                    CrawlerBot.OnEventBroadcast += OnStopped;
                     CrawlerBot.StartWorking(new Configurations(configurationJsonString));
                     RedrawEvery(TimeSpan.FromSeconds(1));
                 }
@@ -51,6 +51,7 @@ namespace Helix.Gui
                     {
                         case CrawlerState.RanToCompletion:
                         case CrawlerState.Faulted:
+                            _constantRedrawTask.Wait();
                             Redraw(restrictHumanInteraction: false);
                             break;
                     }
@@ -59,7 +60,7 @@ namespace Helix.Gui
                 {
                     if (@event.EventType != EventType.StartProgressUpdated)
                     {
-                        CrawlerBot.EventBroadcast -= OnStartProgressUpdated;
+                        CrawlerBot.OnEventBroadcast -= OnStartProgressUpdated;
                         return;
                     }
                     Redraw(@event.Message, redrawEverything: false);
@@ -75,8 +76,8 @@ namespace Helix.Gui
                 {
                     try
                     {
-                        CrawlerBot.EventBroadcast -= OnResourceVerified;
-                        CrawlerBot.EventBroadcast += OnStopProgressUpdated;
+                        CrawlerBot.OnEventBroadcast -= OnResourceVerified;
+                        CrawlerBot.OnEventBroadcast += OnStopProgressUpdated;
                         CrawlerBot.StopWorking();
 
                         var waitingTime = TimeSpan.FromMinutes(1);

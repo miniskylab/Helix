@@ -14,12 +14,12 @@ namespace Helix.Crawler
         readonly object _extractionLock;
         readonly ILogger _logger;
         readonly IMemory _memory;
+        readonly INetworkServicePool _networkServicePool;
         bool _objectDisposed;
         int _pendingExtractionTaskCount;
         int _pendingRenderingTaskCount;
         int _pendingVerificationTaskCount;
         readonly object _renderingLock;
-        readonly INetworkServicePool _networkServicePool;
         readonly object _verificationLock;
 
         public CancellationToken CancellationToken

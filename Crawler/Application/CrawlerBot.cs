@@ -43,7 +43,7 @@ namespace Helix.Crawler
             }
         }
 
-        public static event Action<Event> EventBroadcast;
+        public static event Action<Event> OnEventBroadcast;
 
         static CrawlerBot()
         {
@@ -84,7 +84,7 @@ namespace Helix.Crawler
         public static void StartWorking(Configurations configurations)
         {
             if (!TryTransit(CrawlerCommand.StartWorking)) return;
-            EventBroadcaster.OnEventBroadcast += OnEventBroadcast;
+            EventBroadcaster.OnEventBroadcast += EventBroadcastCallback;
             EventBroadcaster.Broadcast(Event("Initializing start sequence ..."));
             EventBroadcaster.Broadcast(Event("Connecting services ..."));
             ServiceLocator.CreateTransientServices(configurations);
@@ -182,8 +182,8 @@ namespace Helix.Crawler
                 EventType = EventType.Stopped,
                 Message = GetStopEventMessage()
             });
-            EventBroadcaster.OnEventBroadcast -= OnEventBroadcast;
-            EventBroadcast = null;
+            EventBroadcaster.OnEventBroadcast -= EventBroadcastCallback;
+            OnEventBroadcast = null;
 
             string GetStopEventMessage()
             {
@@ -209,6 +209,13 @@ namespace Helix.Crawler
             }
         }
 
+        static void EventBroadcastCallback(Event @event)
+        {
+            OnEventBroadcast?.Invoke(@event);
+            if (@event.EventType != EventType.ResourceVerified && !string.IsNullOrWhiteSpace(@event.Message))
+                Logger.LogInfo(@event.Message);
+        }
+
         static void Extract()
         {
             while (!_scheduler.EverythingIsDone && !_scheduler.CancellationToken.IsCancellationRequested)
@@ -219,13 +226,6 @@ namespace Helix.Crawler
                         resource => _memory.MemorizeToBeVerifiedResource(resource)
                     );
                 });
-        }
-
-        static void OnEventBroadcast(Event @event)
-        {
-            EventBroadcast?.Invoke(@event);
-            if (@event.EventType != EventType.ResourceVerified && !string.IsNullOrWhiteSpace(@event.Message))
-                Logger.LogInfo(@event.Message);
         }
 
         static void Render()
