@@ -1,0 +1,30 @@
+.about-me-overlay__avartar {
+    display: block;
+    width: 130px;
+    height: 130px;
+    padding: 6px;
+    margin: 40px auto 0 auto;
+    border-radius: 50%;
+    border: 6px solid #3399FF;
+    box-sizing: border-box;
+}
+
+.about-me-overlay__title {
+    margin-top: 15px;
+    font-size: 20px;
+    font-weight: bold;
+    text-align: center;
+    color: #3399FF;
+    -webkit-text-stroke-width: thin;
+}
+
+.about-me-overlay__introduction {
+    line-height: 25px;
+    margin-top: 20px;
+    padding: 0 40px;
+    box-sizing: border-box;
+    font-size: 14px;
+    font-weight: bold;
+    text-align: justify;
+    color: #FFFFFF;
+}
