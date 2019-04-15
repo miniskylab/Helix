@@ -3,17 +3,12 @@ const socket = new require("net").Socket();
 
 const endOfTransmissionCharacter = '\4';
 
-const btnMain = document.getElementById("btn-main");
 const txtStartUri = document.getElementById("txt-start-uri");
 const txtDomainName = document.getElementById("txt-domain-name");
-const txtHtmlRendererCount = document.getElementById("txt-html-renderer-count");
 const ckbVerifyExternalUrls = document.getElementById("ckb-verify-external-urls");
 const ckbShowWebBrowsers = document.getElementById("ckb-show-web-browsers");
-const configurationPanel = document.getElementById("configuration-panel");
-const shutdownOverlay = document.getElementById("shutdown-overlay");
-const shutdownOverlaySubtitle = document.getElementById("shutdown-overlay-subtitle");
-const shutdownFailureOverlay = document.getElementById("shutdown-failure-overlay");
 
+const configurationPanel = document.getElementById("configuration-panel");
 const lblVerified = document.getElementById("lbl-verified");
 const lblValid = document.getElementById("lbl-valid");
 const lblBroken = document.getElementById("lbl-broken");
@@ -23,6 +18,12 @@ const lblAveragePageLoadTimeUnitOfMeasure = document.getElementById("lbl-average
 const lblElapsedTime = document.getElementById("lbl-elapsed-time");
 const lblStatusText = document.getElementById("lbl-status-text");
 const lblShutdownOverlayMessage = document.getElementById("shutdown-overlay-message");
+
+const shutdownOverlay = document.getElementById("shutdown-overlay");
+const shutdownOverlaySubtitle = document.getElementById("shutdown-overlay-subtitle");
+const shutdownFailureOverlay = document.getElementById("shutdown-failure-overlay");
+
+const btnMain = document.getElementById("btn-main");
 const btnStop = document.getElementById("btn-stop");
 
 socket.connect(18880, "127.0.0.1", () => {
@@ -45,7 +46,6 @@ socket.connect(18880, "127.0.0.1", () => {
             payload: JSON.stringify({
                 StartUri: txtStartUri.value,
                 DomainName: txtDomainName.value,
-                HtmlRendererCount: txtHtmlRendererCount.value,
                 VerifyExternalUrls: ckbVerifyExternalUrls.checked,
                 UseHeadlessWebBrowsers: !ckbShowWebBrowsers.checked
             })
