@@ -3,7 +3,7 @@
     width: 100px;
     height: 100px;
     padding: 5px;
-    margin: 30px auto 0 auto;
+    margin: 26px auto 0 auto;
     border-radius: 50%;
     border: 5px solid #3399FF;
     box-sizing: border-box;
@@ -81,16 +81,3 @@
 .about-me-overlay__badge-description--chelsea-cucumber { color: #87AC4E; }
 .about-me-overlay__badge-description--deluge { color: #8959A8; }
 .about-me-overlay__badge-description--sandy-brown { color: #F7A65F; }
-
-.about-me-overlay__button {
-    display: block;
-    margin: 20px auto 0 auto;
-    width: 120px;
-    height: 34px;
-    padding: 6px;
-    box-sizing: border-box;
-    border: 2px solid #9B9B9B;
-    font-size: 13px;
-    text-align: center;
-    color: #9B9B9B;
-}
