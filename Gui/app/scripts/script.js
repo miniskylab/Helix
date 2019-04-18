@@ -22,9 +22,14 @@ const lblShutdownOverlayMessage = document.getElementById("shutdown-overlay-mess
 const shutdownOverlay = document.getElementById("shutdown-overlay");
 const shutdownOverlaySubtitle = document.getElementById("shutdown-overlay-subtitle");
 const shutdownFailureOverlay = document.getElementById("shutdown-failure-overlay");
+const aboutMeOverlay = document.getElementById("about-me-overlay");
 
+const btnShowAboutMeOverlay = document.getElementById("btn-show-about-me-overlay");
+const btnMinimize = document.getElementById("btn-minimize");
 const btnMain = document.getElementById("btn-main");
 const btnStop = document.getElementById("btn-stop");
+const btnClose = document.getElementById("btn-close");
+const btnCloseAboutMeOverlay = document.getElementById("btn-close-about-me-overlay");
 
 socket.connect(18880, "127.0.0.1", () => {
 
@@ -52,7 +57,7 @@ socket.connect(18880, "127.0.0.1", () => {
         }));
     });
 
-    document.getElementById("btn-close").addEventListener("click", () => {
+    btnClose.addEventListener("click", () => {
         let waitingTime = 120;
         const getShutdownOverlaySubTitle = (remainingTime) => `(Please allow up to <div style='display:inline-block;color:#FF6347;'>${remainingTime}</div> seconds)`;
         shutdownOverlaySubtitle.innerHTML = getShutdownOverlaySubTitle(waitingTime);
@@ -73,7 +78,11 @@ socket.connect(18880, "127.0.0.1", () => {
         socket.on("end", () => { ipcRenderer.send("btn-close-clicked"); });
     });
 
-    document.getElementById("btn-minimize").addEventListener("click", () => { remote.BrowserWindow.getFocusedWindow().minimize(); });
+    btnMinimize.addEventListener("click", () => { remote.BrowserWindow.getFocusedWindow().minimize(); });
+
+    btnShowAboutMeOverlay.addEventListener("click", () => { aboutMeOverlay.style.display = "block"; });
+
+    btnCloseAboutMeOverlay.addEventListener("click", () => { aboutMeOverlay.style.display = "none"; });
 
     socket.on("data", byteStream => {
         const jsonMessages = new TextDecoder("utf-8").decode(byteStream).split(endOfTransmissionCharacter);
