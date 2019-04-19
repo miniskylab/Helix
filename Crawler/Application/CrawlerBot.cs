@@ -161,8 +161,8 @@ namespace Helix.Crawler
             if (_scheduler != null)
             {
                 EventBroadcaster.Broadcast(Event("De-activating main workflow ..."));
+                if (_scheduler.RemainingWorkload == 0) crawlerCommand = CrawlerCommand.MarkAsRanToCompletion;
                 _scheduler.CancelEverything();
-                if (_scheduler.EverythingIsDone) crawlerCommand = CrawlerCommand.MarkAsRanToCompletion;
 
                 EventBroadcaster.Broadcast(Event("Waiting for background tasks to complete ..."));
                 try { Task.WhenAll(BackgroundTasks).Wait(); }
@@ -218,7 +218,7 @@ namespace Helix.Crawler
 
         static void Extract()
         {
-            while (!_scheduler.EverythingIsDone && !_scheduler.CancellationToken.IsCancellationRequested)
+            while (_scheduler.RemainingWorkload != 0 && !_scheduler.CancellationToken.IsCancellationRequested)
                 _scheduler.CreateTask((resourceExtractor, toBeExtractedHtmlDocument) =>
                 {
                     resourceExtractor.ExtractResourcesFrom(
@@ -230,7 +230,7 @@ namespace Helix.Crawler
 
         static void Render()
         {
-            while (!_scheduler.EverythingIsDone && !_scheduler.CancellationToken.IsCancellationRequested)
+            while (_scheduler.RemainingWorkload != 0 && !_scheduler.CancellationToken.IsCancellationRequested)
                 _scheduler.CreateTask((htmlRenderer, toBeRenderedResource) =>
                 {
                     var renderingFailed = !htmlRenderer.TryRender(
@@ -264,7 +264,7 @@ namespace Helix.Crawler
 
         static void Verify()
         {
-            while (!_scheduler.EverythingIsDone && !_scheduler.CancellationToken.IsCancellationRequested)
+            while (_scheduler.RemainingWorkload != 0 && !_scheduler.CancellationToken.IsCancellationRequested)
                 _scheduler.CreateTask((resourceVerifier, resource) =>
                 {
                     if (!resourceVerifier.TryVerify(resource, out var verificationResult)) return;

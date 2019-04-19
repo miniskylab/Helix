@@ -40,16 +40,23 @@ namespace Helix.Gui
                     CrawlerBot.StartWorking(new Configurations(configurationJsonString));
                     RedrawEvery(TimeSpan.FromSeconds(1));
                 }
-                catch (Exception exception) { Redraw(exception.Message, false); }
+                catch (Exception exception)
+                {
+                    Redraw(new Frame
+                    {
+                        StatusText = exception.Message,
+                        RestrictHumanInteraction = false
+                    });
+                }
 
                 void OnStopped(Event @event)
                 {
                     if (@event.EventType != EventType.Stopped) return;
-                    Redraw(@event.Message);
+                    Redraw(new Frame { StatusText = @event.Message });
 
                     if (!CrawlerState.Completed.HasFlag(CrawlerBot.CrawlerState)) return;
                     _constantRedrawTask.Wait();
-                    Redraw(restrictHumanInteraction: false);
+                    Redraw(new Frame { RestrictHumanInteraction = false });
                 }
                 void OnStartProgressUpdated(Event @event)
                 {
@@ -58,7 +65,7 @@ namespace Helix.Gui
                         CrawlerBot.OnEventBroadcast -= OnStartProgressUpdated;
                         return;
                     }
-                    Redraw(@event.Message, redrawEverything: false);
+                    Redraw(new Frame { StatusText = @event.Message });
                 }
             });
             SynchronousServerSocket.On("btn-close-clicked", _ =>
@@ -98,37 +105,22 @@ namespace Helix.Gui
                 void OnStopProgressUpdated(Event @event)
                 {
                     if (@event.EventType != EventType.StopProgressUpdated) return;
-                    Redraw(@event.Message);
+                    Redraw(new Frame { StatusText = @event.Message });
                 }
             }
             void OnResourceVerified(Event @event)
             {
                 if (@event.EventType != EventType.ResourceVerified) return;
-                Redraw(@event.Message);
+                Redraw(new Frame { StatusText = @event.Message });
             }
         }
 
-        static void Redraw(string statusText = null, bool? restrictHumanInteraction = null, bool redrawEverything = true)
+        static void Redraw(Frame frame)
         {
             SynchronousServerSocket.Send(new Message
             {
                 Text = "redraw",
-                Payload = JsonConvert.SerializeObject(
-                    redrawEverything
-                        ? new Frame
-                        {
-                            CrawlerState = CrawlerBot.CrawlerState,
-                            VerifiedUrlCount = CrawlerBot.Statistics?.VerifiedUrlCount,
-                            ValidUrlCount = CrawlerBot.Statistics?.ValidUrlCount,
-                            BrokenUrlCount = CrawlerBot.Statistics?.BrokenUrlCount,
-                            MillisecondsAveragePageLoadTime = CrawlerBot.Statistics?.MillisecondsAveragePageLoadTime,
-                            RemainingWorkload = CrawlerBot.RemainingWorkload,
-                            ElapsedTime = Stopwatch.Elapsed.ToString("hh' : 'mm' : 'ss"),
-                            RestrictHumanInteraction = restrictHumanInteraction,
-                            StatusText = statusText
-                        }
-                        : new Frame { RestrictHumanInteraction = restrictHumanInteraction, StatusText = statusText }
-                )
+                Payload = JsonConvert.SerializeObject(frame)
             });
         }
 
@@ -139,7 +131,16 @@ namespace Helix.Gui
             {
                 while (!(CrawlerState.Completed).HasFlag(CrawlerBot.CrawlerState))
                 {
-                    Redraw();
+                    Redraw(new Frame
+                    {
+                        CrawlerState = CrawlerBot.CrawlerState,
+                        VerifiedUrlCount = CrawlerBot.Statistics?.VerifiedUrlCount,
+                        ValidUrlCount = CrawlerBot.Statistics?.ValidUrlCount,
+                        BrokenUrlCount = CrawlerBot.Statistics?.BrokenUrlCount,
+                        MillisecondsAveragePageLoadTime = CrawlerBot.Statistics?.MillisecondsAveragePageLoadTime,
+                        RemainingWorkload = CrawlerBot.RemainingWorkload,
+                        ElapsedTime = Stopwatch.Elapsed.ToString("hh' : 'mm' : 'ss")
+                    });
                     Thread.Sleep(timeSpan);
                 }
                 Stopwatch.Stop();

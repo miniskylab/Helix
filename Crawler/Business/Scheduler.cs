@@ -31,25 +31,6 @@ namespace Helix.Crawler
             }
         }
 
-        public bool EverythingIsDone
-        {
-            get
-            {
-                if (_objectDisposed) throw new ObjectDisposedException(nameof(Scheduler));
-                lock (_extractionLock)
-                lock (_renderingLock)
-                lock (_verificationLock)
-                {
-                    var noMoreToBeRenderedResources = _memory.ToBeRenderedResourceCount == 0;
-                    var noMoreToBeVerifiedResources = _memory.ToBeVerifiedResourceCount == 0;
-                    var noMoreToBeExtractedHtmlDocuments = _memory.ToBeExtractedHtmlDocumentCount == 0;
-                    var nothingToDo = noMoreToBeExtractedHtmlDocuments && noMoreToBeRenderedResources && noMoreToBeVerifiedResources;
-                    var noActiveThread = _pendingExtractionTaskCount + _pendingRenderingTaskCount + _pendingVerificationTaskCount == 0;
-                    return nothingToDo && noActiveThread;
-                }
-            }
-        }
-
         public int RemainingWorkload
         {
             get
@@ -145,7 +126,7 @@ namespace Helix.Crawler
 
             void GetResourceExtractorAndToBeExtractedHtmlDocument()
             {
-                while (!EverythingIsDone && !CancellationToken.IsCancellationRequested)
+                while (RemainingWorkload != 0 && !CancellationToken.IsCancellationRequested)
                 {
                     Monitor.Enter(_extractionLock);
                     if (_pendingExtractionTaskCount >= 300)
@@ -227,7 +208,7 @@ namespace Helix.Crawler
             }
             void GetHtmlRendererAndToBeRenderedResource()
             {
-                while (!EverythingIsDone && !CancellationToken.IsCancellationRequested)
+                while (RemainingWorkload != 0 && !CancellationToken.IsCancellationRequested)
                 {
                     Monitor.Enter(_renderingLock);
                     if (_pendingRenderingTaskCount >= 300)
@@ -299,7 +280,7 @@ namespace Helix.Crawler
 
             void GetResourceVerifierAndToBeVerifiedResource()
             {
-                while (!EverythingIsDone && !CancellationToken.IsCancellationRequested)
+                while (RemainingWorkload != 0 && !CancellationToken.IsCancellationRequested)
                 {
                     Monitor.Enter(_verificationLock);
                     if (_pendingVerificationTaskCount >= 400)

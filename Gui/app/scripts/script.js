@@ -122,17 +122,12 @@ function redraw(frame) {
             btnMain.firstElementChild.className = "controls__play-icon";
             if (btnMain.classList.contains("controls__main-button--amber")) btnMain.classList.remove("controls__main-button--amber");
             if (!btnStop.hasAttribute("disabled")) btnStop.setAttribute("disabled", "");
-            hideShutdownOverlay();
-            shutdownFailureOverlay.style.display = "none";
             break;
         case "Running":
             if (btnMainIsPauseButton) break;
             btnMain.firstElementChild.className = "controls__pause-icon";
             if (!btnMain.classList.contains("controls__main-button--amber")) btnMain.classList.add("controls__main-button--amber");
             if (btnStop.hasAttribute("disabled")) btnStop.removeAttribute("disabled");
-            break;
-        case "Stopping":
-            showShutdownOverlay();
     }
 }
 

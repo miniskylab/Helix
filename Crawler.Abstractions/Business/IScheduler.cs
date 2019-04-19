@@ -7,8 +7,6 @@ namespace Helix.Crawler.Abstractions
     {
         CancellationToken CancellationToken { get; }
 
-        bool EverythingIsDone { get; }
-
         int RemainingWorkload { get; }
 
         void CancelEverything();
