@@ -1,4 +1,4 @@
-﻿const {app, BrowserWindow, ipcMain} = require("electron");
+﻿const {app, BrowserWindow, ipcMain, shell} = require("electron");
 
 app.on("ready", () => {
     const mainWindow = new BrowserWindow({
@@ -13,5 +13,9 @@ app.on("ready", () => {
     });
     mainWindow.loadURL(`file://${__dirname}/index.html`);
     mainWindow.webContents.on("did-finish-load", () => { mainWindow.show(); });
+    mainWindow.webContents.on("new-window", (event, url) => {
+        event.preventDefault();
+        shell.openExternal(url);
+    });
 });
 ipcMain.on("btn-close-clicked", () => { app.quit(); });

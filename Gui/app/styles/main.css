@@ -62,10 +62,23 @@ body {
     margin: 20px auto 0 auto;
     width: 120px;
     height: 34px;
+    line-height: 19px;
     padding: 6px;
     box-sizing: border-box;
     border: 2px solid #9B9B9B;
     font-size: 13px;
     text-align: center;
     color: #9B9B9B;
+}
+
+.button:hover {
+    color: #FFFFFF;
+    background-color: rgba(155, 155, 155, 0.1);
+    cursor: pointer;
+}
+
+.button:active {
+    color: #FFFFFF;
+    background-color: #9B9B9B;
+    cursor: pointer;
 }

@@ -24,7 +24,6 @@
     box-sizing: border-box;
     font-size: 14px;
     text-align: justify;
-    color: #FFFFFF;
 }
 
 .about-me-overlay__badge-collection {
@@ -37,8 +36,20 @@
 }
 
 .about-me-overlay__badge {
-    width: calc(100% / 3);
+    width: 50px;
+    text-decoration: none;
+    cursor: pointer;
 }
+.about-me-overlay__badge:hover svg { fill: #FFFFFF; }
+.about-me-overlay__badge:hover .about-me-overlay__badge-description { color: #FFFFFF; }
+.about-me-overlay__badge:hover .about-me-overlay__badge-icon--chelsea-cucumber { background-color: rgba(135, 172, 78, 0.15); }
+.about-me-overlay__badge:hover .about-me-overlay__badge-icon--deluge { background-color: rgba(138, 89, 168, 0.15); }
+.about-me-overlay__badge:hover .about-me-overlay__badge-icon--sandy-brown { background-color: rgba(247, 166, 95, 0.15); }
+.about-me-overlay__badge:active svg { fill: #FFFFFF; }
+.about-me-overlay__badge:active .about-me-overlay__badge-description { color: #FFFFFF; }
+.about-me-overlay__badge:active .about-me-overlay__badge-icon--chelsea-cucumber { background-color: #87AC4E; }
+.about-me-overlay__badge:active .about-me-overlay__badge-icon--deluge { background-color: #8959A8; }
+.about-me-overlay__badge:active .about-me-overlay__badge-icon--sandy-brown { background-color: #F7A65F; }
 
 .about-me-overlay__badge-icon {
     display: block;
@@ -54,26 +65,23 @@
 .about-me-overlay__badge-icon--chelsea-cucumber {
     padding: 9px;
     border-color: #87AC4E;
-    background-color: rgba(135, 172, 78, 0.15);
 }
 .about-me-overlay__badge-icon--chelsea-cucumber svg { fill: #87AC4E; }
 
 .about-me-overlay__badge-icon--deluge {
     padding: 11px;
     border-color: #8959A8;
-    background-color: rgba(138, 89, 168, 0.15);
 }
 .about-me-overlay__badge-icon--deluge svg { fill: #8959A8; }
 
 .about-me-overlay__badge-icon--sandy-brown {
     padding: 6px;
     border-color: #F7A65F;
-    background-color: rgba(247, 166, 95, 0.15);
 }
 .about-me-overlay__badge-icon--sandy-brown svg { fill: #F7A65F; }
 
 .about-me-overlay__badge-description {
-    margin-top: 8px;
+    margin: 8px -100% 0 -100%;
     font-size: 13px;
     font-weight: bold;
     text-align: center;
