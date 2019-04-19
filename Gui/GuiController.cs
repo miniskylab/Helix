@@ -47,14 +47,9 @@ namespace Helix.Gui
                     if (@event.EventType != EventType.Stopped) return;
                     Redraw(@event.Message);
 
-                    switch (CrawlerBot.CrawlerState)
-                    {
-                        case CrawlerState.RanToCompletion:
-                        case CrawlerState.Faulted:
-                            _constantRedrawTask.Wait();
-                            Redraw(restrictHumanInteraction: false);
-                            break;
-                    }
+                    if (!CrawlerState.Completed.HasFlag(CrawlerBot.CrawlerState)) return;
+                    _constantRedrawTask.Wait();
+                    Redraw(restrictHumanInteraction: false);
                 }
                 void OnStartProgressUpdated(Event @event)
                 {
@@ -71,41 +66,41 @@ namespace Helix.Gui
                 StopWorking();
                 ManualResetEvent.Set();
                 ManualResetEvent.Dispose();
-
-                void StopWorking()
-                {
-                    try
-                    {
-                        CrawlerBot.OnEventBroadcast -= OnResourceVerified;
-                        CrawlerBot.OnEventBroadcast += OnStopProgressUpdated;
-                        CrawlerBot.StopWorking();
-
-                        var waitingTime = TimeSpan.FromMinutes(1);
-                        if (_constantRedrawTask == null || _constantRedrawTask.Wait(waitingTime)) return;
-
-                        var errorMessage = $"Constant redrawing task failed to finish after {waitingTime.TotalSeconds} seconds.";
-                        File.AppendAllText(
-                            Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "debug.log"),
-                            $"\r\n[{DateTime.Now:yyyy/MM/dd HH:mm:ss}] {errorMessage}"
-                        );
-                    }
-                    catch (Exception exception)
-                    {
-                        File.AppendAllText("debug.log", $"\r\n[{DateTime.Now:yyyy/MM/dd HH:mm:ss}] {exception}");
-                    }
-
-                    void OnStopProgressUpdated(Event @event)
-                    {
-                        if (@event.EventType != EventType.StopProgressUpdated) return;
-                        Redraw(@event.Message);
-                    }
-                }
             });
+            SynchronousServerSocket.On("btn-stop-clicked", _ => { StopWorking(); });
             GuiProcess.Start();
             ManualResetEvent.WaitOne();
             SynchronousServerSocket.Dispose();
             GuiProcess.Close();
 
+            void StopWorking()
+            {
+                try
+                {
+                    CrawlerBot.OnEventBroadcast -= OnResourceVerified;
+                    CrawlerBot.OnEventBroadcast += OnStopProgressUpdated;
+                    CrawlerBot.StopWorking();
+
+                    var waitingTime = TimeSpan.FromMinutes(1);
+                    if (_constantRedrawTask == null || _constantRedrawTask.Wait(waitingTime)) return;
+
+                    var errorMessage = $"Constant redrawing task failed to finish after {waitingTime.TotalSeconds} seconds.";
+                    File.AppendAllText(
+                        Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "debug.log"),
+                        $"\r\n[{DateTime.Now:yyyy/MM/dd HH:mm:ss}] {errorMessage}"
+                    );
+                }
+                catch (Exception exception)
+                {
+                    File.AppendAllText("debug.log", $"\r\n[{DateTime.Now:yyyy/MM/dd HH:mm:ss}] {exception}");
+                }
+
+                void OnStopProgressUpdated(Event @event)
+                {
+                    if (@event.EventType != EventType.StopProgressUpdated) return;
+                    Redraw(@event.Message);
+                }
+            }
             void OnResourceVerified(Event @event)
             {
                 if (@event.EventType != EventType.ResourceVerified) return;

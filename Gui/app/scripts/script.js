@@ -31,6 +31,8 @@ const btnStop = document.getElementById("btn-stop");
 const btnClose = document.getElementById("btn-close");
 const btnCloseAboutMeOverlay = document.getElementById("btn-close-about-me-overlay");
 
+let shutdownCountdown = null;
+
 socket.connect(18880, "127.0.0.1", () => {
 
     btnMain.addEventListener("click", () => {
@@ -58,24 +60,14 @@ socket.connect(18880, "127.0.0.1", () => {
     });
 
     btnClose.addEventListener("click", () => {
-        let waitingTime = 120;
-        const getShutdownOverlaySubTitle = (remainingTime) => `(Please allow up to <div style='display:inline-block;color:#FF6347;'>${remainingTime}</div> seconds)`;
-        shutdownOverlaySubtitle.innerHTML = getShutdownOverlaySubTitle(waitingTime);
-        lblShutdownOverlayMessage.textContent = "Initializing shutdown sequence ...";
-        shutdownOverlay.style.display = "block";
-
-        const shutdownCountdown = setInterval(() => {
-            waitingTime--;
-            shutdownOverlaySubtitle.innerHTML = getShutdownOverlaySubTitle(waitingTime);
-            if (waitingTime === 0) {
-                shutdownFailureOverlay.style.display = "block";
-                shutdownOverlay.style.display = "none";
-                clearInterval(shutdownCountdown);
-            }
-        }, 1000);
-
+        showShutdownOverlay();
         socket.end(JSON.stringify({text: "btn-close-clicked"}));
         socket.on("end", () => { ipcRenderer.send("btn-close-clicked"); });
+    });
+
+    btnStop.addEventListener("click", () => {
+        showShutdownOverlay();
+        socket.write(JSON.stringify({text: "btn-stop-clicked"}));
     });
 
     btnMinimize.addEventListener("click", () => { remote.BrowserWindow.getFocusedWindow().minimize(); });
@@ -129,12 +121,42 @@ function redraw(frame) {
             if (btnMainIsStartButton) break;
             btnMain.firstElementChild.className = "controls__play-icon";
             if (btnMain.classList.contains("controls__main-button--amber")) btnMain.classList.remove("controls__main-button--amber");
-            // if (!btnStop.hasAttribute("disabled")) btnStop.setAttribute("disabled", "");
+            if (!btnStop.hasAttribute("disabled")) btnStop.setAttribute("disabled", "");
+            hideShutdownOverlay();
+            shutdownFailureOverlay.style.display = "none";
             break;
         case "Running":
             if (btnMainIsPauseButton) break;
             btnMain.firstElementChild.className = "controls__pause-icon";
             if (!btnMain.classList.contains("controls__main-button--amber")) btnMain.classList.add("controls__main-button--amber");
-        // if (btnStop.hasAttribute("disabled")) btnStop.removeAttribute("disabled");
+            if (btnStop.hasAttribute("disabled")) btnStop.removeAttribute("disabled");
+            break;
+        case "Stopping":
+            showShutdownOverlay();
     }
+}
+
+function showShutdownOverlay() {
+    if (shutdownCountdown) return;
+    let waitingTime = 120;
+    const getShutdownOverlaySubTitle = (remainingTime) => `(Please allow up to <div style='display:inline-block;color:#FF6347;'>${remainingTime}</div> seconds)`;
+    shutdownOverlaySubtitle.innerHTML = getShutdownOverlaySubTitle(waitingTime);
+    lblShutdownOverlayMessage.textContent = "Initializing shutdown sequence ...";
+    shutdownOverlay.style.display = "block";
+
+    shutdownCountdown = setInterval(() => {
+        waitingTime--;
+        shutdownOverlaySubtitle.innerHTML = getShutdownOverlaySubTitle(waitingTime);
+        if (waitingTime === 0) {
+            shutdownFailureOverlay.style.display = "block";
+            hideShutdownOverlay();
+        }
+    }, 1000);
+}
+
+function hideShutdownOverlay() {
+    if (!shutdownCountdown) return;
+    shutdownOverlay.style.display = "none";
+    clearInterval(shutdownCountdown);
+    shutdownCountdown = null;
 }

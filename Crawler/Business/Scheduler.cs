@@ -87,17 +87,28 @@ namespace Helix.Crawler
             if (_objectDisposed) throw new ObjectDisposedException(nameof(Scheduler));
             _cancellationTokenSource.Cancel();
 
-            while (GetPendingTaskCount() > 0)
-            {
-                Thread.Sleep(100);
-                _eventBroadcaster.Broadcast(new Event
-                {
-                    EventType = EventType.StopProgressUpdated,
-                    Message = $"Cancelling pending tasks ({GetPendingTaskCount()} remaining) ..."
-                });
-            }
+            WaitForPendingTasksToComplete();
             _memory.Clear();
 
+            void WaitForPendingTasksToComplete()
+            {
+                var lastPendingTaskCount = -1;
+                var pendingTaskCount = GetPendingTaskCount();
+                while (pendingTaskCount > 0)
+                {
+                    Thread.Sleep(100);
+                    if (pendingTaskCount != lastPendingTaskCount)
+                    {
+                        lastPendingTaskCount = pendingTaskCount;
+                        _eventBroadcaster.Broadcast(new Event
+                        {
+                            EventType = EventType.StopProgressUpdated,
+                            Message = $"Cancelling pending tasks ({pendingTaskCount} remaining) ..."
+                        });
+                    }
+                    pendingTaskCount = GetPendingTaskCount();
+                }
+            }
             int GetPendingTaskCount() { return _pendingExtractionTaskCount + _pendingRenderingTaskCount + _pendingVerificationTaskCount; }
         }
 
