@@ -62,14 +62,26 @@ namespace Helix.Gui
                 void OnStopped(Event @event)
                 {
                     if (@event.EventType != EventType.Stopped) return;
-                    Redraw(new Frame { StatusText = @event.Message });
+                    Redraw(new Frame
+                    {
+                        StatusText = CrawlerBot.CrawlerState == CrawlerState.Faulted
+                            ? "One or more errors occurred. Check the logs for more details."
+                            : CrawlerBot.CrawlerState == CrawlerState.RanToCompletion
+                                ? "The crawling task has completed."
+                                : $"{@event.Message}."
+                    });
 
-                    if (!CrawlerState.Completed.HasFlag(CrawlerBot.CrawlerState)) return;
                     _constantRedrawTask?.Wait();
                     Redraw(new Frame
                     {
                         DisableMainButton = false,
-                        MainButtonFunctionality = MainButtonFunctionality.Start
+                        MainButtonFunctionality = MainButtonFunctionality.Start,
+                        VerifiedUrlCount = CrawlerBot.Statistics?.VerifiedUrlCount,
+                        ValidUrlCount = CrawlerBot.Statistics?.ValidUrlCount,
+                        BrokenUrlCount = CrawlerBot.Statistics?.BrokenUrlCount,
+                        MillisecondsAveragePageLoadTime = CrawlerBot.Statistics?.MillisecondsAveragePageLoadTime,
+                        RemainingWorkload = CrawlerBot.RemainingWorkload,
+                        ElapsedTime = Stopwatch.Elapsed.ToString("hh' : 'mm' : 'ss")
                     });
                 }
                 void OnStartProgressUpdated(Event @event)
@@ -136,7 +148,7 @@ namespace Helix.Gui
             _constantRedrawTask = Task.Run(() =>
             {
                 Stopwatch.Restart();
-                while (!(CrawlerState.Completed).HasFlag(CrawlerBot.CrawlerState))
+                while (!CrawlerState.Completed.HasFlag(CrawlerBot.CrawlerState))
                 {
                     Redraw(new Frame
                     {
