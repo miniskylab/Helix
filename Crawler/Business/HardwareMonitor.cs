@@ -14,6 +14,8 @@ namespace Helix.Crawler
         CancellationTokenSource _cancellationTokenSource;
         Task _samplingTask;
 
+        public bool IsRunning { get; private set; }
+
         public event Action<double> OnHighCpuUsage;
         public event Action<double> OnLowCpuUsage;
 
@@ -22,7 +24,8 @@ namespace Helix.Crawler
 
         public void StartMonitoring(double millisecondSampleDuration, float highCpuUsageThreshold, float lowCpuUsageThreshold)
         {
-            if (_samplingTask != null) throw new Exception($"{nameof(HardwareMonitor)} is already running.");
+            if (IsRunning) throw new Exception($"{nameof(HardwareMonitor)} is already running.");
+            IsRunning = true;
 
             var cpuUtilizationSamples = new List<double>();
             _cancellationTokenSource = new CancellationTokenSource();
@@ -84,7 +87,9 @@ namespace Helix.Crawler
 
         public void StopMonitoring()
         {
-            if (_samplingTask == null) throw new Exception($"{nameof(HardwareMonitor)} is not running.");
+            if (!IsRunning) throw new Exception($"{nameof(HardwareMonitor)} is not running.");
+            IsRunning = false;
+
             _cancellationTokenSource.Cancel();
             _samplingTask.Wait();
 

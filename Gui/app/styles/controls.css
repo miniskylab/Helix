@@ -71,12 +71,7 @@
     right: 0;
 }
 
-.controls__main-button--amber {
-    border-color: #FFBF47;
-    filter: grayscale(85%);
-    opacity: .65;
-    pointer-events: none;
-}
+.controls__main-button--amber { border-color: #FFBF47; }
 
 .controls__main-button--amber:hover {
     border-color: #FFBF47;

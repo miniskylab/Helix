@@ -12,6 +12,7 @@ namespace Helix.Crawler
 {
     public static class CrawlerBot
     {
+        static IEventBroadcaster _eventBroadcaster;
         static IHardwareMonitor _hardwareMonitor;
         static IMemory _memory;
         static IReportWriter _reportWriter;
@@ -19,7 +20,6 @@ namespace Helix.Crawler
         static IResourceScope _resourceScope;
         static IScheduler _scheduler;
         static readonly List<Task> BackgroundTasks;
-        static readonly IEventBroadcaster EventBroadcaster;
         static readonly ILogger Logger;
         static readonly StateMachine<CrawlerState, CrawlerCommand> StateMachine;
         static readonly object TransitionLock;
@@ -54,7 +54,6 @@ namespace Helix.Crawler
             TransitionLock = new object();
             BackgroundTasks = new List<Task>();
             Logger = ServiceLocator.Get<ILogger>();
-            EventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
             StateMachine = new StateMachine<CrawlerState, CrawlerCommand>(
                 new Dictionary<Transition<CrawlerState, CrawlerCommand>, CrawlerState>
                 {
@@ -81,66 +80,165 @@ namespace Helix.Crawler
             }
         }
 
-        public static void StartWorking(Configurations configurations)
+        public static void StopWorking()
         {
-            if (!TryTransit(CrawlerCommand.StartWorking)) return;
-            EventBroadcaster.OnEventBroadcast += EventBroadcastCallback;
-            EventBroadcaster.Broadcast(Event("Initializing start sequence ..."));
-            EventBroadcaster.Broadcast(Event("Connecting services ..."));
-            ServiceLocator.CreateTransientServices(configurations);
-            Statistics = ServiceLocator.Get<IStatistics>();
-            _memory = ServiceLocator.Get<IMemory>();
-            _scheduler = ServiceLocator.Get<IScheduler>();
-            _resourceScope = ServiceLocator.Get<IResourceScope>();
-            _hardwareMonitor = ServiceLocator.Get<IHardwareMonitor>();
-            _resourceProcessor = ServiceLocator.Get<IResourceProcessor>();
-
-            BackgroundTasks.Add(Task.Run(() =>
+            if (!TryTransit(CrawlerCommand.StopWorking))
             {
                 try
                 {
-                    EventBroadcaster.Broadcast(Event("Re-creating directory containing screenshot files ..."));
-                    EnsureDirectoryContainsScreenshotFilesIsRecreated();
-
-                    EventBroadcaster.Broadcast(Event("Re-creating report database ..."));
-                    _reportWriter = ServiceLocator.Get<IReportWriter>();
-
-                    EventBroadcaster.Broadcast(Event("Starting hardware monitor service ..."));
-                    _hardwareMonitor.StartMonitoring();
-
-                    EventBroadcaster.Broadcast(Event("Activating main workflow ..."));
-                    _memory.MemorizeToBeVerifiedResource(
-                        _resourceProcessor.Enrich(new Resource
-                        {
-                            ParentUri = null,
-                            OriginalUrl = configurations.StartUri.AbsoluteUri
-                        })
-                    );
-                    var renderingTask = Task.Run(Render, _scheduler.CancellationToken);
-                    var extractionTask = Task.Run(Extract, _scheduler.CancellationToken);
-                    var verificationTask = Task.Run(Verify, _scheduler.CancellationToken);
-                    BackgroundTasks.Add(renderingTask);
-                    BackgroundTasks.Add(extractionTask);
-                    BackgroundTasks.Add(verificationTask);
-
-                    Logger.LogInfo("Working ...");
-                    Task.WhenAll(renderingTask, extractionTask, verificationTask).Wait();
+                    var commandName = Enum.GetName(typeof(CrawlerCommand), CrawlerCommand.StopWorking);
+                    var exceptionMessage = $"Transition from current state [{CrawlerState}] via [{commandName}] command failed.";
+                    throw new InvalidOperationException(exceptionMessage);
                 }
-                catch (Exception exception)
-                {
-                    Logger.LogException(exception);
-                    TryTransit(CrawlerCommand.MarkAsFaulted);
-                }
-                finally { Task.Run(StopWorking); }
-            }, _scheduler.CancellationToken));
-
-            void EnsureDirectoryContainsScreenshotFilesIsRecreated()
-            {
-                if (Directory.Exists(configurations.PathToDirectoryContainsScreenshotFiles))
-                    Directory.Delete(configurations.PathToDirectoryContainsScreenshotFiles, true);
-                Directory.CreateDirectory(configurations.PathToDirectoryContainsScreenshotFiles);
+                catch (InvalidOperationException invalidOperationException) { Logger.LogException(invalidOperationException); }
+                return;
             }
-            Event Event(string message)
+
+            try
+            {
+                BroadcastEvent(StopProgressUpdatedEvent("Initializing stop sequence ..."));
+                if (_hardwareMonitor.IsRunning)
+                {
+                    BroadcastEvent(StopProgressUpdatedEvent("Stopping hardware monitor service ..."));
+                    _hardwareMonitor.StopMonitoring();
+                }
+
+                var crawlerCommand = CrawlerCommand.MarkAsCancelled;
+                if (_scheduler != null)
+                {
+                    BroadcastEvent(StopProgressUpdatedEvent("De-activating main workflow ..."));
+                    if (_scheduler.RemainingWorkload == 0) crawlerCommand = CrawlerCommand.MarkAsRanToCompletion;
+                    _scheduler.CancelEverything();
+
+                    BroadcastEvent(StopProgressUpdatedEvent("Waiting for background tasks to complete ..."));
+                    try { Task.WhenAll(BackgroundTasks).Wait(); }
+                    catch (Exception exception)
+                    {
+                        Logger.LogException(exception);
+                        crawlerCommand = CrawlerCommand.MarkAsFaulted;
+                    }
+                }
+
+                BroadcastEvent(StopProgressUpdatedEvent("Releasing resources ..."));
+                ServiceLocator.DisposeTransientServices();
+
+                TryTransit(crawlerCommand);
+                BroadcastEvent(new Event
+                {
+                    EventType = EventType.Stopped,
+                    Message = GetStopEventMessage()
+                });
+                OnEventBroadcast = null;
+
+                string GetStopEventMessage()
+                {
+                    switch (CrawlerState)
+                    {
+                        case CrawlerState.RanToCompletion:
+                            return "Done.";
+                        case CrawlerState.Cancelled:
+                            return "Cancelled.";
+                        case CrawlerState.Faulted:
+                            return "One or more errors occurred. Check the logs for more details.";
+                        default:
+                            throw new InvalidConstraintException();
+                    }
+                }
+                Event StopProgressUpdatedEvent(string message = "")
+                {
+                    return new Event
+                    {
+                        EventType = EventType.StopProgressUpdated,
+                        Message = message
+                    };
+                }
+            }
+            catch (Exception exception)
+            {
+                Logger.LogException(exception);
+            }
+        }
+
+        public static bool TryStartWorking(Configurations configurations)
+        {
+            if (!TryTransit(CrawlerCommand.StartWorking))
+            {
+                try
+                {
+                    var commandName = Enum.GetName(typeof(CrawlerCommand), CrawlerCommand.StartWorking);
+                    var exceptionMessage = $"Transition from current state [{CrawlerState}] via [{commandName}] command failed.";
+                    throw new InvalidOperationException(exceptionMessage);
+                }
+                catch (InvalidOperationException invalidOperationException) { Logger.LogException(invalidOperationException); }
+                return false;
+            }
+
+            try
+            {
+                Logger.LogInfo("Initializing start sequence ...");
+                ServiceLocator.CreateTransientServices(configurations);
+
+                Logger.LogInfo("Connecting services ...");
+                Statistics = ServiceLocator.Get<IStatistics>();
+                _memory = ServiceLocator.Get<IMemory>();
+                _resourceScope = ServiceLocator.Get<IResourceScope>();
+                _hardwareMonitor = ServiceLocator.Get<IHardwareMonitor>();
+                _resourceProcessor = ServiceLocator.Get<IResourceProcessor>();
+                _reportWriter = ServiceLocator.Get<IReportWriter>();
+                _scheduler = ServiceLocator.Get<IScheduler>();
+
+                _eventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
+                _eventBroadcaster.OnEventBroadcast += BroadcastEvent;
+
+                BroadcastEvent(StartProgressUpdatedEvent("Re-creating directory containing screenshot files ..."));
+                EnsureDirectoryContainsScreenshotFilesIsRecreated();
+
+                BroadcastEvent(StartProgressUpdatedEvent("Activating main workflow ..."));
+                _memory.MemorizeToBeVerifiedResource(
+                    _resourceProcessor.Enrich(new Resource
+                    {
+                        ParentUri = null,
+                        OriginalUrl = configurations.StartUri.AbsoluteUri
+                    })
+                );
+                var renderingTask = Task.Run(Render, _scheduler.CancellationToken);
+                var extractionTask = Task.Run(Extract, _scheduler.CancellationToken);
+                var verificationTask = Task.Run(Verify, _scheduler.CancellationToken);
+                BackgroundTasks.Add(renderingTask);
+                BackgroundTasks.Add(extractionTask);
+                BackgroundTasks.Add(verificationTask);
+
+                Logger.LogInfo("Starting hardware monitor service ...");
+                _hardwareMonitor.StartMonitoring();
+
+                BackgroundTasks.Add(Task.Run(() =>
+                {
+                    try { Task.WhenAll(renderingTask, extractionTask, verificationTask).Wait(); }
+                    catch (Exception exception)
+                    {
+                        Logger.LogException(exception);
+                        TryTransit(CrawlerCommand.MarkAsFaulted);
+                    }
+                    finally { Task.Run(StopWorking); }
+                }, _scheduler.CancellationToken));
+                return true;
+
+                void EnsureDirectoryContainsScreenshotFilesIsRecreated()
+                {
+                    if (Directory.Exists(configurations.PathToDirectoryContainsScreenshotFiles))
+                        Directory.Delete(configurations.PathToDirectoryContainsScreenshotFiles, true);
+                    Directory.CreateDirectory(configurations.PathToDirectoryContainsScreenshotFiles);
+                }
+            }
+            catch (Exception exception)
+            {
+                Logger.LogException(exception);
+                TryTransit(CrawlerCommand.MarkAsFaulted);
+                StopWorking();
+                return false;
+            }
+
+            Event StartProgressUpdatedEvent(string message)
             {
                 return new Event
                 {
@@ -150,66 +248,7 @@ namespace Helix.Crawler
             }
         }
 
-        public static void StopWorking()
-        {
-            if (!TryTransit(CrawlerCommand.StopWorking)) return;
-            EventBroadcaster.Broadcast(Event("Initializing stop sequence ..."));
-            EventBroadcaster.Broadcast(Event("Stopping hardware monitor service ..."));
-            _hardwareMonitor.StopMonitoring();
-
-            var crawlerCommand = CrawlerCommand.MarkAsCancelled;
-            if (_scheduler != null)
-            {
-                EventBroadcaster.Broadcast(Event("De-activating main workflow ..."));
-                if (_scheduler.RemainingWorkload == 0) crawlerCommand = CrawlerCommand.MarkAsRanToCompletion;
-                _scheduler.CancelEverything();
-
-                EventBroadcaster.Broadcast(Event("Waiting for background tasks to complete ..."));
-                try { Task.WhenAll(BackgroundTasks).Wait(); }
-                catch (Exception exception)
-                {
-                    Logger.LogException(exception);
-                    crawlerCommand = CrawlerCommand.MarkAsFaulted;
-                }
-            }
-
-            EventBroadcaster.Broadcast(Event("Releasing resources ..."));
-            ServiceLocator.DisposeTransientServices();
-
-            TryTransit(crawlerCommand);
-            EventBroadcaster.Broadcast(new Event
-            {
-                EventType = EventType.Stopped,
-                Message = GetStopEventMessage()
-            });
-            EventBroadcaster.OnEventBroadcast -= EventBroadcastCallback;
-            OnEventBroadcast = null;
-
-            string GetStopEventMessage()
-            {
-                switch (CrawlerState)
-                {
-                    case CrawlerState.RanToCompletion:
-                        return "Done.";
-                    case CrawlerState.Cancelled:
-                        return "Cancelled.";
-                    case CrawlerState.Faulted:
-                        return "One or more errors occurred. Check the logs for more details.";
-                    default:
-                        throw new InvalidConstraintException();
-                }
-            }
-            Event Event(string message = "")
-            {
-                return new Event
-                {
-                    EventType = EventType.StopProgressUpdated,
-                    Message = message
-                };
-            }
-        }
-
-        static void EventBroadcastCallback(Event @event)
+        static void BroadcastEvent(Event @event)
         {
             OnEventBroadcast?.Invoke(@event);
             if (@event.EventType != EventType.ResourceVerified && !string.IsNullOrWhiteSpace(@event.Message))
@@ -277,7 +316,7 @@ namespace Helix.Crawler
                     else Statistics.IncrementValidUrlCount();
 
                     _reportWriter.WriteReport(verificationResult);
-                    EventBroadcaster.Broadcast(new Event
+                    BroadcastEvent(new Event
                     {
                         EventType = EventType.ResourceVerified,
                         Message = $"{verificationResult.StatusCode:D} - {verificationResult.VerifiedUrl}"

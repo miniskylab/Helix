@@ -166,10 +166,12 @@ namespace Helix.Crawler
                     _htmlRendererPool.Take().Dispose();
                     _statistics.DisposedHtmlRendererCount++;
 
+                    var disposedHtmlRendererCount = _statistics.DisposedHtmlRendererCount;
+                    var createdHtmlRendererCount = _statistics.CreatedHtmlRendererCount;
                     _eventBroadcaster.Broadcast(new Event
                     {
                         EventType = EventType.StopProgressUpdated,
-                        Message = $"Closing web browsers ({_statistics.DisposedHtmlRendererCount}/{_statistics.CreatedHtmlRendererCount})"
+                        Message = $"Closing web browsers ({disposedHtmlRendererCount}/{createdHtmlRendererCount}) ..."
                     });
                 }
                 _htmlRendererPool?.Dispose();

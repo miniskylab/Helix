@@ -4,6 +4,8 @@ namespace Helix.Crawler.Abstractions
 {
     public interface IHardwareMonitor
     {
+        bool IsRunning { get; }
+
         event Action<double> OnHighCpuUsage;
         event Action<double> OnLowCpuUsage;
 

@@ -32,20 +32,30 @@ namespace Helix.Gui
 
             SynchronousServerSocket.On("btn-start-clicked", configurationJsonString =>
             {
-                try
+                CrawlerBot.OnEventBroadcast += OnStartProgressUpdated;
+                CrawlerBot.OnEventBroadcast += OnResourceVerified;
+                CrawlerBot.OnEventBroadcast += OnStopped;
+
+                Redraw(new Frame
                 {
-                    CrawlerBot.OnEventBroadcast += OnStartProgressUpdated;
-                    CrawlerBot.OnEventBroadcast += OnResourceVerified;
-                    CrawlerBot.OnEventBroadcast += OnStopped;
-                    CrawlerBot.StartWorking(new Configurations(configurationJsonString));
-                    RedrawEvery(TimeSpan.FromSeconds(1));
-                }
-                catch (Exception exception)
+                    DisableMainButton = true,
+                    MainButtonFunctionality = MainButtonFunctionality.Start
+                });
+                if (CrawlerBot.TryStartWorking(new Configurations(configurationJsonString)))
                 {
                     Redraw(new Frame
                     {
-                        StatusText = exception.Message,
-                        RestrictHumanInteraction = false
+                        // DisableMainButton = false,
+                        MainButtonFunctionality = MainButtonFunctionality.Pause
+                    });
+                    RedrawEvery(TimeSpan.FromSeconds(0.4));
+                }
+                else
+                {
+                    Redraw(new Frame
+                    {
+                        DisableMainButton = false,
+                        MainButtonFunctionality = MainButtonFunctionality.Start
                     });
                 }
 
@@ -55,8 +65,12 @@ namespace Helix.Gui
                     Redraw(new Frame { StatusText = @event.Message });
 
                     if (!CrawlerState.Completed.HasFlag(CrawlerBot.CrawlerState)) return;
-                    _constantRedrawTask.Wait();
-                    Redraw(new Frame { RestrictHumanInteraction = false });
+                    _constantRedrawTask?.Wait();
+                    Redraw(new Frame
+                    {
+                        DisableMainButton = false,
+                        MainButtonFunctionality = MainButtonFunctionality.Start
+                    });
                 }
                 void OnStartProgressUpdated(Event @event)
                 {
@@ -70,7 +84,7 @@ namespace Helix.Gui
             });
             SynchronousServerSocket.On("btn-close-clicked", _ =>
             {
-                StopWorking();
+                if (!CrawlerState.Completed.HasFlag(CrawlerBot.CrawlerState)) StopWorking();
                 ManualResetEvent.Set();
                 ManualResetEvent.Dispose();
             });
@@ -115,25 +129,17 @@ namespace Helix.Gui
             }
         }
 
-        static void Redraw(Frame frame)
-        {
-            SynchronousServerSocket.Send(new Message
-            {
-                Text = "redraw",
-                Payload = JsonConvert.SerializeObject(frame)
-            });
-        }
+        static void Redraw(Frame frame) { SynchronousServerSocket.Send(new Message { Payload = JsonConvert.SerializeObject(frame) }); }
 
         static void RedrawEvery(TimeSpan timeSpan)
         {
-            Stopwatch.Restart();
             _constantRedrawTask = Task.Run(() =>
             {
+                Stopwatch.Restart();
                 while (!(CrawlerState.Completed).HasFlag(CrawlerBot.CrawlerState))
                 {
                     Redraw(new Frame
                     {
-                        CrawlerState = CrawlerBot.CrawlerState,
                         VerifiedUrlCount = CrawlerBot.Statistics?.VerifiedUrlCount,
                         ValidUrlCount = CrawlerBot.Statistics?.ValidUrlCount,
                         BrokenUrlCount = CrawlerBot.Statistics?.BrokenUrlCount,
