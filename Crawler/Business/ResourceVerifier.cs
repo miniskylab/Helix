@@ -9,9 +9,8 @@ namespace Helix.Crawler
 {
     public sealed class ResourceVerifier : IResourceVerifier
     {
-        CancellationTokenSource _cancellationTokenSource;
         readonly Configurations _configurations;
-        HttpClient _httpClient;
+        readonly HttpClient _httpClient;
         bool _objectDisposed;
         readonly IResourceProcessor _resourceProcessor;
         Task<HttpResponseMessage> _sendingGETRequestTask;
@@ -21,7 +20,6 @@ namespace Helix.Crawler
         {
             _configurations = configurations;
             _resourceProcessor = resourceProcessor;
-            _cancellationTokenSource = new CancellationTokenSource();
             _objectDisposed = false;
             _httpClient = httpClient;
         }
@@ -34,7 +32,7 @@ namespace Helix.Crawler
             _objectDisposed = true;
         }
 
-        public bool TryVerify(Resource resource, out VerificationResult verificationResult)
+        public bool TryVerify(Resource resource, CancellationToken cancellationToken, out VerificationResult verificationResult)
         {
             if (_objectDisposed) throw new ObjectDisposedException(nameof(ResourceVerifier));
             verificationResult = null;
@@ -55,7 +53,7 @@ namespace Helix.Crawler
                 _sendingGETRequestTask = _httpClient.GetAsync(
                     resource.Uri,
                     HttpCompletionOption.ResponseHeadersRead,
-                    _cancellationTokenSource.Token
+                    cancellationToken
                 );
                 var httpResponseMessage = _sendingGETRequestTask.Result;
                 resource.StatusCode = (StatusCode) httpResponseMessage.StatusCode;
@@ -67,7 +65,7 @@ namespace Helix.Crawler
                 switch (aggregateException.InnerException)
                 {
                     case TaskCanceledException _:
-                        resource.StatusCode = _cancellationTokenSource.Token.IsCancellationRequested
+                        resource.StatusCode = cancellationToken.IsCancellationRequested
                             ? StatusCode.Processing
                             : StatusCode.RequestTimeout;
                         break;
@@ -85,7 +83,6 @@ namespace Helix.Crawler
 
         void ReleaseUnmanagedResources()
         {
-            _cancellationTokenSource?.Cancel();
             try { _sendingGETRequestTask?.Wait(); }
             catch
             {
@@ -95,12 +92,7 @@ namespace Helix.Crawler
             }
 
             _sendingGETRequestTask?.Dispose();
-            _cancellationTokenSource?.Dispose();
-            _httpClient?.Dispose();
-
-            _cancellationTokenSource = null;
             _sendingGETRequestTask = null;
-            _httpClient = null;
         }
 
         ~ResourceVerifier() { ReleaseUnmanagedResources(); }

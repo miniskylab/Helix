@@ -139,7 +139,13 @@ namespace Helix.Crawler
             try
             {
                 Logger.LogInfo("Initializing start sequence ...");
-                ServiceLocator.CreateTransientServices(configurations);
+                _resourceProcessor = null;
+                _eventBroadcaster = null;
+                _hardwareMonitor = null;
+                _resourceScope = null;
+                _reportWriter = null;
+                _scheduler = null;
+                _memory = null;
 
                 Logger.LogInfo("Connecting services ...");
                 ConnectServices();
@@ -176,6 +182,7 @@ namespace Helix.Crawler
 
             void ConnectServices()
             {
+                ServiceLocator.CreateTransientServices(configurations);
                 Statistics = ServiceLocator.Get<IStatistics>();
                 _memory = ServiceLocator.Get<IMemory>();
                 _resourceScope = ServiceLocator.Get<IResourceScope>();
@@ -267,13 +274,9 @@ namespace Helix.Crawler
             {
                 if (!StateMachine.TryGetNext(crawlerCommand, out _))
                 {
-                    try
-                    {
-                        var commandName = Enum.GetName(typeof(CrawlerCommand), crawlerCommand);
-                        var exceptionMessage = $"Transition from state [{StateMachine.CurrentState}] via [{commandName}] command failed.";
-                        throw new InvalidOperationException(exceptionMessage);
-                    }
-                    catch (InvalidOperationException invalidOperationException) { Logger.LogException(invalidOperationException); }
+                    var commandName = Enum.GetName(typeof(CrawlerCommand), crawlerCommand);
+                    Logger.LogInfo($"Transition from state [{StateMachine.CurrentState}] via [{commandName}] command failed.\n" +
+                                   $"{Environment.StackTrace}");
                     return false;
                 }
                 StateMachine.MoveNext(crawlerCommand);
@@ -286,7 +289,7 @@ namespace Helix.Crawler
             while (_scheduler.RemainingWorkload != 0 && !_scheduler.CancellationToken.IsCancellationRequested)
                 _scheduler.CreateTask((resourceVerifier, resource) =>
                 {
-                    if (!resourceVerifier.TryVerify(resource, out var verificationResult)) return;
+                    if (!resourceVerifier.TryVerify(resource, _scheduler.CancellationToken, out var verificationResult)) return;
                     var isOrphanedUri = verificationResult.StatusCode == StatusCode.OrphanedUri;
                     var uriSchemeNotSupported = verificationResult.StatusCode == StatusCode.UriSchemeNotSupported;
                     if (isOrphanedUri || uriSchemeNotSupported) return;

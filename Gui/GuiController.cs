@@ -48,7 +48,7 @@ namespace Helix.Gui
                         // DisableMainButton = false,
                         MainButtonFunctionality = MainButtonFunctionality.Pause
                     });
-                    RedrawEvery(TimeSpan.FromSeconds(0.4));
+                    RedrawEvery(TimeSpan.FromSeconds(1));
                 }
                 else
                 {
@@ -64,7 +64,6 @@ namespace Helix.Gui
                     if (@event.EventType != EventType.Stopped) return;
                     Redraw(new Frame
                     {
-                        ShowWaitingOverlay = false,
                         StatusText = CrawlerBot.CrawlerState == CrawlerState.Faulted
                             ? "One or more errors occurred. Check the logs for more details."
                             : CrawlerBot.CrawlerState == CrawlerState.RanToCompletion
@@ -106,6 +105,7 @@ namespace Helix.Gui
             {
                 Redraw(new Frame { ShowWaitingOverlay = true });
                 StopWorking();
+                Redraw(new Frame { ShowWaitingOverlay = false });
             });
             GuiProcess.Start();
             ManualResetEvent.WaitOne();
@@ -143,7 +143,14 @@ namespace Helix.Gui
             void OnResourceVerified(Event @event)
             {
                 if (@event.EventType != EventType.ResourceVerified) return;
-                Redraw(new Frame { StatusText = @event.Message });
+                Redraw(new Frame
+                {
+                    VerifiedUrlCount = CrawlerBot.Statistics?.VerifiedUrlCount,
+                    ValidUrlCount = CrawlerBot.Statistics?.ValidUrlCount,
+                    BrokenUrlCount = CrawlerBot.Statistics?.BrokenUrlCount,
+                    RemainingWorkload = CrawlerBot.RemainingWorkload,
+                    StatusText = @event.Message
+                });
             }
         }
 

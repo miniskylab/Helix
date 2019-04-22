@@ -57,6 +57,11 @@ body {
     user-select: none;
 }
 
+.overlay--error {
+    border-color: #FF6347;
+    box-shadow: inset 0 4px 30px 2px #FF6347;
+}
+
 .button {
     display: block;
     margin: 20px auto 0 auto;
