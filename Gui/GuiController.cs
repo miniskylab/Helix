@@ -64,6 +64,7 @@ namespace Helix.Gui
                     if (@event.EventType != EventType.Stopped) return;
                     Redraw(new Frame
                     {
+                        ShowWaitingOverlay = false,
                         StatusText = CrawlerBot.CrawlerState == CrawlerState.Faulted
                             ? "One or more errors occurred. Check the logs for more details."
                             : CrawlerBot.CrawlerState == CrawlerState.RanToCompletion
@@ -96,11 +97,16 @@ namespace Helix.Gui
             });
             SynchronousServerSocket.On("btn-close-clicked", _ =>
             {
+                Redraw(new Frame { ShowWaitingOverlay = true });
                 if (!CrawlerState.Completed.HasFlag(CrawlerBot.CrawlerState)) StopWorking();
                 ManualResetEvent.Set();
                 ManualResetEvent.Dispose();
             });
-            SynchronousServerSocket.On("btn-stop-clicked", _ => { StopWorking(); });
+            SynchronousServerSocket.On("btn-stop-clicked", _ =>
+            {
+                Redraw(new Frame { ShowWaitingOverlay = true });
+                StopWorking();
+            });
             GuiProcess.Start();
             ManualResetEvent.WaitOne();
             SynchronousServerSocket.Dispose();

@@ -58,13 +58,13 @@ socket.connect(18880, "127.0.0.1", () => {
     });
 
     btnClose.addEventListener("click", () => {
-        showWaitingOverlay();
+        showWaitingOverlay(120, () => { dialogOverlay.style.display = "block"; });
         socket.end(JSON.stringify({text: "btn-close-clicked"}));
         socket.on("end", () => { ipcRenderer.send("btn-close-clicked"); });
     });
 
     btnStop.addEventListener("click", () => {
-        showWaitingOverlay();
+        showWaitingOverlay(120, () => { dialogOverlay.style.display = "block"; });
         socket.write(JSON.stringify({text: "btn-stop-clicked"}));
     });
 
@@ -90,31 +90,6 @@ socket.connect(18880, "127.0.0.1", () => {
             })
             .reduce((combinedFrame, frame) => Object.assign(combinedFrame, frame), {});
     }
-
-    function showWaitingOverlay() {
-        if (waitingCountdown) return;
-        let waitingTime = 120;
-        const getWaitingOverlaySubTitle = (remainingTime) => `(Please allow up to <div style='display:inline-block;color:#FF6347;'>${remainingTime}</div> seconds)`;
-        waitingOverlaySubtitle.innerHTML = getWaitingOverlaySubTitle(waitingTime);
-        lblWaitingOverlayMessage.textContent = "Initializing stop sequence ...";
-        waitingOverlay.style.display = "block";
-
-        waitingCountdown = setInterval(() => {
-            waitingTime--;
-            waitingOverlaySubtitle.innerHTML = getWaitingOverlaySubTitle(waitingTime);
-            if (waitingTime === 0) {
-                dialogOverlay.style.display = "block";
-                hideWaitingOverlay();
-            }
-        }, 1000);
-    }
-
-    function hideWaitingOverlay() {
-        if (!waitingCountdown) return;
-        waitingOverlay.style.display = "none";
-        clearInterval(waitingCountdown);
-        waitingCountdown = null;
-    }
 });
 
 function redraw(frame) {
@@ -125,6 +100,13 @@ function redraw(frame) {
     if (notNullAndUndefined(frame.MillisecondsAveragePageLoadTime)) lblAveragePageLoadTime.textContent = frame.MillisecondsAveragePageLoadTime.toLocaleString("en-US", {maximumFractionDigits: 0});
     if (isNumeric(frame.MillisecondsAveragePageLoadTime)) lblAveragePageLoadTimeUnitOfMeasure.style.visibility = "visible";
     if (notNullAndUndefined(frame.ElapsedTime)) lblElapsedTime.textContent = frame.ElapsedTime;
+
+    if (frame.ShowWaitingOverlay === true) showWaitingOverlay(120, () => { dialogOverlay.style.display = "block"; });
+    else if (frame.ShowWaitingOverlay === false) {
+        hideWaitingOverlay();
+        dialogOverlay.style.display = "none";
+    }
+
     if (notNullAndUndefined(frame.StatusText)) waitingOverlay.style.display === "block"
         ? lblWaitingOverlayMessage.textContent = frame.StatusText
         : lblStatusText.textContent = frame.StatusText;
@@ -158,4 +140,28 @@ function redraw(frame) {
     function notNullAndUndefined(variable) { return variable !== null && variable !== undefined; }
 
     function isNumeric(variable) { return !isNaN(variable) && typeof (variable) === "number"; }
+}
+
+function showWaitingOverlay(waitingTimeInSecond = 0, onTimeup = () => {}) {
+    if (waitingCountdown) return;
+    const getWaitingOverlaySubTitle = (remainingTime) => `(Please allow up to <div style='display:inline-block;color:#FF6347;'>${remainingTime}</div> seconds)`;
+    waitingOverlaySubtitle.innerHTML = getWaitingOverlaySubTitle(waitingTimeInSecond);
+    lblWaitingOverlayMessage.textContent = "Initializing stop sequence ...";
+    waitingOverlay.style.display = "block";
+
+    waitingCountdown = setInterval(() => {
+        waitingTimeInSecond--;
+        waitingOverlaySubtitle.innerHTML = getWaitingOverlaySubTitle(waitingTimeInSecond);
+        if (waitingTimeInSecond === 0) {
+            onTimeup();
+            hideWaitingOverlay();
+        }
+    }, 1000);
+}
+
+function hideWaitingOverlay() {
+    if (!waitingCountdown) return;
+    waitingOverlay.style.display = "none";
+    clearInterval(waitingCountdown);
+    waitingCountdown = null;
 }
