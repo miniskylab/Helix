@@ -15,11 +15,11 @@ const lblAveragePageLoadTime = document.getElementById("lbl-average-page-load-ti
 const lblAveragePageLoadTimeUnitOfMeasure = document.getElementById("lbl-average-page-load-time-unit-of-measure");
 const lblElapsedTime = document.getElementById("lbl-elapsed-time");
 const lblStatusText = document.getElementById("lbl-status-text");
-const lblShutdownOverlayMessage = document.getElementById("shutdown-overlay-message");
+const lblWaitingOverlayMessage = document.getElementById("waiting-overlay-message");
 
-const shutdownOverlay = document.getElementById("shutdown-overlay");
-const shutdownOverlaySubtitle = document.getElementById("shutdown-overlay-subtitle");
-const shutdownFailureOverlay = document.getElementById("shutdown-failure-overlay");
+const waitingOverlay = document.getElementById("waiting-overlay");
+const waitingOverlaySubtitle = document.getElementById("waiting-overlay-subtitle");
+const dialogOverlay = document.getElementById("dialog-overlay");
 const aboutMeOverlay = document.getElementById("about-me-overlay");
 
 const btnShowAboutMeOverlay = document.getElementById("btn-show-about-me-overlay");
@@ -29,7 +29,7 @@ const btnStop = document.getElementById("btn-stop");
 const btnClose = document.getElementById("btn-close");
 const btnCloseAboutMeOverlay = document.getElementById("btn-close-about-me-overlay");
 
-let shutdownCountdown = null;
+let waitingCountdown = null;
 
 socket.connect(18880, "127.0.0.1", () => {
 
@@ -58,13 +58,13 @@ socket.connect(18880, "127.0.0.1", () => {
     });
 
     btnClose.addEventListener("click", () => {
-        showShutdownOverlay();
+        showWaitingOverlay();
         socket.end(JSON.stringify({text: "btn-close-clicked"}));
         socket.on("end", () => { ipcRenderer.send("btn-close-clicked"); });
     });
 
     btnStop.addEventListener("click", () => {
-        showShutdownOverlay();
+        showWaitingOverlay();
         socket.write(JSON.stringify({text: "btn-stop-clicked"}));
     });
 
@@ -91,29 +91,29 @@ socket.connect(18880, "127.0.0.1", () => {
             .reduce((combinedFrame, frame) => Object.assign(combinedFrame, frame), {});
     }
 
-    function showShutdownOverlay() {
-        if (shutdownCountdown) return;
+    function showWaitingOverlay() {
+        if (waitingCountdown) return;
         let waitingTime = 120;
-        const getShutdownOverlaySubTitle = (remainingTime) => `(Please allow up to <div style='display:inline-block;color:#FF6347;'>${remainingTime}</div> seconds)`;
-        shutdownOverlaySubtitle.innerHTML = getShutdownOverlaySubTitle(waitingTime);
-        lblShutdownOverlayMessage.textContent = "Initializing shutdown sequence ...";
-        shutdownOverlay.style.display = "block";
+        const getWaitingOverlaySubTitle = (remainingTime) => `(Please allow up to <div style='display:inline-block;color:#FF6347;'>${remainingTime}</div> seconds)`;
+        waitingOverlaySubtitle.innerHTML = getWaitingOverlaySubTitle(waitingTime);
+        lblWaitingOverlayMessage.textContent = "Initializing stop sequence ...";
+        waitingOverlay.style.display = "block";
 
-        shutdownCountdown = setInterval(() => {
+        waitingCountdown = setInterval(() => {
             waitingTime--;
-            shutdownOverlaySubtitle.innerHTML = getShutdownOverlaySubTitle(waitingTime);
+            waitingOverlaySubtitle.innerHTML = getWaitingOverlaySubTitle(waitingTime);
             if (waitingTime === 0) {
-                shutdownFailureOverlay.style.display = "block";
-                hideShutdownOverlay();
+                dialogOverlay.style.display = "block";
+                hideWaitingOverlay();
             }
         }, 1000);
     }
 
-    function hideShutdownOverlay() {
-        if (!shutdownCountdown) return;
-        shutdownOverlay.style.display = "none";
-        clearInterval(shutdownCountdown);
-        shutdownCountdown = null;
+    function hideWaitingOverlay() {
+        if (!waitingCountdown) return;
+        waitingOverlay.style.display = "none";
+        clearInterval(waitingCountdown);
+        waitingCountdown = null;
     }
 });
 
@@ -125,8 +125,8 @@ function redraw(frame) {
     if (notNullAndUndefined(frame.MillisecondsAveragePageLoadTime)) lblAveragePageLoadTime.textContent = frame.MillisecondsAveragePageLoadTime.toLocaleString("en-US", {maximumFractionDigits: 0});
     if (isNumeric(frame.MillisecondsAveragePageLoadTime)) lblAveragePageLoadTimeUnitOfMeasure.style.visibility = "visible";
     if (notNullAndUndefined(frame.ElapsedTime)) lblElapsedTime.textContent = frame.ElapsedTime;
-    if (notNullAndUndefined(frame.StatusText)) shutdownOverlay.style.display === "block"
-        ? lblShutdownOverlayMessage.textContent = frame.StatusText
+    if (notNullAndUndefined(frame.StatusText)) waitingOverlay.style.display === "block"
+        ? lblWaitingOverlayMessage.textContent = frame.StatusText
         : lblStatusText.textContent = frame.StatusText;
 
     if (frame.DisableMainButton === true) {
