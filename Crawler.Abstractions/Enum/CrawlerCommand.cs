@@ -2,8 +2,9 @@ namespace Helix.Crawler.Abstractions
 {
     public enum CrawlerCommand
     {
-        StartWorking,
-        StopWorking,
+        Activate,
+        Run,
+        Stop,
         MarkAsRanToCompletion,
         MarkAsCancelled,
         MarkAsFaulted,

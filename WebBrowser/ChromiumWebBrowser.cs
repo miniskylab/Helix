@@ -25,7 +25,7 @@ namespace Helix.WebBrowser
         bool _objectDisposed;
         readonly string _pathToChromeDriverExecutable;
         readonly string _pathToChromiumExecutable;
-        readonly Dictionary<string, object> _publicApiLockMap;
+        readonly Dictionary<string, object> _publicApiLockMap; // TODO: remove
         readonly Stopwatch _stopwatch;
         readonly bool _useHeadlessWebBrowser;
         readonly bool _useIncognitoWebBrowser;

@@ -19,19 +19,13 @@ namespace Helix.Crawler
         static IResourceScope _resourceScope;
         static IScheduler _scheduler;
         static Task _waitingForCompletionTask;
+        static readonly object CrawlerStateTransitionLock;
         static readonly ILogger Logger;
         static readonly StateMachine<CrawlerState, CrawlerCommand> StateMachine;
-        static readonly object TransitionLock;
 
         public static IStatistics Statistics { get; private set; }
 
-        public static CrawlerState CrawlerState
-        {
-            get
-            {
-                lock (TransitionLock) return StateMachine.CurrentState;
-            }
-        }
+        public static CrawlerState CrawlerState => StateMachine.CurrentState;
 
         public static int RemainingWorkload
         {
@@ -50,24 +44,25 @@ namespace Helix.Crawler
             AppContext.SetSwitch("System.Net.Http.UseSocketsHttpHandler", false);
             ServicePointManager.DefaultConnectionLimit = int.MaxValue;
 
-            TransitionLock = new object();
+            CrawlerStateTransitionLock = new object();
             Logger = ServiceLocator.Get<ILogger>();
             StateMachine = new StateMachine<CrawlerState, CrawlerCommand>(
                 new Dictionary<Transition<CrawlerState, CrawlerCommand>, CrawlerState>
                 {
-                    { CreateTransition(CrawlerState.WaitingToRun, CrawlerCommand.StartWorking), CrawlerState.Running },
-                    { CreateTransition(CrawlerState.WaitingToRun, CrawlerCommand.StopWorking), CrawlerState.Completed },
-                    { CreateTransition(CrawlerState.Running, CrawlerCommand.StopWorking), CrawlerState.Completed },
+                    { CreateTransition(CrawlerState.WaitingForActivation, CrawlerCommand.Stop), CrawlerState.Completed },
+                    { CreateTransition(CrawlerState.WaitingForActivation, CrawlerCommand.Activate), CrawlerState.WaitingToRun },
+                    { CreateTransition(CrawlerState.WaitingToRun, CrawlerCommand.Run), CrawlerState.Running },
+                    { CreateTransition(CrawlerState.Running, CrawlerCommand.Stop), CrawlerState.Completed },
                     { CreateTransition(CrawlerState.Running, CrawlerCommand.Pause), CrawlerState.Paused },
                     { CreateTransition(CrawlerState.Completed, CrawlerCommand.MarkAsRanToCompletion), CrawlerState.RanToCompletion },
                     { CreateTransition(CrawlerState.Completed, CrawlerCommand.MarkAsCancelled), CrawlerState.Cancelled },
                     { CreateTransition(CrawlerState.Completed, CrawlerCommand.MarkAsFaulted), CrawlerState.Faulted },
                     { CreateTransition(CrawlerState.Paused, CrawlerCommand.Resume), CrawlerState.Running },
-                    { CreateTransition(CrawlerState.Faulted, CrawlerCommand.StartWorking), CrawlerState.Running },
-                    { CreateTransition(CrawlerState.RanToCompletion, CrawlerCommand.StartWorking), CrawlerState.Running },
-                    { CreateTransition(CrawlerState.Cancelled, CrawlerCommand.StartWorking), CrawlerState.Running }
+                    { CreateTransition(CrawlerState.Faulted, CrawlerCommand.Activate), CrawlerState.WaitingToRun },
+                    { CreateTransition(CrawlerState.RanToCompletion, CrawlerCommand.Activate), CrawlerState.WaitingToRun },
+                    { CreateTransition(CrawlerState.Cancelled, CrawlerCommand.Activate), CrawlerState.WaitingToRun }
                 },
-                CrawlerState.WaitingToRun
+                CrawlerState.WaitingForActivation
             );
 
             Transition<CrawlerState, CrawlerCommand> CreateTransition(CrawlerState fromState, CrawlerCommand command)
@@ -78,7 +73,7 @@ namespace Helix.Crawler
 
         public static void StopWorking()
         {
-            if (!TryTransit(CrawlerCommand.StopWorking)) return;
+            if (!TryTransit(CrawlerCommand.Stop)) return;
             var crawlerCommand = CrawlerCommand.MarkAsCancelled;
             try
             {
@@ -139,9 +134,9 @@ namespace Helix.Crawler
             }
         }
 
-        public static bool TryStartWorking(Configurations configurations)
+        public static bool TryStart(Configurations configurations)
         {
-            if (!TryTransit(CrawlerCommand.StartWorking)) return false;
+            if (!TryTransit(CrawlerCommand.Activate)) return false;
             try
             {
                 EnsureFreshStart();
@@ -158,6 +153,7 @@ namespace Helix.Crawler
                 StopWorking();
                 return false;
             }
+            finally { TryTransit(CrawlerCommand.Run); }
 
             void EnsureFreshStart()
             {
@@ -282,7 +278,7 @@ namespace Helix.Crawler
 
         static bool TryTransit(CrawlerCommand crawlerCommand)
         {
-            lock (TransitionLock)
+            lock (CrawlerStateTransitionLock)
             {
                 if (!StateMachine.TryGetNext(crawlerCommand, out _))
                 {

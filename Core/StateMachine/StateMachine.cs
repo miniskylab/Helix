@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 namespace Helix.Core
 {
+    // TODO: add lock
     public sealed class StateMachine<TState, TCommand> where TState : Enum where TCommand : Enum
     {
         readonly Dictionary<Transition<TState, TCommand>, TState> _possibleTransitions;
@@ -17,6 +18,7 @@ namespace Helix.Core
 
         public void MoveNext(TCommand command) { CurrentState = GetNext(command); }
 
+        // TODO: remove
         public bool TryGetNext(TCommand command, out TState nextState)
         {
             var transition = new Transition<TState, TCommand>(CurrentState, command);

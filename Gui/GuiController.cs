@@ -45,7 +45,7 @@ namespace Helix.Gui
                     DisableCloseButton = true,
                     MainButtonFunctionality = MainButtonFunctionality.Start
                 });
-                if (CrawlerBot.TryStartWorking(new Configurations(configurationJsonString)))
+                if (CrawlerBot.TryStart(new Configurations(configurationJsonString)))
                 {
                     Redraw(new Frame
                     {
