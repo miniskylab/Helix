@@ -79,38 +79,14 @@ namespace Helix.Crawler
         public static void StopWorking()
         {
             if (!TryTransit(CrawlerCommand.StopWorking)) return;
+            var crawlerCommand = CrawlerCommand.MarkAsCancelled;
             try
             {
                 BroadcastEvent(StopProgressUpdatedEvent("Initializing stop sequence ..."));
-                if (_hardwareMonitor != null && _hardwareMonitor.IsRunning)
-                {
-                    BroadcastEvent(StopProgressUpdatedEvent("Stopping hardware monitor service ..."));
-                    _hardwareMonitor.StopMonitoring();
-                }
-
-                var crawlerCommand = CrawlerCommand.MarkAsCancelled;
-                if (_scheduler != null)
-                {
-                    BroadcastEvent(StopProgressUpdatedEvent("De-activating main workflow ..."));
-                    if (_scheduler.RemainingWorkload == 0) crawlerCommand = CrawlerCommand.MarkAsRanToCompletion;
-                    _scheduler.CancelEverything();
-                }
-
-                if (_waitingForCompletionTask != null)
-                {
-                    BroadcastEvent(StopProgressUpdatedEvent("Waiting for background tasks to complete ..."));
-                    try { _waitingForCompletionTask.Wait(); }
-                    catch (Exception exception)
-                    {
-                        Logger.LogException(exception);
-                        crawlerCommand = CrawlerCommand.MarkAsFaulted;
-                    }
-                    finally { _waitingForCompletionTask = null; }
-                }
-
-                BroadcastEvent(StopProgressUpdatedEvent("Releasing resources ..."));
-                ServiceLocator.DisposeTransientServices();
-
+                StopMonitoringHardwareResources();
+                DeactivateMainWorkflow();
+                WaitForBackgroundTaskToComplete();
+                ReleaseResources();
                 TryTransit(crawlerCommand);
                 BroadcastEvent(new Event
                 {
@@ -118,17 +94,49 @@ namespace Helix.Crawler
                     Message = Enum.GetName(typeof(CrawlerState), CrawlerState)
                 });
                 OnEventBroadcast = null;
-
-                Event StopProgressUpdatedEvent(string message = "")
-                {
-                    return new Event
-                    {
-                        EventType = EventType.StopProgressUpdated,
-                        Message = message
-                    };
-                }
             }
             catch (Exception exception) { Logger.LogException(exception); }
+
+            void StopMonitoringHardwareResources()
+            {
+                if (_hardwareMonitor == null || !_hardwareMonitor.IsRunning) return;
+                BroadcastEvent(StopProgressUpdatedEvent("Stopping hardware monitor service ..."));
+                _hardwareMonitor.StopMonitoring();
+            }
+            void DeactivateMainWorkflow()
+            {
+                if (_scheduler == null) return;
+                BroadcastEvent(StopProgressUpdatedEvent("De-activating main workflow ..."));
+
+                if (_scheduler.RemainingWorkload == 0) crawlerCommand = CrawlerCommand.MarkAsRanToCompletion;
+                _scheduler.CancelEverything();
+            }
+            void WaitForBackgroundTaskToComplete()
+            {
+                if (_waitingForCompletionTask == null) return;
+                BroadcastEvent(StopProgressUpdatedEvent("Waiting for background tasks to complete ..."));
+
+                try { _waitingForCompletionTask.Wait(); }
+                catch (Exception exception)
+                {
+                    Logger.LogException(exception);
+                    crawlerCommand = CrawlerCommand.MarkAsFaulted;
+                }
+                finally { _waitingForCompletionTask = null; }
+            }
+            void ReleaseResources()
+            {
+                BroadcastEvent(StopProgressUpdatedEvent("Releasing resources ..."));
+                ServiceLocator.DisposeTransientServices();
+            }
+            Event StopProgressUpdatedEvent(string message = "")
+            {
+                return new Event
+                {
+                    EventType = EventType.StopProgressUpdated,
+                    Message = message
+                };
+            }
         }
 
         public static bool TryStartWorking(Configurations configurations)
@@ -136,37 +144,12 @@ namespace Helix.Crawler
             if (!TryTransit(CrawlerCommand.StartWorking)) return false;
             try
             {
-                Logger.LogInfo("Initializing start sequence ...");
-                _resourceProcessor = null;
-                _eventBroadcaster = null;
-                _hardwareMonitor = null;
-                _resourceScope = null;
-                _reportWriter = null;
-                _scheduler = null;
-                _memory = null;
-
-                Logger.LogInfo("Connecting services ...");
+                EnsureFreshStart();
                 ConnectServices();
-
-                BroadcastEvent(StartProgressUpdatedEvent("Re-creating directory containing screenshot files ..."));
                 EnsureDirectoryContainsScreenshotFilesIsRecreated();
-
-                _waitingForCompletionTask = Task.Run(() =>
-                {
-                    try
-                    {
-                        Logger.LogInfo("Starting hardware monitor service ...");
-                        _hardwareMonitor.StartMonitoring();
-
-                        BroadcastEvent(StartProgressUpdatedEvent("Activating main workflow ..."));
-                        ActivateMainWorkflowAndWaitForCompletion();
-                    }
-                    catch (Exception exception) { Logger.LogException(exception); }
-                    finally
-                    {
-                        if (CrawlerState == CrawlerState.Running) Task.Run(StopWorking);
-                    }
-                }, _scheduler.CancellationToken);
+                ActivateMainWorkflow();
+                MonitorHardwareResources();
+                WaitForCompletionInSeparateThread();
                 return true;
             }
             catch (Exception exception)
@@ -176,8 +159,20 @@ namespace Helix.Crawler
                 return false;
             }
 
+            void EnsureFreshStart()
+            {
+                Logger.LogInfo("Initializing start sequence ...");
+                _resourceProcessor = null;
+                _eventBroadcaster = null;
+                _hardwareMonitor = null;
+                _resourceScope = null;
+                _reportWriter = null;
+                _scheduler = null;
+                _memory = null;
+            }
             void ConnectServices()
             {
+                Logger.LogInfo("Connecting services ...");
                 ServiceLocator.CreateTransientServices(configurations);
                 Statistics = ServiceLocator.Get<IStatistics>();
                 _memory = ServiceLocator.Get<IMemory>();
@@ -192,12 +187,14 @@ namespace Helix.Crawler
             }
             void EnsureDirectoryContainsScreenshotFilesIsRecreated()
             {
+                BroadcastEvent(StartProgressUpdatedEvent("Re-creating directory containing screenshot files ..."));
                 if (Directory.Exists(configurations.PathToDirectoryContainsScreenshotFiles))
                     Directory.Delete(configurations.PathToDirectoryContainsScreenshotFiles, true);
                 Directory.CreateDirectory(configurations.PathToDirectoryContainsScreenshotFiles);
             }
-            void ActivateMainWorkflowAndWaitForCompletion()
+            void ActivateMainWorkflow()
             {
+                BroadcastEvent(StartProgressUpdatedEvent("Activating main workflow ..."));
                 _memory.MemorizeToBeVerifiedResource(
                     _resourceProcessor.Enrich(new Resource
                     {
@@ -205,11 +202,30 @@ namespace Helix.Crawler
                         OriginalUrl = configurations.StartUri.AbsoluteUri
                     })
                 );
-                Task.WhenAll(
-                    Task.Run(Render, _scheduler.CancellationToken),
-                    Task.Run(Extract, _scheduler.CancellationToken),
-                    Task.Run(Verify, _scheduler.CancellationToken)
-                ).Wait();
+            }
+            void MonitorHardwareResources()
+            {
+                Logger.LogInfo("Starting hardware monitor service ...");
+                _hardwareMonitor.StartMonitoring();
+            }
+            void WaitForCompletionInSeparateThread()
+            {
+                _waitingForCompletionTask = Task.Run(() =>
+                {
+                    try
+                    {
+                        Task.WhenAll(
+                            Task.Run(Render, _scheduler.CancellationToken),
+                            Task.Run(Extract, _scheduler.CancellationToken),
+                            Task.Run(Verify, _scheduler.CancellationToken)
+                        ).Wait();
+                    }
+                    catch (Exception exception) { Logger.LogException(exception); }
+                    finally
+                    {
+                        if (CrawlerState == CrawlerState.Running) Task.Run(StopWorking);
+                    }
+                }, _scheduler.CancellationToken);
             }
             Event StartProgressUpdatedEvent(string message)
             {
