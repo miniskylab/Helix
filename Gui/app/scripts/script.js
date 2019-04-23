@@ -34,37 +34,41 @@ let waitingCountdown = null;
 socket.connect(18880, "127.0.0.1", () => {
 
     btnMain.addEventListener("click", () => {
-        if (!btnMain.hasAttribute("disabled")) btnMain.setAttribute("disabled", "");
-        if (!configurationPanel.hasAttribute("disabled")) configurationPanel.setAttribute("disabled", "");
-        lblAveragePageLoadTimeUnitOfMeasure.style.visibility = "hidden";
-        redraw({
-            VerifiedUrlCount: "-",
-            ValidUrlCount: "-",
-            BrokenUrlCount: "-",
-            RemainingWorkload: "-",
-            MillisecondsAveragePageLoadTime: "-",
-            ElapsedTime: "-- : -- : --",
-            StatusText: "Initializing start sequence ..."
-        });
-        socket.write(JSON.stringify({
-            text: "btn-start-clicked",
-            payload: JSON.stringify({
-                StartUri: txtStartUri.value,
-                DomainName: txtDomainName.value,
-                VerifyExternalUrls: ckbVerifyExternalUrls.checked,
-                UseHeadlessWebBrowsers: !ckbShowWebBrowsers.checked
-            })
-        }));
+        if (mainButtonIsStartButton()) {
+            lblAveragePageLoadTimeUnitOfMeasure.style.visibility = "hidden";
+            redraw({
+                DisableMainButton: true,
+                DisableStopButton: true,
+                DisableCloseButton: true,
+                DisableConfigurationPanel: true,
+                VerifiedUrlCount: "-",
+                ValidUrlCount: "-",
+                BrokenUrlCount: "-",
+                RemainingWorkload: "-",
+                MillisecondsAveragePageLoadTime: "-",
+                ElapsedTime: "-- : -- : --",
+                StatusText: "Initializing start sequence ..."
+            });
+            socket.write(JSON.stringify({
+                text: "btn-start-clicked",
+                payload: JSON.stringify({
+                    StartUri: txtStartUri.value,
+                    DomainName: txtDomainName.value,
+                    VerifyExternalUrls: ckbVerifyExternalUrls.checked,
+                    UseHeadlessWebBrowsers: !ckbShowWebBrowsers.checked
+                })
+            }));
+        }
     });
 
     btnClose.addEventListener("click", () => {
-        showWaitingOverlay(120, () => { dialogOverlay.style.display = "block"; });
+        redraw({ShowWaitingOverlay: true});
         socket.end(JSON.stringify({text: "btn-close-clicked"}));
         socket.on("end", () => { ipcRenderer.send("btn-close-clicked"); });
     });
 
     btnStop.addEventListener("click", () => {
-        showWaitingOverlay(120, () => { dialogOverlay.style.display = "block"; });
+        redraw({ShowWaitingOverlay: true});
         socket.write(JSON.stringify({text: "btn-stop-clicked"}));
     });
 
@@ -111,28 +115,26 @@ function redraw(frame) {
         ? lblWaitingOverlayMessage.textContent = frame.StatusText
         : lblStatusText.textContent = frame.StatusText;
 
-    if (frame.DisableMainButton === true) {
-        if (!btnMain.hasAttribute("disabled")) btnMain.setAttribute("disabled", "");
-        if (frame.MainButtonFunctionality === "Start") {
-            if (btnStop.hasAttribute("disabled")) btnStop.removeAttribute("disabled");
-            if (!configurationPanel.hasAttribute("disabled")) configurationPanel.setAttribute("disabled", "");
-        }
-    } else if (frame.DisableMainButton === false) {
-        if (btnMain.hasAttribute("disabled")) btnMain.removeAttribute("disabled");
-        if (frame.MainButtonFunctionality === "Start") {
-            if (!btnStop.hasAttribute("disabled")) btnStop.setAttribute("disabled", "");
-            if (configurationPanel.hasAttribute("disabled")) configurationPanel.removeAttribute("disabled");
-        }
-    }
+    if (frame.DisableStopButton === true && !btnStop.hasAttribute("disabled")) btnStop.setAttribute("disabled", "");
+    else if (frame.DisableStopButton === false && btnStop.hasAttribute("disabled")) btnStop.removeAttribute("disabled");
+
+    if (frame.DisableCloseButton === true && !btnClose.hasAttribute("disabled")) btnClose.setAttribute("disabled", "");
+    else if (frame.DisableCloseButton === false && btnClose.hasAttribute("disabled")) btnClose.removeAttribute("disabled");
+
+    if (frame.DisableConfigurationPanel === true && !configurationPanel.hasAttribute("disabled")) configurationPanel.setAttribute("disabled", "");
+    else if (frame.DisableConfigurationPanel === false && configurationPanel.hasAttribute("disabled")) configurationPanel.removeAttribute("disabled");
+
+    if (frame.DisableMainButton === true && !btnMain.hasAttribute("disabled")) btnMain.setAttribute("disabled", "");
+    else if (frame.DisableMainButton === false && btnMain.hasAttribute("disabled")) btnMain.removeAttribute("disabled");
 
     switch (frame.MainButtonFunctionality) {
         case "Start":
-            if (btnMain.firstElementChild.className === "controls__play-icon") break;
+            if (mainButtonIsStartButton()) break;
             btnMain.firstElementChild.className = "controls__play-icon";
             if (btnMain.classList.contains("controls__main-button--amber")) btnMain.classList.remove("controls__main-button--amber");
             break;
         case "Pause":
-            if (btnMain.firstElementChild.className === "controls__pause-icon") break;
+            if (mainButtonIsPauseButton()) break;
             btnMain.firstElementChild.className = "controls__pause-icon";
             if (!btnMain.classList.contains("controls__main-button--amber")) btnMain.classList.add("controls__main-button--amber");
     }
@@ -141,6 +143,10 @@ function redraw(frame) {
 
     function isNumeric(variable) { return !isNaN(variable) && typeof (variable) === "number"; }
 }
+
+function mainButtonIsStartButton() { return btnMain.firstElementChild.className === "controls__play-icon"; }
+
+function mainButtonIsPauseButton() { return btnMain.firstElementChild.className === "controls__pause-icon"; }
 
 function showWaitingOverlay(waitingTimeInSecond = 0, onTimeup = () => {}) {
     if (waitingCountdown) return;

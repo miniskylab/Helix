@@ -9,7 +9,13 @@ namespace Helix.Gui
     {
         public int? BrokenUrlCount { [UsedImplicitly] get; set; }
 
+        public bool? DisableCloseButton { [UsedImplicitly] get; set; }
+
+        public bool? DisableConfigurationPanel { [UsedImplicitly] get; set; }
+
         public bool? DisableMainButton { [UsedImplicitly] get; set; }
+
+        public bool? DisableStopButton { [UsedImplicitly] get; set; }
 
         public string ElapsedTime { [UsedImplicitly] get; set; }
 

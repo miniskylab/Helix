@@ -56,16 +56,14 @@ namespace Helix.Crawler
                 new Dictionary<Transition<CrawlerState, CrawlerCommand>, CrawlerState>
                 {
                     { CreateTransition(CrawlerState.WaitingToRun, CrawlerCommand.StartWorking), CrawlerState.Running },
-                    { CreateTransition(CrawlerState.WaitingToRun, CrawlerCommand.StopWorking), CrawlerState.Stopping },
-                    { CreateTransition(CrawlerState.Running, CrawlerCommand.StopWorking), CrawlerState.Stopping },
+                    { CreateTransition(CrawlerState.WaitingToRun, CrawlerCommand.StopWorking), CrawlerState.Completed },
+                    { CreateTransition(CrawlerState.Running, CrawlerCommand.StopWorking), CrawlerState.Completed },
                     { CreateTransition(CrawlerState.Running, CrawlerCommand.Pause), CrawlerState.Paused },
-                    { CreateTransition(CrawlerState.Running, CrawlerCommand.MarkAsFaulted), CrawlerState.Faulted },
-                    { CreateTransition(CrawlerState.Stopping, CrawlerCommand.MarkAsRanToCompletion), CrawlerState.RanToCompletion },
-                    { CreateTransition(CrawlerState.Stopping, CrawlerCommand.MarkAsCancelled), CrawlerState.Cancelled },
-                    { CreateTransition(CrawlerState.Stopping, CrawlerCommand.MarkAsFaulted), CrawlerState.Faulted },
-                    { CreateTransition(CrawlerState.Faulted, CrawlerCommand.StartWorking), CrawlerState.Running },
-                    { CreateTransition(CrawlerState.Faulted, CrawlerCommand.StopWorking), CrawlerState.Faulted },
+                    { CreateTransition(CrawlerState.Completed, CrawlerCommand.MarkAsRanToCompletion), CrawlerState.RanToCompletion },
+                    { CreateTransition(CrawlerState.Completed, CrawlerCommand.MarkAsCancelled), CrawlerState.Cancelled },
+                    { CreateTransition(CrawlerState.Completed, CrawlerCommand.MarkAsFaulted), CrawlerState.Faulted },
                     { CreateTransition(CrawlerState.Paused, CrawlerCommand.Resume), CrawlerState.Running },
+                    { CreateTransition(CrawlerState.Faulted, CrawlerCommand.StartWorking), CrawlerState.Running },
                     { CreateTransition(CrawlerState.RanToCompletion, CrawlerCommand.StartWorking), CrawlerState.Running },
                     { CreateTransition(CrawlerState.Cancelled, CrawlerCommand.StartWorking), CrawlerState.Running }
                 },
@@ -84,7 +82,7 @@ namespace Helix.Crawler
             try
             {
                 BroadcastEvent(StopProgressUpdatedEvent("Initializing stop sequence ..."));
-                if (_hardwareMonitor.IsRunning)
+                if (_hardwareMonitor != null && _hardwareMonitor.IsRunning)
                 {
                     BroadcastEvent(StopProgressUpdatedEvent("Stopping hardware monitor service ..."));
                     _hardwareMonitor.StopMonitoring();
@@ -96,18 +94,18 @@ namespace Helix.Crawler
                     BroadcastEvent(StopProgressUpdatedEvent("De-activating main workflow ..."));
                     if (_scheduler.RemainingWorkload == 0) crawlerCommand = CrawlerCommand.MarkAsRanToCompletion;
                     _scheduler.CancelEverything();
+                }
 
+                if (_waitingForCompletionTask != null)
+                {
                     BroadcastEvent(StopProgressUpdatedEvent("Waiting for background tasks to complete ..."));
-                    try
-                    {
-                        _waitingForCompletionTask?.Wait();
-                        _waitingForCompletionTask = null;
-                    }
+                    try { _waitingForCompletionTask.Wait(); }
                     catch (Exception exception)
                     {
                         Logger.LogException(exception);
                         crawlerCommand = CrawlerCommand.MarkAsFaulted;
                     }
+                    finally { _waitingForCompletionTask = null; }
                 }
 
                 BroadcastEvent(StopProgressUpdatedEvent("Releasing resources ..."));
@@ -163,19 +161,17 @@ namespace Helix.Crawler
                         BroadcastEvent(StartProgressUpdatedEvent("Activating main workflow ..."));
                         ActivateMainWorkflowAndWaitForCompletion();
                     }
-                    catch (Exception exception)
+                    catch (Exception exception) { Logger.LogException(exception); }
+                    finally
                     {
-                        Logger.LogException(exception);
-                        TryTransit(CrawlerCommand.MarkAsFaulted);
+                        if (CrawlerState == CrawlerState.Running) Task.Run(StopWorking);
                     }
-                    finally { Task.Run(StopWorking); }
                 }, _scheduler.CancellationToken);
                 return true;
             }
             catch (Exception exception)
             {
                 Logger.LogException(exception);
-                TryTransit(CrawlerCommand.MarkAsFaulted);
                 StopWorking();
                 return false;
             }

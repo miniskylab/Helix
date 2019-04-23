@@ -30,6 +30,7 @@ namespace Helix.Gui
              * TODO: Will be removed and replaced with built-in .Net Core 3.0 feature. */
             ShowWindow(GetConsoleWindow(), 0);
 
+            var closeButtonWasClicked = false;
             SynchronousServerSocket.On("btn-start-clicked", configurationJsonString =>
             {
                 CrawlerBot.OnEventBroadcast += OnStartProgressUpdated;
@@ -39,6 +40,9 @@ namespace Helix.Gui
                 Redraw(new Frame
                 {
                     DisableMainButton = true,
+                    DisableConfigurationPanel = true,
+                    DisableStopButton = true,
+                    DisableCloseButton = true,
                     MainButtonFunctionality = MainButtonFunctionality.Start
                 });
                 if (CrawlerBot.TryStartWorking(new Configurations(configurationJsonString)))
@@ -46,6 +50,8 @@ namespace Helix.Gui
                     Redraw(new Frame
                     {
                         // DisableMainButton = false,
+                        DisableStopButton = false,
+                        DisableCloseButton = false,
                         MainButtonFunctionality = MainButtonFunctionality.Pause
                     });
                     RedrawEvery(TimeSpan.FromSeconds(1));
@@ -55,6 +61,7 @@ namespace Helix.Gui
                     Redraw(new Frame
                     {
                         DisableMainButton = false,
+                        DisableCloseButton = false,
                         MainButtonFunctionality = MainButtonFunctionality.Start
                     });
                 }
@@ -64,6 +71,8 @@ namespace Helix.Gui
                     if (@event.EventType != EventType.Stopped) return;
                     Redraw(new Frame
                     {
+                        DisableCloseButton = closeButtonWasClicked,
+                        ShowWaitingOverlay = closeButtonWasClicked,
                         StatusText = CrawlerBot.CrawlerState == CrawlerState.Faulted
                             ? "One or more errors occurred. Check the logs for more details."
                             : CrawlerBot.CrawlerState == CrawlerState.RanToCompletion
@@ -74,7 +83,9 @@ namespace Helix.Gui
                     _constantRedrawTask?.Wait();
                     Redraw(new Frame
                     {
+                        DisableStopButton = true,
                         DisableMainButton = false,
+                        DisableConfigurationPanel = false,
                         MainButtonFunctionality = MainButtonFunctionality.Start,
                         VerifiedUrlCount = CrawlerBot.Statistics?.VerifiedUrlCount,
                         ValidUrlCount = CrawlerBot.Statistics?.ValidUrlCount,
@@ -96,16 +107,26 @@ namespace Helix.Gui
             });
             SynchronousServerSocket.On("btn-close-clicked", _ =>
             {
-                Redraw(new Frame { ShowWaitingOverlay = true });
+                closeButtonWasClicked = true;
+                Redraw(new Frame
+                {
+                    ShowWaitingOverlay = true,
+                    DisableStopButton = true,
+                    DisableCloseButton = true
+                });
                 if (!CrawlerState.Completed.HasFlag(CrawlerBot.CrawlerState)) StopWorking();
                 ManualResetEvent.Set();
                 ManualResetEvent.Dispose();
             });
             SynchronousServerSocket.On("btn-stop-clicked", _ =>
             {
-                Redraw(new Frame { ShowWaitingOverlay = true });
+                Redraw(new Frame
+                {
+                    ShowWaitingOverlay = true,
+                    DisableStopButton = true,
+                    DisableCloseButton = true
+                });
                 StopWorking();
-                Redraw(new Frame { ShowWaitingOverlay = false });
             });
             GuiProcess.Start();
             ManualResetEvent.WaitOne();
