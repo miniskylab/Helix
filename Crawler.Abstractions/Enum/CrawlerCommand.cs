@@ -5,6 +5,7 @@ namespace Helix.Crawler.Abstractions
         Activate,
         Run,
         Stop,
+        Abort,
         MarkAsRanToCompletion,
         MarkAsCancelled,
         MarkAsFaulted,

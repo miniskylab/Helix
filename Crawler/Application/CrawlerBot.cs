@@ -52,6 +52,8 @@ namespace Helix.Crawler
                     { CreateTransition(CrawlerState.WaitingForActivation, CrawlerCommand.Stop), CrawlerState.Completed },
                     { CreateTransition(CrawlerState.WaitingForActivation, CrawlerCommand.Activate), CrawlerState.WaitingToRun },
                     { CreateTransition(CrawlerState.WaitingToRun, CrawlerCommand.Run), CrawlerState.Running },
+                    { CreateTransition(CrawlerState.WaitingToRun, CrawlerCommand.Abort), CrawlerState.WaitingForStop },
+                    { CreateTransition(CrawlerState.WaitingForStop, CrawlerCommand.Stop), CrawlerState.Completed },
                     { CreateTransition(CrawlerState.Running, CrawlerCommand.Stop), CrawlerState.Completed },
                     { CreateTransition(CrawlerState.Running, CrawlerCommand.Pause), CrawlerState.Paused },
                     { CreateTransition(CrawlerState.Completed, CrawlerCommand.MarkAsRanToCompletion), CrawlerState.RanToCompletion },
@@ -146,17 +148,18 @@ namespace Helix.Crawler
                 ActivateMainWorkflow();
                 MonitorHardwareResources();
                 WaitForCompletionInSeparateThread();
+                TryTransit(CrawlerCommand.Run);
                 return true;
             }
             catch (Exception exception)
             {
                 Logger.LogException(exception);
+                TryTransit(CrawlerCommand.Abort);
                 _waitingForCompletionTask = Task.FromException(exception);
 
                 StopWorking();
                 return false;
             }
-            finally { TryTransit(CrawlerCommand.Run); }
 
             void EnsureFreshStart()
             {

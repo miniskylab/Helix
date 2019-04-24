@@ -8,11 +8,12 @@ namespace Helix.Crawler.Abstractions
         None = 0,
         WaitingForActivation = 1 << 0,
         WaitingToRun = 1 << 1,
-        Running = 1 << 2,
-        RanToCompletion = 1 << 3,
-        Cancelled = 1 << 4,
-        Faulted = 1 << 5,
-        Paused = 1 << 6,
+        WaitingForStop = 1 << 2,
+        Running = 1 << 3,
+        RanToCompletion = 1 << 4,
+        Cancelled = 1 << 5,
+        Faulted = 1 << 6,
+        Paused = 1 << 7,
         Completed = RanToCompletion | Cancelled | Faulted
     }
 }
