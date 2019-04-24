@@ -103,7 +103,8 @@ namespace Helix.Crawler
                 if (_scheduler == null) return;
                 BroadcastEvent(StopProgressUpdatedEvent("De-activating main workflow ..."));
 
-                if (_scheduler.RemainingWorkload == 0) crawlerCommand = CrawlerCommand.MarkAsRanToCompletion;
+                if (_scheduler.RemainingWorkload == 0 && _memory.AlreadyVerifiedUrlCount > 0)
+                    crawlerCommand = CrawlerCommand.MarkAsRanToCompletion;
                 _scheduler.CancelEverything();
             }
             void WaitForBackgroundTaskToComplete()
@@ -150,6 +151,8 @@ namespace Helix.Crawler
             catch (Exception exception)
             {
                 Logger.LogException(exception);
+                _waitingForCompletionTask = Task.FromException(exception);
+
                 StopWorking();
                 return false;
             }

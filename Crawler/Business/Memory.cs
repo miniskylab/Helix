@@ -16,6 +16,14 @@ namespace Helix.Crawler
         readonly BlockingCollection<Resource> _toBeTakenScreenshotResources;
         readonly BlockingCollection<Resource> _toBeVerifiedResources;
 
+        public int AlreadyVerifiedUrlCount
+        {
+            get
+            {
+                lock (_memorizationLock) return _alreadyVerifiedUrls.Count;
+            }
+        }
+
         public int ToBeExtractedHtmlDocumentCount => _toBeExtractedHtmlDocuments.Count;
 
         public int ToBeRenderedResourceCount => _toBeRenderedResources.Count + _toBeTakenScreenshotResources.Count;
