@@ -7,6 +7,9 @@ namespace Helix.Gui
     [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
     public class Frame
     {
+        [JsonConverter(typeof(StringEnumConverter))]
+        public BorderColor? BorderColor { [UsedImplicitly] get; set; }
+
         public int? BrokenUrlCount { [UsedImplicitly] get; set; }
 
         public bool? DisableCloseButton { [UsedImplicitly] get; set; }
@@ -39,5 +42,11 @@ namespace Helix.Gui
     {
         Start,
         Pause
+    }
+
+    public enum BorderColor
+    {
+        Normal,
+        Error
     }
 }

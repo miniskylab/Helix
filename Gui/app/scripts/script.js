@@ -1,6 +1,9 @@
 ﻿const {remote, ipcRenderer} = require("electron");
 const socket = new require("net").Socket();
 
+const htmlElement = document.getElementById("html");
+const titleBar = document.getElementById("title-bar");
+
 const txtStartUri = document.getElementById("txt-start-uri");
 const txtDomainName = document.getElementById("txt-domain-name");
 const ckbVerifyExternalUrls = document.getElementById("ckb-verify-external-urls");
@@ -137,6 +140,16 @@ function redraw(frame) {
             if (mainButtonIsPauseButton()) break;
             btnMain.firstElementChild.className = "controls__pause-icon";
             if (!btnMain.classList.contains("controls__main-button--amber")) btnMain.classList.add("controls__main-button--amber");
+    }
+
+    switch (frame.BorderColor) {
+        case "Normal":
+            htmlElement.className = "border";
+            titleBar.className = "title-bar";
+            break;
+        case "Error":
+            htmlElement.className = "border border--error";
+            titleBar.className = "title-bar title-bar--error";
     }
 
     function notNullAndUndefined(variable) { return variable !== null && variable !== undefined; }

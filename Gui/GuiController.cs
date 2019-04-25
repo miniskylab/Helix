@@ -40,9 +40,10 @@ namespace Helix.Gui
                 Redraw(new Frame
                 {
                     DisableMainButton = true,
-                    DisableConfigurationPanel = true,
                     DisableStopButton = true,
                     DisableCloseButton = true,
+                    DisableConfigurationPanel = true,
+                    BorderColor = BorderColor.Normal,
                     MainButtonFunctionality = MainButtonFunctionality.Start
                 });
                 if (CrawlerBot.TryStart(new Configurations(configurationJsonString)))
@@ -73,6 +74,7 @@ namespace Helix.Gui
                     {
                         DisableCloseButton = closeButtonWasClicked,
                         ShowWaitingOverlay = closeButtonWasClicked,
+                        BorderColor = CrawlerBot.CrawlerState == CrawlerState.Faulted ? BorderColor.Error : BorderColor.Normal,
                         StatusText = CrawlerBot.CrawlerState == CrawlerState.Faulted
                             ? "One or more errors occurred. Check the logs for more details."
                             : CrawlerBot.CrawlerState == CrawlerState.RanToCompletion
