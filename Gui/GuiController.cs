@@ -139,7 +139,7 @@ namespace Helix.Gui
                 {
                     CrawlerBot.OnEventBroadcast -= OnResourceVerified;
                     CrawlerBot.OnEventBroadcast += OnStopProgressUpdated;
-                    CrawlerBot.StopWorking();
+                    CrawlerBot.Stop();
 
                     var waitingTime = TimeSpan.FromMinutes(1);
                     if (_constantRedrawTask == null || _constantRedrawTask.Wait(waitingTime)) return;

@@ -19,7 +19,6 @@ namespace Helix.Crawler
         static IResourceScope _resourceScope;
         static IScheduler _scheduler;
         static Task _waitingForCompletionTask;
-        static readonly object CrawlerStateTransitionLock;
         static readonly ILogger Logger;
         static readonly StateMachine<CrawlerState, CrawlerCommand> StateMachine;
 
@@ -44,7 +43,6 @@ namespace Helix.Crawler
             AppContext.SetSwitch("System.Net.Http.UseSocketsHttpHandler", false);
             ServicePointManager.DefaultConnectionLimit = int.MaxValue;
 
-            CrawlerStateTransitionLock = new object();
             Logger = ServiceLocator.Get<ILogger>();
             StateMachine = new StateMachine<CrawlerState, CrawlerCommand>(
                 new Dictionary<Transition<CrawlerState, CrawlerCommand>, CrawlerState>
@@ -73,7 +71,7 @@ namespace Helix.Crawler
             }
         }
 
-        public static void StopWorking()
+        public static void Stop()
         {
             if (!TryTransit(CrawlerCommand.Stop)) return;
             var crawlerCommand = CrawlerCommand.MarkAsCancelled;
@@ -107,7 +105,7 @@ namespace Helix.Crawler
 
                 if (_scheduler.RemainingWorkload == 0 && _memory.AlreadyVerifiedUrlCount > 0)
                     crawlerCommand = CrawlerCommand.MarkAsRanToCompletion;
-                _scheduler.CancelEverything();
+                _scheduler.CancelPendingTasks();
             }
             void WaitForBackgroundTaskToComplete()
             {
@@ -157,7 +155,7 @@ namespace Helix.Crawler
                 TryTransit(CrawlerCommand.Abort);
                 _waitingForCompletionTask = Task.FromException(exception);
 
-                StopWorking();
+                Stop();
                 return false;
             }
 
@@ -225,7 +223,7 @@ namespace Helix.Crawler
                     catch (Exception exception) { Logger.LogException(exception); }
                     finally
                     {
-                        if (CrawlerState == CrawlerState.Running) Task.Run(StopWorking);
+                        if (CrawlerState == CrawlerState.Running) Task.Run(Stop);
                     }
                 }, _scheduler.CancellationToken);
             }
@@ -284,18 +282,12 @@ namespace Helix.Crawler
 
         static bool TryTransit(CrawlerCommand crawlerCommand)
         {
-            lock (CrawlerStateTransitionLock)
-            {
-                if (!StateMachine.TryGetNext(crawlerCommand, out _))
-                {
-                    var commandName = Enum.GetName(typeof(CrawlerCommand), crawlerCommand);
-                    Logger.LogInfo($"Transition from state [{StateMachine.CurrentState}] via [{commandName}] command failed.\n" +
-                                   $"{Environment.StackTrace}");
-                    return false;
-                }
-                StateMachine.MoveNext(crawlerCommand);
-                return true;
-            }
+            if (StateMachine.TryMoveNext(crawlerCommand)) return true;
+
+            var commandName = Enum.GetName(typeof(CrawlerCommand), crawlerCommand);
+            Logger.LogInfo($"Transition from state [{StateMachine.CurrentState}] via [{commandName}] command failed.\n" +
+                           $"{Environment.StackTrace}");
+            return false;
         }
 
         static void Verify()

@@ -3,34 +3,34 @@ using System.Collections.Generic;
 
 namespace Helix.Core
 {
-    // TODO: add lock
     public sealed class StateMachine<TState, TCommand> where TState : Enum where TCommand : Enum
     {
         readonly Dictionary<Transition<TState, TCommand>, TState> _possibleTransitions;
+        readonly object _stateTransitionLock;
 
         public TState CurrentState { get; private set; }
 
         public StateMachine(Dictionary<Transition<TState, TCommand>, TState> possibleTransitions, TState initialState)
         {
             CurrentState = initialState;
+            _stateTransitionLock = new object();
             _possibleTransitions = possibleTransitions;
         }
 
-        public void MoveNext(TCommand command) { CurrentState = GetNext(command); }
+        public bool TryMoveNext(TCommand command)
+        {
+            lock (_stateTransitionLock)
+            {
+                if (!TryGetNext(command, out var nextState)) return false;
+                CurrentState = nextState;
+                return true;
+            }
+        }
 
-        // TODO: remove
-        public bool TryGetNext(TCommand command, out TState nextState)
+        bool TryGetNext(TCommand command, out TState nextState)
         {
             var transition = new Transition<TState, TCommand>(CurrentState, command);
             return _possibleTransitions.TryGetValue(transition, out nextState);
-        }
-
-        TState GetNext(TCommand command)
-        {
-            var transition = new Transition<TState, TCommand>(CurrentState, command);
-            if (!_possibleTransitions.TryGetValue(transition, out var nextState))
-                throw new InvalidOperationException("Invalid transition: " + CurrentState + " -> " + command);
-            return nextState;
         }
     }
 }

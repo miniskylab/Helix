@@ -9,7 +9,7 @@ namespace Helix.Crawler.Abstractions
 
         int RemainingWorkload { get; }
 
-        void CancelEverything();
+        void CancelPendingTasks();
 
         void CreateTask(Action<IResourceExtractor, HtmlDocument> taskDescription);
 

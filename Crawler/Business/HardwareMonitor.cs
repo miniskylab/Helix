@@ -9,6 +9,7 @@ using Helix.Crawler.Abstractions;
 
 namespace Helix.Crawler
 {
+    // TODO: Use win32 api
     public class HardwareMonitor : IHardwareMonitor
     {
         CancellationTokenSource _cancellationTokenSource;

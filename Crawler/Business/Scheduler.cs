@@ -63,7 +63,7 @@ namespace Helix.Crawler
             _cancellationTokenSource = new CancellationTokenSource();
         }
 
-        public void CancelEverything()
+        public void CancelPendingTasks()
         {
             if (_objectDisposed) throw new ObjectDisposedException(nameof(Scheduler));
             _cancellationTokenSource.Cancel();

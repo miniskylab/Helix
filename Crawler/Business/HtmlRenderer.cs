@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,7 +17,6 @@ namespace Helix.Crawler
         readonly Configurations _configurations;
         readonly ILogger _logger;
         bool _objectDisposed;
-        readonly Dictionary<string, object> _publicApiLockMap;
         Resource _resourceBeingRendered;
         bool _takeScreenshot;
         IWebBrowser _webBrowser;
@@ -37,7 +35,6 @@ namespace Helix.Crawler
             _objectDisposed = false;
             _takeScreenshot = false;
             _configurations = configurations;
-            _publicApiLockMap = new Dictionary<string, object> { { $"{nameof(TryRender)}", new object() } };
 
             Task EnsureInternal(object _, SessionEventArgs networkTraffic)
             {
@@ -69,6 +66,7 @@ namespace Helix.Crawler
                         {
                             UpdateStatusCodeIfNotMatch();
                             TakeScreenshotIfNecessary();
+                            return;
                         }
 
                         if (_resourceBeingRendered.IsBroken) return;
@@ -126,49 +124,36 @@ namespace Helix.Crawler
 
         public void Dispose()
         {
-            try
-            {
-                foreach (var lockObject in _publicApiLockMap.Values) Monitor.Enter(lockObject);
-                if (_objectDisposed) return;
-                ReleaseUnmanagedResources();
-                GC.SuppressFinalize(this);
-                _objectDisposed = true;
-            }
-            finally
-            {
-                foreach (var lockObject in _publicApiLockMap.Values) Monitor.Exit(lockObject);
-            }
+            if (_objectDisposed) return;
+            _objectDisposed = true;
+
+            ReleaseUnmanagedResources();
+            GC.SuppressFinalize(this);
         }
 
         public bool TryRender(Resource resource, out string html, out long? millisecondsPageLoadTime, CancellationToken cancellationToken,
             Action<Exception> onFailed)
         {
-            lock (_publicApiLockMap[nameof(TryRender)])
-            {
-                if (_objectDisposed) throw new ObjectDisposedException(nameof(HtmlRenderer));
-                _cancellationTokenSource?.Cancel();
-                while (_activeHttpTrafficCount > 0) Thread.Sleep(100);
-                _cancellationTokenSource?.Dispose();
-                _cancellationTokenSource = new CancellationTokenSource();
-                _resourceBeingRendered = resource;
+            if (_objectDisposed) throw new ObjectDisposedException(nameof(HtmlRenderer));
+            _cancellationTokenSource?.Cancel();
+            while (_activeHttpTrafficCount > 0) Thread.Sleep(100);
+            _cancellationTokenSource?.Dispose();
+            _cancellationTokenSource = new CancellationTokenSource();
+            _resourceBeingRendered = resource;
 
-                var uri = resource.Uri;
-                var renderingResult = _webBrowser.TryRender(uri, out html, out millisecondsPageLoadTime, cancellationToken, onFailed);
-                if (resource.IsBroken) millisecondsPageLoadTime = null;
-                if (!_takeScreenshot) return renderingResult;
+            var uri = resource.Uri;
+            var renderingResult = _webBrowser.TryRender(uri, out html, out millisecondsPageLoadTime, cancellationToken, onFailed);
+            if (resource.IsBroken) millisecondsPageLoadTime = null;
+            if (!_takeScreenshot) return renderingResult;
 
-                var pathToDirectoryContainsScreenshotFiles = _configurations.PathToDirectoryContainsScreenshotFiles;
-                var pathToScreenshotFile = Path.Combine(pathToDirectoryContainsScreenshotFiles, $"{_resourceBeingRendered.Id}.png");
-                _webBrowser.TryTakeScreenshot(pathToScreenshotFile, OnScreenshotTakingFailed);
-                _takeScreenshot = false;
+            var pathToDirectoryContainsScreenshotFiles = _configurations.PathToDirectoryContainsScreenshotFiles;
+            var pathToScreenshotFile = Path.Combine(pathToDirectoryContainsScreenshotFiles, $"{_resourceBeingRendered.Id}.png");
+            _webBrowser.TryTakeScreenshot(pathToScreenshotFile, OnScreenshotTakingFailed);
+            _takeScreenshot = false;
 
-                return renderingResult;
+            return renderingResult;
 
-                void OnScreenshotTakingFailed(Exception exception)
-                {
-                    _logger.LogInfo($"Failed to take screenshot of [{uri}].\r\n{exception}");
-                }
-            }
+            void OnScreenshotTakingFailed(Exception exception) { _logger.LogInfo($"Failed to take screenshot of [{uri}].\r\n{exception}"); }
         }
 
         void ReleaseUnmanagedResources()
