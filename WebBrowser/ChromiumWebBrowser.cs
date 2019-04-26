@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Management;
 using System.Net;
 using System.Threading;
@@ -78,9 +80,25 @@ namespace Helix.WebBrowser
         public string GetUserAgentString()
         {
             if (!string.IsNullOrEmpty(_userAgentString)) return _userAgentString;
-            OpenWebBrowser(new[] { "--window-position=0,-2000", "--window-size=1,1" });
-            _userAgentString = (string) _chromeDriver.ExecuteScript("return navigator.userAgent;");
+
+            OpenWebBrowser(new[] { "--window-position=0,9999", "--window-size=1,1" });
+            const string simpleWaitingPage = @"data:text/html;charset=utf-8,<html><head></head><body><div>This is test</div></body></html>";
+            _chromeDriver.Navigate().GoToUrl(simpleWaitingPage);
+
+            var results = ((IReadOnlyCollection<object>) _chromeDriver.ExecuteScript(
+                "return [screen.width, screen.height, navigator.userAgent];"
+            )).ToArray();
+            var screenWidth = Convert.ToInt32(results[0]);
+            var screenHeight = Convert.ToInt32(results[1]);
+            const int browserWidth = 800;
+            const int browserHeight = 600;
+            var browserPositionX = (int) Math.Round((screenWidth - browserWidth) * 0.5);
+            var browserPositionY = (int) Math.Round((screenHeight - browserHeight) * 0.5);
+            _chromeDriver.Manage().Window.Size = new Size(browserWidth, browserHeight);
+            _chromeDriver.Manage().Window.Position = new Point(browserPositionX, browserPositionY);
+            _userAgentString = (string) results[2];
             CloseWebBrowser();
+
             return _userAgentString;
         }
 
