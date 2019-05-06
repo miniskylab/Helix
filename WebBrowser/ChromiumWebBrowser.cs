@@ -81,7 +81,7 @@ namespace Helix.WebBrowser
         {
             if (!string.IsNullOrEmpty(_userAgentString)) return _userAgentString;
 
-            OpenWebBrowser(new[] { "--window-position=0,9999", "--window-size=1,1" });
+            OpenWebBrowser(new[] { "--window-position=0,9999", "--window-size=1,1", "--incognito" });
             const string simpleWaitingPage = @"data:text/html;charset=utf-8,<html><head></head><body><div>This is test</div></body></html>";
             _chromeDriver.Navigate().GoToUrl(simpleWaitingPage);
 
