@@ -1,11 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Drawing;
 using System.IO;
-using System.Linq;
 using System.Management;
 using System.Net;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Helix.WebBrowser.Abstractions;
@@ -49,6 +48,84 @@ namespace Helix.WebBrowser
             }
         }
 
+        static string WaitingPage => Regex.Replace(@"data:text/html;charset=utf-8,
+        <html>
+            <head>
+                <style>
+                    body {
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        flex-direction: column;
+                        background-color: rgb(30, 30, 30);
+                    }
+                    .text {
+                        font-family: cursive;
+                        font-weight: bold;
+                        font-size: 16px;
+                        margin-top: 25px;
+                        margin-bottom: -15px;
+                    }
+                    .loading-spinner { height: 60px; }
+                    .outer-circle {
+                        width: 50px;
+                        height: 50px;
+                        margin: 0 auto;
+                        background-color: rgba(0, 0, 0, 0);
+                        border: 5px solid rgba(0, 183, 229, 0.9);
+                        border-right: 5px solid rgba(0, 0, 0, 0);
+                        border-left: 5px solid rgba(0, 0, 0, 0);
+                        border-radius: 50px;
+                        box-shadow: 0 0 35px rgb(33, 135, 231);
+                        opacity: .9;
+                        animation: blink-spin 1s infinite ease-in-out;
+                    }
+                    .inner-circle {
+                        position: relative;
+                        width: 30px;
+                        height: 30px;
+                        margin: 0 auto;
+                        top: -50px;
+                        background-color: rgba(0, 0, 0, 0);
+                        border: 5px solid rgba(0, 183, 229, 0.9);
+                        border-left: 5px solid rgba(0, 0, 0, 0);
+                        border-right: 5px solid rgba(0, 0, 0, 0);
+                        border-radius: 50px;
+                        box-shadow: 0 0 15px rgb(33, 135, 231);
+                        opacity: .9;
+                        animation: spin 1s infinite linear;
+                    }
+                    @keyframes blink-spin {
+                        0% {
+                            transform: rotate(160deg);
+                            box-shadow: 0 0 1px rgb(33, 135, 231);
+                            opacity: 0;
+                        }
+                        50% {
+                            transform: rotate(145deg);
+                            opacity: 1;
+                        }
+                        100% {
+                            transform: rotate(-320deg);
+                            opacity: 0;
+                        }
+                    }
+                    @keyframes spin {
+                        0% { transform: rotate(0); }
+                        100% { transform: rotate(360deg); }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class=""loading-spinner"">
+                    <div class=""outer-circle""></div>
+                    <div class=""inner-circle""></div>
+                </div>
+                <div class=""text"" style=""color: rgb(0, 183, 229);"">Helix is testing web browser ...</div>
+                <div class=""text"" style=""color: rgb(255, 99, 71);"">Please do not attempt to manually close this web browser.</div>
+            </body>
+        </html>", "\\s+", " ");
+
         public event AsyncEventHandler<SessionEventArgs> BeforeRequest;
         public event AsyncEventHandler<SessionEventArgs> BeforeResponse;
 
@@ -80,25 +157,12 @@ namespace Helix.WebBrowser
         public string GetUserAgentString()
         {
             if (!string.IsNullOrEmpty(_userAgentString)) return _userAgentString;
-
-            OpenWebBrowser(new[] { "--window-position=0,9999", "--window-size=1,1", "--incognito" });
-            const string simpleWaitingPage = @"data:text/html;charset=utf-8,<html><head></head><body><div>This is test</div></body></html>";
-            _chromeDriver.Navigate().GoToUrl(simpleWaitingPage);
-
-            var results = ((IReadOnlyCollection<object>) _chromeDriver.ExecuteScript(
-                "return [screen.width, screen.height, navigator.userAgent];"
-            )).ToArray();
-            var screenWidth = Convert.ToInt32(results[0]);
-            var screenHeight = Convert.ToInt32(results[1]);
-            const int browserWidth = 800;
-            const int browserHeight = 600;
-            var browserPositionX = (int) Math.Round((screenWidth - browserWidth) * 0.5);
-            var browserPositionY = (int) Math.Round((screenHeight - browserHeight) * 0.5);
-            _chromeDriver.Manage().Window.Size = new Size(browserWidth, browserHeight);
-            _chromeDriver.Manage().Window.Position = new Point(browserPositionX, browserPositionY);
-            _userAgentString = (string) results[2];
-            CloseWebBrowser();
-
+            try
+            {
+                OpenWebBrowser(new[] { "--incognito", $"--start-maximized {WaitingPage}" });
+                _userAgentString = (string) _chromeDriver.ExecuteScript("return navigator.userAgent");
+            }
+            finally { CloseWebBrowser(); }
             return _userAgentString;
         }
 
@@ -202,10 +266,10 @@ namespace Helix.WebBrowser
 
         void CloseWebBrowser(bool forcibly = false)
         {
-            if (forcibly) KillAllRelatedProcesses();
+            if (forcibly || _chromeDriver == null) KillAllRelatedProcesses();
             else
             {
-                try { _chromeDriver?.Quit(); }
+                try { _chromeDriver.Quit(); }
                 catch (WebDriverException webDriverException)
                 {
                     if (webDriverException.InnerException?.GetType() != typeof(WebException)) throw;
@@ -217,6 +281,7 @@ namespace Helix.WebBrowser
 
             void KillAllRelatedProcesses()
             {
+                if (_chromeDriverService == null) return;
                 var childProcessQueryString = $"Select * From Win32_Process Where ParentProcessID={_chromeDriverService.ProcessId}";
                 var managementObjectSearcher = new ManagementObjectSearcher(childProcessQueryString);
                 foreach (var managementObject in managementObjectSearcher.Get())
