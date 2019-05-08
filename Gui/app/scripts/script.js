@@ -7,7 +7,7 @@ const titleBar = document.getElementById("title-bar");
 const txtStartUri = document.getElementById("txt-start-uri");
 const txtDomainName = document.getElementById("txt-domain-name");
 const ckbVerifyExternalUrls = document.getElementById("ckb-verify-external-urls");
-const ckbShowWebBrowsers = document.getElementById("ckb-show-web-browsers");
+const ckbUseWebBrowsers = document.getElementById("ckb-use-web-browsers");
 
 const configurationPanel = document.getElementById("configuration-panel");
 const lblVerified = document.getElementById("lbl-verified");
@@ -58,7 +58,7 @@ socket.connect(18880, "127.0.0.1", () => {
                     StartUri: txtStartUri.value,
                     DomainName: txtDomainName.value,
                     VerifyExternalUrls: ckbVerifyExternalUrls.checked,
-                    UseHeadlessWebBrowsers: !ckbShowWebBrowsers.checked
+                    UseWebBrowsers: ckbUseWebBrowsers.checked
                 })
             }));
         }

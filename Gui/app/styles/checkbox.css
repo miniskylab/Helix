@@ -6,6 +6,12 @@
     cursor: pointer;
 }
 
+.checkbox[disabled] {
+    pointer-events: none;
+    filter: grayscale(85%);
+    opacity: .65;
+}
+
 .checkbox input {
     position: absolute;
     width: 100%;

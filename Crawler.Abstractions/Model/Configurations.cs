@@ -29,7 +29,7 @@ namespace Helix.Crawler.Abstractions
 
         public bool TakeScreenshotEvidence { get; } = true;
 
-        public bool UseHeadlessWebBrowsers { get; }
+        public bool UseHeadlessWebBrowsers { get; } = true;
 
         public bool UseIncognitoWebBrowser { get; } = true;
 
@@ -44,7 +44,6 @@ namespace Helix.Crawler.Abstractions
         public Configurations(string configurationJsonString)
         {
             var tokens = JObject.Parse(configurationJsonString);
-            UseHeadlessWebBrowsers = (bool) (tokens.SelectToken(nameof(UseHeadlessWebBrowsers)) ?? false);
             VerifyExternalUrls = (bool) (tokens.SelectToken(nameof(VerifyExternalUrls)) ?? false);
             StartUri = ValidateStartUri((string) tokens.SelectToken(nameof(StartUri)) ?? string.Empty);
 
