@@ -14,13 +14,13 @@ namespace Helix.Crawler
     static class ServiceLocator
     {
         static HttpClient _httpClient;
-        static readonly ServiceProvider _singletonServiceProvider;
-        static readonly IServiceCollection _transientServiceCollection;
         static ServiceProvider _transientServiceProvider;
+        static readonly ServiceProvider SingletonServiceProvider;
+        static readonly IServiceCollection TransientServiceCollection;
 
         static ServiceLocator()
         {
-            _transientServiceCollection = new ServiceCollection()
+            TransientServiceCollection = new ServiceCollection()
                 .AddTransient<IHtmlRenderer, HtmlRenderer>()
                 .AddTransient<IResourceExtractor, ResourceExtractor>()
                 .AddTransient<IResourceVerifier, ResourceVerifier>()
@@ -37,19 +37,19 @@ namespace Helix.Crawler
 
             var singletonServiceCollection = new ServiceCollection()
                 .AddSingleton(_ => (ILogger) Activator.CreateInstance(typeof(Logger), new Configurations()));
-            _singletonServiceProvider = singletonServiceCollection.BuildServiceProvider();
+            SingletonServiceProvider = singletonServiceCollection.BuildServiceProvider();
 
             foreach (var singletonServiceDescriptor in singletonServiceCollection)
-                _transientServiceCollection.AddSingleton(
+                TransientServiceCollection.AddSingleton(
                     singletonServiceDescriptor.ServiceType,
-                    _singletonServiceProvider.GetService(singletonServiceDescriptor.ServiceType)
+                    SingletonServiceProvider.GetService(singletonServiceDescriptor.ServiceType)
                 );
 
             AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
             {
-                _singletonServiceProvider.GetService<ILogger>().LogInfo("Disposing application-wide singleton services ...");
-                _singletonServiceProvider.GetService<ILogger>().Dispose();
-                _singletonServiceProvider.Dispose();
+                SingletonServiceProvider.GetService<ILogger>().LogInfo("Disposing application-wide singleton services ...");
+                SingletonServiceProvider.GetService<ILogger>().Dispose();
+                SingletonServiceProvider.Dispose();
             };
         }
 
@@ -57,7 +57,7 @@ namespace Helix.Crawler
         {
             if (_transientServiceProvider?.GetService<Configurations>() != null) throw new InvalidConstraintException();
             DisposeTransientServices();
-            _transientServiceProvider = _transientServiceCollection
+            _transientServiceProvider = TransientServiceCollection
                 .AddTransient(_ => CreateAndConfigureWebBrowser())
                 .AddTransient(_ => CreateAndConfigureSqLitePersistence())
                 .AddSingleton(CreateAndConfigureHttpClient())
@@ -112,7 +112,7 @@ namespace Helix.Crawler
 
         public static TService Get<TService>() where TService : class
         {
-            return _transientServiceProvider?.GetService<TService>() ?? _singletonServiceProvider.GetService<TService>();
+            return _transientServiceProvider?.GetService<TService>() ?? SingletonServiceProvider.GetService<TService>();
         }
     }
 }

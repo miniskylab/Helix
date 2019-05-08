@@ -72,6 +72,10 @@ namespace Helix.Gui
                     if (@event.EventType != EventType.Stopped) return;
                     Redraw(new Frame
                     {
+                        DisableStopButton = true,
+                        DisableMainButton = false,
+                        DisableConfigurationPanel = false,
+                        MainButtonFunctionality = MainButtonFunctionality.Start,
                         DisableCloseButton = closeButtonWasClicked,
                         ShowWaitingOverlay = closeButtonWasClicked,
                         BorderColor = CrawlerBot.CrawlerState == CrawlerState.Faulted ? BorderColor.Error : BorderColor.Normal,
@@ -83,12 +87,9 @@ namespace Helix.Gui
                     });
 
                     _constantRedrawTask?.Wait();
+                    if (CrawlerBot.CrawlerState == CrawlerState.Faulted) return;
                     Redraw(new Frame
                     {
-                        DisableStopButton = true,
-                        DisableMainButton = false,
-                        DisableConfigurationPanel = false,
-                        MainButtonFunctionality = MainButtonFunctionality.Start,
                         VerifiedUrlCount = CrawlerBot.Statistics?.VerifiedUrlCount,
                         ValidUrlCount = CrawlerBot.Statistics?.ValidUrlCount,
                         BrokenUrlCount = CrawlerBot.Statistics?.BrokenUrlCount,
@@ -148,7 +149,7 @@ namespace Helix.Gui
 
                     var errorMessage = $"Constant redrawing task failed to finish after {waitingTime.TotalSeconds} seconds.";
                     File.AppendAllText(
-                        Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "debug.log"),
+                        Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()?.Location), "debug.log"),
                         $"\r\n[{DateTime.Now:yyyy/MM/dd HH:mm:ss}] {errorMessage}"
                     );
                 }

@@ -37,7 +37,7 @@ namespace Helix.Crawler.Abstractions
 
         public string WorkingDirectory => CurrentDirectory;
 
-        static string CurrentDirectory => Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
+        static string CurrentDirectory => Path.GetDirectoryName(Assembly.GetEntryAssembly()?.Location);
 
         public Configurations() { }
 
