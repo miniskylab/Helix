@@ -14,6 +14,9 @@ namespace Helix.Crawler.Abstractions
         public string ParentUrl { [UsedImplicitly] get; set; }
 
         [Required]
+        public string ResourceType { [UsedImplicitly] get; set; }
+
+        [Required]
         public StatusCode StatusCode { [UsedImplicitly] get; set; }
 
         [Required]

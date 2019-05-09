@@ -44,7 +44,8 @@ namespace Helix.Crawler
                 IsInternalResource = resource.IsInternal,
                 ParentUrl = resource.ParentUri?.AbsoluteUri,
                 StatusCode = resource.StatusCode,
-                VerifiedUrl = resource.AbsoluteUrl
+                VerifiedUrl = resource.AbsoluteUrl,
+                ResourceType = Enum.GetName(typeof(ResourceType), resource.ResourceType)
             };
             if (resource.StatusCode != default) return true;
 
@@ -58,7 +59,9 @@ namespace Helix.Crawler
                 var httpResponseMessage = _sendingGETRequestTask.Result;
                 resource.StatusCode = (StatusCode) httpResponseMessage.StatusCode;
                 resource.Size = httpResponseMessage.Content.Headers.ContentLength;
+
                 _resourceProcessor.Categorize(resource, httpResponseMessage.Content.Headers.ContentType?.ToString());
+                verificationResult.ResourceType = Enum.GetName(typeof(ResourceType), resource.ResourceType);
             }
             catch (AggregateException aggregateException)
             {
