@@ -9,7 +9,8 @@ app.on("ready", () => {
         fullscreenable: false,
         maximizable: false,
         resizable: false,
-        frame: false
+        frame: false,
+        webPreferences: {nodeIntegration: true}
     });
     mainWindow.loadURL(`file://${__dirname}/index.html`);
     mainWindow.webContents.on("did-finish-load", () => { mainWindow.show(); });

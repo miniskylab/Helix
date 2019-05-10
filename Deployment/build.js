@@ -137,7 +137,7 @@ function Unzip(pathToZipFile, pathToDestinationDirectory) {
                 if (isDirectory(entry)) zipFile.readEntry();
                 else zipFile.openReadStream(entry, (error, readStream) => {
                     if (error) throw error;
-                    const pathToUnzippedDestinationFile = `${pathToDestinationDirectory.replace(/\/+$/, "/")}/${entry.fileName}`;
+                    const pathToUnzippedDestinationFile = `${pathToDestinationDirectory.replace(/\\+/g, "/")}/${entry.fileName}`;
                     EnsureParentDirectoryExistence(pathToUnzippedDestinationFile);
                     readStream.pipe(fs.createWriteStream(pathToUnzippedDestinationFile));
                     readStream.on("end", () => zipFile.readEntry());
@@ -150,12 +150,12 @@ function Unzip(pathToZipFile, pathToDestinationDirectory) {
 
 function EnsureDirectoryRecreated(pathToDirectory) {
     if (fs.existsSync(pathToDirectory)) rimraf.sync(pathToDirectory);
-    fs.mkdirSync(pathToDirectory);
+    fs.mkdirSync(pathToDirectory, {recursive: true});
 }
 
 function EnsureParentDirectoryExistence(generalPath) {
     const parentDirectory = path.dirname(generalPath);
-    if (!fs.existsSync(parentDirectory)) fs.mkdirSync(parentDirectory);
+    if (!fs.existsSync(parentDirectory)) fs.mkdirSync(parentDirectory, {recursive: true});
 }
 
 async function TryRename(oldPath, newPath, attemptCount = 10) {
