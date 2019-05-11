@@ -8,17 +8,20 @@ const url = require("url");
 const yauzl = require("yauzl");
 const rimraf = require("rimraf");
 const asar = require("asar");
+const Inliner = require("inliner");
+const babelMinifier = require("babel-minify");
 
-const latestStableChromiumVersion = "73.0.3683.75-r625896";
-const latestChromeDriverVersion = "73.0.3683.68";
+const electronVersion = "5.0.1";
+const chromiumVersion = "74.0.3729.131-r638880";
+const chromeDriverVersion = "74.0.3729.6";
 
 (async () => {
     const commandLineArguments = process.argv.slice(2);
-    const pathToHelixBinaryReleaseDirectory = `${commandLineArguments[commandLineArguments.indexOf("-o") + 1]}`;
+    const pathToHelixBinaryReleaseDirectory = `${commandLineArguments[commandLineArguments.indexOf("-o") + 1]}`.replace(/\\+/g, "/");
 
-    await DeployElectronJs(`${pathToHelixBinaryReleaseDirectory}ui`);
-    await DeployChromiumWebBrowser(`${pathToHelixBinaryReleaseDirectory}`, latestStableChromiumVersion);
-    await DeployChromeWebDriver(pathToHelixBinaryReleaseDirectory, latestChromeDriverVersion);
+    await DeployElectronJs(`${pathToHelixBinaryReleaseDirectory}ui`, electronVersion);
+    await DeployChromiumWebBrowser(`${pathToHelixBinaryReleaseDirectory}`, chromiumVersion);
+    await DeployChromeWebDriver(pathToHelixBinaryReleaseDirectory, chromeDriverVersion);
 
     console.log("Build process completed!");
 })();
@@ -26,12 +29,29 @@ const latestChromeDriverVersion = "73.0.3683.68";
 function RestoreNpmPackages() {
     if (!fs.existsSync("node_modules")) {
         console.log("\nRestoring NPM packages ...");
-        child_process.execSync("npm install yauzl@latest rimraf@latest asar@latest --silent", {stdio: [0, 1, 2]});
+        child_process.execSync("npm install --silent", {stdio: [0, 1, 2]});
     }
 }
 
-async function DeployChromiumWebBrowser(pathToUnzippedChromiumWebBrowserDirectory, version) {
-    if (fs.existsSync(`${pathToUnzippedChromiumWebBrowserDirectory}chromium`)) return;
+async function DeployElectronJs(pathToDestinationDirectory, version) {
+    if (!fs.existsSync(pathToDestinationDirectory)) {
+        console.log(`Downloading Electron v${version} from the Internet ...`);
+        const pathToTemporaryDownloadedZipFile = "temp_electronjs.zip";
+        const electronDownloadUrl = `https://github.com/electron/electron/releases/download/v${version}/electron-v${version}-win32-x64.zip`;
+        await DownloadFileFromTheInternet(electronDownloadUrl, pathToTemporaryDownloadedZipFile);
+
+        console.log("Unzipping downloaded ElectronJs binary ...");
+        EnsureDirectoryRecreated(pathToDestinationDirectory);
+        await Unzip(pathToTemporaryDownloadedZipFile, pathToDestinationDirectory);
+        fs.unlinkSync(pathToTemporaryDownloadedZipFile);
+    }
+
+    console.log("Deploying GUI code ...");
+    await CreateAndDeployAsarFile(`${pathToDestinationDirectory}/resources`);
+}
+
+async function DeployChromiumWebBrowser(pathToDestinationDirectory, version) {
+    if (fs.existsSync(`${pathToDestinationDirectory}chromium`)) return;
 
     console.log(`Downloading Chromium Web Browser v${version} from the Internet ...`);
     const pathToTemporaryDownloadedZipFile = "temp_chromium.zip";
@@ -39,13 +59,13 @@ async function DeployChromiumWebBrowser(pathToUnzippedChromiumWebBrowserDirector
     await DownloadFileFromTheInternet(chromiumWebBrowserDownloadUrl, pathToTemporaryDownloadedZipFile);
 
     console.log(`Unzipping downloaded Chromium Web Browser v${version} ...`);
-    await Unzip(pathToTemporaryDownloadedZipFile, pathToUnzippedChromiumWebBrowserDirectory);
-    TryRename(`${pathToUnzippedChromiumWebBrowserDirectory}chrome-win32`, `${pathToUnzippedChromiumWebBrowserDirectory}chromium`);
+    await Unzip(pathToTemporaryDownloadedZipFile, pathToDestinationDirectory);
+    TryRename(`${pathToDestinationDirectory}chrome-win32`, `${pathToDestinationDirectory}chromium`);
     fs.unlinkSync(pathToTemporaryDownloadedZipFile);
 }
 
-async function DeployChromeWebDriver(pathToUnzippedChromeWebDriverDirectory, version) {
-    if (fs.existsSync(`${pathToUnzippedChromeWebDriverDirectory}/chromedriver.exe`)) return;
+async function DeployChromeWebDriver(pathToDestinationDirectory, version) {
+    if (fs.existsSync(`${pathToDestinationDirectory}/chromedriver.exe`)) return;
 
     console.log(`Downloading Chrome Web Driver v${version} from the Internet ...`);
     const pathToTemporaryDownloadedZipFile = "temp_chromedriver.zip";
@@ -53,52 +73,44 @@ async function DeployChromeWebDriver(pathToUnzippedChromeWebDriverDirectory, ver
     await DownloadFileFromTheInternet(chromeWebDriverDownloadUrl, pathToTemporaryDownloadedZipFile);
 
     console.log(`Unzipping downloaded Chrome Web Driver v${version} ...`);
-    await Unzip(pathToTemporaryDownloadedZipFile, pathToUnzippedChromeWebDriverDirectory);
+    await Unzip(pathToTemporaryDownloadedZipFile, pathToDestinationDirectory);
     fs.unlinkSync(pathToTemporaryDownloadedZipFile);
 }
 
-async function DeployElectronJs(pathToUnzippedElectronJsBinaryDirectory) {
-    if (!fs.existsSync(pathToUnzippedElectronJsBinaryDirectory)) {
-        console.log("Fetching latest ElectronJs release metadata ...");
-        const latestElectronJsReleaseJson = await SendGETRequestOverHttps("https://api.github.com/repos/electron/electron/releases/latest");
-        const latestElectronJsBinaryDownloadUrl = ExtractLatestElectronJsBinaryDownloadUrl(latestElectronJsReleaseJson);
+async function CreateAndDeployAsarFile(pathToDestinationDirectory) {
+    const pathToTemporaryAppDirectory = `${pathToDestinationDirectory}/app`;
+    EnsureDirectoryRecreated(pathToTemporaryAppDirectory);
 
-        console.log("Downloading latest ElectronJs binary from the Internet ...");
-        const pathToTemporaryDownloadedZipFile = "temp_electronjs.zip";
-        await DownloadFileFromTheInternet(latestElectronJsBinaryDownloadUrl, pathToTemporaryDownloadedZipFile);
+    const pathToGuiSourceCodeDirectory = "../Gui/app";
+    fs.copyFileSync(`${pathToGuiSourceCodeDirectory}/index.js`, `${pathToTemporaryAppDirectory}/index.js`);
+    fs.copyFileSync(`${pathToGuiSourceCodeDirectory}/package.json`, `${pathToTemporaryAppDirectory}/package.json`);
 
-        console.log("Unzipping downloaded ElectronJs binary ...");
-        EnsureDirectoryRecreated(pathToUnzippedElectronJsBinaryDirectory);
-        await Unzip(pathToTemporaryDownloadedZipFile, pathToUnzippedElectronJsBinaryDirectory);
-        fs.unlinkSync(pathToTemporaryDownloadedZipFile);
-    }
+    const pathToJavaScriptFile = `${pathToGuiSourceCodeDirectory}/scripts/script.js`;
+    const originalJavaScriptCode = fs.readFileSync(pathToJavaScriptFile, "utf8");
+    try {
+        const minifiedJavaScriptCode = MinifyJavaScriptCode(originalJavaScriptCode);
+        fs.writeFileSync(pathToJavaScriptFile, minifiedJavaScriptCode, "utf8");
+        await InlineAssetsIntoHtml(`${pathToGuiSourceCodeDirectory}/index.html`, `${pathToTemporaryAppDirectory}/index.html`);
+    } finally { fs.writeFileSync(pathToJavaScriptFile, originalJavaScriptCode, "utf8"); }
 
-    console.log("Deploying GUI code ...");
-    const pathToGuiSourceCode = "../Gui/app";
-    const pathToDeploymentArchiveFile = `${pathToUnzippedElectronJsBinaryDirectory}/resources/app.asar`;
-    if (fs.existsSync(pathToDeploymentArchiveFile)) fs.unlinkSync(pathToDeploymentArchiveFile);
-    await asar.createPackage(pathToGuiSourceCode, pathToDeploymentArchiveFile);
+    const pathToAsarFile = `${pathToDestinationDirectory}/app.asar`;
+    if (fs.existsSync(pathToAsarFile)) fs.unlinkSync(pathToAsarFile);
+    await asar.createPackage(pathToTemporaryAppDirectory, pathToAsarFile);
+    rimraf.sync(pathToTemporaryAppDirectory);
 }
 
-function SendGETRequestOverHttps(destinationUrl) {
-    return new Promise((resolve, reject) => {
-        https.get({
-            host: url.parse(destinationUrl).hostname,
-            path: destinationUrl,
-            headers: {"user-agent": "node.js"}
-        }, httpResponse => {
-            let responseBody = "";
-            httpResponse.on("data", chunk => responseBody += chunk);
-            httpResponse.on("end", () => resolve(JSON.parse(responseBody)));
-        }).on("error", error => reject(error.message));
-    });
+async function InlineAssetsIntoHtml(pathToOriginalHtmlFile, pathToDestinationHtmlFile) {
+    return new Promise(resolve => {
+        new Inliner(pathToOriginalHtmlFile, (error, minifiedAndInlinedHtmlContent) => {
+            fs.writeFileSync(pathToDestinationHtmlFile, minifiedAndInlinedHtmlContent, "utf8");
+            resolve();
+        });
+    })
 }
 
-function ExtractLatestElectronJsBinaryDownloadUrl(latestElectronJsReleaseJson) {
-    const electronJsWindowsBinarySelector = /electron-.+-win32-x64\.zip/g;
-    const electronJsWindowsBinaryMetadata = latestElectronJsReleaseJson.assets
-        .find(asset => electronJsWindowsBinarySelector.test(asset.browser_download_url));
-    return electronJsWindowsBinaryMetadata.browser_download_url;
+function MinifyJavaScriptCode(javaScriptCode) {
+    const {code: minifiedJavaScriptCode} = babelMinifier(javaScriptCode);
+    return minifiedJavaScriptCode;
 }
 
 function DownloadFileFromTheInternet(downloadUrl, pathToDestinationFileOnDisk) {
@@ -137,7 +149,7 @@ function Unzip(pathToZipFile, pathToDestinationDirectory) {
                 if (isDirectory(entry)) zipFile.readEntry();
                 else zipFile.openReadStream(entry, (error, readStream) => {
                     if (error) throw error;
-                    const pathToUnzippedDestinationFile = `${pathToDestinationDirectory.replace(/\\+/g, "/")}/${entry.fileName}`;
+                    const pathToUnzippedDestinationFile = `${pathToDestinationDirectory}/${entry.fileName}`;
                     EnsureParentDirectoryExistence(pathToUnzippedDestinationFile);
                     readStream.pipe(fs.createWriteStream(pathToUnzippedDestinationFile));
                     readStream.on("end", () => zipFile.readEntry());
