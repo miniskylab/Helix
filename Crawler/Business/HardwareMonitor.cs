@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
@@ -9,7 +8,6 @@ using Helix.Crawler.Abstractions;
 
 namespace Helix.Crawler
 {
-    // TODO: Use win32 api
     public class HardwareMonitor : IHardwareMonitor
     {
         CancellationTokenSource _cancellationTokenSource;
@@ -32,58 +30,32 @@ namespace Helix.Crawler
             _cancellationTokenSource = new CancellationTokenSource();
             _samplingTask = Task.Run(() =>
             {
-                while (!_cancellationTokenSource.IsCancellationRequested)
+                using (var performanceCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total"))
                 {
-                    var startTime = DateTime.UtcNow;
-                    var startCpuUtilization = GetCpuUtilization();
-                    Thread.Sleep(TimeSpan.FromSeconds(1));
-                    var endTime = DateTime.UtcNow;
-                    var endCpuUtilization = GetCpuUtilization();
-
-                    var totalElapsedTime = endTime - startTime;
-                    var totalCpuUtilization = endCpuUtilization.Keys.Intersect(startCpuUtilization.Keys)
-                        .Aggregate(TimeSpan.Zero, (totalProcessorTime, processId) =>
-                        {
-                            var processorTime = endCpuUtilization[processId] - startCpuUtilization[processId];
-                            return totalProcessorTime + processorTime;
-                        });
-
-                    const float compensationRate = 1.3f;
-                    cpuUtilizationSamples.Add(totalCpuUtilization * compensationRate / (Environment.ProcessorCount * totalElapsedTime));
-                    if (cpuUtilizationSamples.Count < TimeSpan.FromMilliseconds(millisecondSampleDuration).TotalSeconds) continue;
-                    CheckCpuUtilization();
-                    cpuUtilizationSamples.Clear();
-
-                    void CheckCpuUtilization()
+                    performanceCounter.NextValue();
+                    while (!_cancellationTokenSource.IsCancellationRequested)
                     {
-                        var averageCpuUtilization = cpuUtilizationSamples.Average();
-                        if (averageCpuUtilization >= highCpuUsageThreshold) OnHighCpuUsage?.Invoke(averageCpuUtilization);
-                        else if (averageCpuUtilization < lowCpuUsageThreshold) OnLowCpuUsage?.Invoke(averageCpuUtilization);
-                    }
-                    IDictionary<int, TimeSpan> GetCpuUtilization()
-                    {
-                        var cpuUtilization = new Dictionary<int, TimeSpan>();
-                        foreach (var process in Process.GetProcesses())
-                        {
-                            try
-                            {
-                                var totalProcessorTime = process.TotalProcessorTime;
-                                cpuUtilization.Add(process.Id, totalProcessorTime);
-                            }
-                            catch (Win32Exception)
-                            {
-                                /* Ignore processes which we don't have permission to inspect. */
-                            }
-                            catch (InvalidOperationException)
-                            {
-                                /* A process might exit before the attempt to get its TotalProcessorTime.
-                                 * If that happens an InvalidOperationException will be thrown and such processes will be ignored. */
-                            }
-                        }
-                        return cpuUtilization;
+                        const int millisecondSampleInterval = 1000;
+                        Thread.Sleep(millisecondSampleInterval);
+
+                        const float bufferRate = 2.2f;
+                        cpuUtilizationSamples.Add(MathF.Ceiling(MathF.Ceiling(performanceCounter.NextValue()) * bufferRate));
+
+                        var millisecondTotalElapsedTime = cpuUtilizationSamples.Count * millisecondSampleInterval;
+                        if (millisecondTotalElapsedTime < millisecondSampleDuration) continue;
+
+                        CheckCpuUtilization();
+                        cpuUtilizationSamples.Clear();
                     }
                 }
             }, _cancellationTokenSource.Token);
+
+            void CheckCpuUtilization()
+            {
+                var averageCpuUtilization = cpuUtilizationSamples.Average();
+                if (averageCpuUtilization >= highCpuUsageThreshold) OnHighCpuUsage?.Invoke(averageCpuUtilization);
+                else if (averageCpuUtilization < lowCpuUsageThreshold) OnLowCpuUsage?.Invoke(averageCpuUtilization);
+            }
         }
 
         public void StopMonitoring()
