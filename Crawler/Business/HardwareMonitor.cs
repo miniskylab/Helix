@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Helix.Crawler.Abstractions;
@@ -15,18 +17,19 @@ namespace Helix.Crawler
 
         public bool IsRunning { get; private set; }
 
-        public event Action<double> OnHighCpuUsage;
-        public event Action<double> OnLowCpuUsage;
+        public event Action<int?, int?> OnHighCpuOrMemoryUsage;
+        public event Action<int, int> OnLowCpuAndMemoryUsage;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public HardwareMonitor() { }
 
-        public void StartMonitoring(double millisecondSampleDuration, float highCpuUsageThreshold, float lowCpuUsageThreshold)
+        public void StartMonitoring(double millisecondSampleDuration, float highCpuUsageThreshold, float lowCpuUsageThreshold,
+            float highMemoryUsageThreshold, float lowMemoryUsageThreshold)
         {
             if (IsRunning) throw new Exception($"{nameof(HardwareMonitor)} is already running.");
             IsRunning = true;
 
-            var cpuUtilizationSamples = new List<double>();
+            var cpuUsageSamples = new List<int>();
             _cancellationTokenSource = new CancellationTokenSource();
             _samplingTask = Task.Run(() =>
             {
@@ -39,22 +42,29 @@ namespace Helix.Crawler
                         Thread.Sleep(millisecondSampleInterval);
 
                         const float bufferRate = 2.2f;
-                        cpuUtilizationSamples.Add(MathF.Ceiling(MathF.Ceiling(performanceCounter.NextValue()) * bufferRate));
+                        cpuUsageSamples.Add((int) MathF.Ceiling(performanceCounter.NextValue() * bufferRate));
 
-                        var millisecondTotalElapsedTime = cpuUtilizationSamples.Count * millisecondSampleInterval;
+                        var millisecondTotalElapsedTime = cpuUsageSamples.Count * millisecondSampleInterval;
                         if (millisecondTotalElapsedTime < millisecondSampleDuration) continue;
 
-                        CheckCpuUtilization();
-                        cpuUtilizationSamples.Clear();
+                        CheckCpuAndMemoryUsage();
+                        cpuUsageSamples.Clear();
                     }
                 }
             }, _cancellationTokenSource.Token);
 
-            void CheckCpuUtilization()
+            void CheckCpuAndMemoryUsage()
             {
-                var averageCpuUtilization = cpuUtilizationSamples.Average();
-                if (averageCpuUtilization >= highCpuUsageThreshold) OnHighCpuUsage?.Invoke(averageCpuUtilization);
-                else if (averageCpuUtilization < lowCpuUsageThreshold) OnLowCpuUsage?.Invoke(averageCpuUtilization);
+                var averageCpuUsage = (int) Math.Ceiling(cpuUsageSamples.Average());
+                var memoryUsage = GetMemoryUsage();
+                var highCpuUsage = averageCpuUsage >= highCpuUsageThreshold;
+                var lowCpuUsage = averageCpuUsage < lowCpuUsageThreshold;
+                var highMemoryUsage = memoryUsage >= highMemoryUsageThreshold;
+                var lowMemoryUsage = memoryUsage < lowMemoryUsageThreshold;
+
+                if (highCpuUsage) OnHighCpuOrMemoryUsage?.Invoke(averageCpuUsage, null);
+                else if (highMemoryUsage) OnHighCpuOrMemoryUsage?.Invoke(null, memoryUsage);
+                else if (lowCpuUsage && lowMemoryUsage) OnLowCpuAndMemoryUsage?.Invoke(averageCpuUsage, memoryUsage);
             }
         }
 
@@ -70,6 +80,39 @@ namespace Helix.Crawler
             _cancellationTokenSource = null;
             _samplingTask.Dispose();
             _samplingTask = null;
+        }
+
+        static int GetMemoryUsage()
+        {
+            var performanceInformation = new PerformanceInformation();
+            GetPerformanceInfo(out performanceInformation, Marshal.SizeOf(performanceInformation));
+            var totalMemory = performanceInformation.PhysicalTotal.ToInt64();
+            var consumedMemory = totalMemory - performanceInformation.PhysicalAvailable.ToInt64();
+            return (int) Math.Round(100f * consumedMemory / totalMemory, 0);
+        }
+
+        [DllImport("psapi.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool GetPerformanceInfo([Out] out PerformanceInformation performanceInformation, [In] int size);
+
+        [StructLayout(LayoutKind.Sequential)]
+        [SuppressMessage("ReSharper", "MemberCanBePrivate.Local")]
+        struct PerformanceInformation
+        {
+            public readonly int Size;
+            public readonly IntPtr CommitTotal;
+            public readonly IntPtr CommitLimit;
+            public readonly IntPtr CommitPeak;
+            public readonly IntPtr PhysicalTotal;
+            public readonly IntPtr PhysicalAvailable;
+            public readonly IntPtr SystemCache;
+            public readonly IntPtr KernelTotal;
+            public readonly IntPtr KernelPaged;
+            public readonly IntPtr KernelNonPaged;
+            public readonly IntPtr PageSize;
+            public readonly int HandlesCount;
+            public readonly int ProcessCount;
+            public readonly int ThreadCount;
         }
     }
 }

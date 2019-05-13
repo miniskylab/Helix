@@ -6,11 +6,11 @@ namespace Helix.Crawler.Abstractions
     {
         bool IsRunning { get; }
 
-        event Action<double> OnHighCpuUsage;
-        event Action<double> OnLowCpuUsage;
+        event Action<int?, int?> OnHighCpuOrMemoryUsage;
+        event Action<int, int> OnLowCpuAndMemoryUsage;
 
-        void StartMonitoring(double millisecondSampleDuration = 10000, float highCpuUsageThreshold = 0.65f,
-            float lowCpuUsageThreshold = 0.45f);
+        void StartMonitoring(double millisecondSampleDuration = 10000, float highCpuUsageThreshold = 65, float lowCpuUsageThreshold = 45,
+            float highMemoryUsageThreshold = 90, float lowMemoryUsageThreshold = 75);
 
         void StopMonitoring();
     }

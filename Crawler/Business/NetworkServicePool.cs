@@ -59,24 +59,42 @@ namespace Helix.Crawler
             }
             void CreateAndDestroyHtmlRenderersAdaptively()
             {
-                hardwareMonitor.OnLowCpuUsage += averageCpuUtilization =>
+                hardwareMonitor.OnLowCpuAndMemoryUsage += (averageCpuUsage, memoryUsage) =>
                 {
                     if (_htmlRendererPool.Count > 0 || _statistics.CreatedHtmlRendererCount == configurations.MaxHtmlRendererCount) return;
                     CreateHtmlRenderer();
+
+                    var createdHtmlRendererCount = _statistics.CreatedHtmlRendererCount;
                     _logger.LogInfo(
-                        $"Low CPU usage detected ({Math.Round(100 * averageCpuUtilization, 0)}%). " +
-                        $"Browser count increased from {_statistics.CreatedHtmlRendererCount - 1} to {_statistics.CreatedHtmlRendererCount}."
+                        $"Low CPU usage ({averageCpuUsage}%) and low memory usage ({memoryUsage}%) detected. " +
+                        $"Browser count increased from {createdHtmlRendererCount - 1} to {createdHtmlRendererCount}."
                     );
                 };
-                hardwareMonitor.OnHighCpuUsage += averageCpuUtilization =>
+                hardwareMonitor.OnHighCpuOrMemoryUsage += (averageCpuUsage, memoryUsage) =>
                 {
                     if (_statistics.CreatedHtmlRendererCount == 1) return;
                     _htmlRendererPool.Take().Dispose();
                     _statistics.CreatedHtmlRendererCount--;
-                    _logger.LogInfo(
-                        $"High CPU usage detected ({Math.Round(100 * averageCpuUtilization, 0)}%). " +
-                        $"Browser count decreased from {_statistics.CreatedHtmlRendererCount + 1} to {_statistics.CreatedHtmlRendererCount}."
-                    );
+
+                    if (averageCpuUsage == null && memoryUsage == null)
+                        throw new ArgumentException(nameof(averageCpuUsage), nameof(memoryUsage));
+
+                    var createdHtmlRendererCount = _statistics.CreatedHtmlRendererCount;
+                    if (averageCpuUsage != null && memoryUsage != null)
+                        _logger.LogInfo(
+                            $"High CPU usage ({averageCpuUsage}%) and high memory usage ({memoryUsage}%) detected. " +
+                            $"Browser count decreased from {createdHtmlRendererCount + 1} to {createdHtmlRendererCount}."
+                        );
+                    else if (averageCpuUsage != null)
+                        _logger.LogInfo(
+                            $"High CPU usage ({averageCpuUsage}%) detected. " +
+                            $"Browser count decreased from {createdHtmlRendererCount + 1} to {createdHtmlRendererCount}."
+                        );
+                    else
+                        _logger.LogInfo(
+                            $"High memory usage ({memoryUsage}%) detected. " +
+                            $"Browser count decreased from {createdHtmlRendererCount + 1} to {createdHtmlRendererCount}."
+                        );
                 };
             }
             void CreateHtmlRenderer()
