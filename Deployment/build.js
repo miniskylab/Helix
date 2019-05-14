@@ -11,6 +11,7 @@ const asar = require("asar");
 const Inliner = require("inliner");
 const babelMinifier = require("babel-minify");
 
+const sqliteVersion = "3.11.2";
 const electronVersion = "5.0.1";
 const chromiumVersion = "74.0.3729.131-r638880";
 const chromeDriverVersion = "74.0.3729.6";
@@ -20,6 +21,7 @@ const chromeDriverVersion = "74.0.3729.6";
     const pathToHelixBinaryReleaseDirectory = `${commandLineArguments[commandLineArguments.indexOf("-o") + 1]}`.replace(/\\+/g, "/");
 
     await DeployElectronJs(`${pathToHelixBinaryReleaseDirectory}ui`, electronVersion);
+    await DeploySqliteBrowser(`${pathToHelixBinaryReleaseDirectory}`, sqliteVersion);
     await DeployChromiumWebBrowser(`${pathToHelixBinaryReleaseDirectory}`, chromiumVersion);
     await DeployChromeWebDriver(pathToHelixBinaryReleaseDirectory, chromeDriverVersion);
 
@@ -48,6 +50,20 @@ async function DeployElectronJs(pathToDestinationDirectory, version) {
 
     console.log("Deploying GUI code ...");
     await CreateAndDeployAsarFile(`${pathToDestinationDirectory}/resources`);
+}
+
+async function DeploySqliteBrowser(pathToDestinationDirectory, version) {
+    if (fs.existsSync(`${pathToDestinationDirectory}sqlite browser`)) return;
+
+    console.log(`Downloading Sqlite Browser v${version} from the Internet ...`);
+    const pathToTemporaryDownloadedZipFile = "temp_sqlite_browser.zip";
+    const sqliteBrowserDownloadUrl = `https://download.sqlitebrowser.org/DB.Browser.for.SQLite-${version}-win64.zip`;
+    await DownloadFileFromTheInternet(sqliteBrowserDownloadUrl, pathToTemporaryDownloadedZipFile);
+
+    console.log(`Unzipping downloaded Sqlite Browser v${version} ...`);
+    await Unzip(pathToTemporaryDownloadedZipFile, pathToDestinationDirectory);
+    TryRename(`${pathToDestinationDirectory}DB Browser for SQLite`, `${pathToDestinationDirectory}sqlite-browser`);
+    fs.unlinkSync(pathToTemporaryDownloadedZipFile);
 }
 
 async function DeployChromiumWebBrowser(pathToDestinationDirectory, version) {
