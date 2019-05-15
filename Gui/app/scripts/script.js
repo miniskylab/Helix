@@ -30,6 +30,7 @@ const btnMinimize = document.getElementById("btn-minimize");
 const btnMain = document.getElementById("btn-main");
 const btnStop = document.getElementById("btn-stop");
 const btnClose = document.getElementById("btn-close");
+const btnPreview = document.getElementById("btn-preview");
 const btnCloseAboutMeOverlay = document.getElementById("btn-close-about-me-overlay");
 
 let waitingCountdown = null;
@@ -80,6 +81,11 @@ socket.connect(18880, "127.0.0.1", () => {
     btnShowAboutMeOverlay.addEventListener("click", () => { aboutMeOverlay.style.display = "block"; });
 
     btnCloseAboutMeOverlay.addEventListener("click", () => { aboutMeOverlay.style.display = "none"; });
+
+    btnPreview.addEventListener("click", () => {
+        // redraw({ShowWaitingOverlay: true});
+        socket.write(JSON.stringify({text: "btn-preview-clicked"}));
+    });
 
     socket.on("data", byteStream => {
         const frame = reconstructFrame(byteStream);

@@ -53,7 +53,7 @@ async function DeployElectronJs(pathToDestinationDirectory, version) {
 }
 
 async function DeploySqliteBrowser(pathToDestinationDirectory, version) {
-    if (fs.existsSync(`${pathToDestinationDirectory}sqlite browser`)) return;
+    if (fs.existsSync(`${pathToDestinationDirectory}sqlite-browser`)) return;
 
     console.log(`Downloading Sqlite Browser v${version} from the Internet ...`);
     const pathToTemporaryDownloadedZipFile = "temp_sqlite_browser.zip";

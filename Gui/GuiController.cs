@@ -18,11 +18,15 @@ namespace Helix.Gui
         static Task _constantRedrawTask;
         static readonly Process GuiProcess = new Process { StartInfo = { FileName = "ui/electron.exe" } };
         static readonly ManualResetEvent ManualResetEvent = new ManualResetEvent(false);
+        static readonly Process SqLiteProcess = new Process { StartInfo = { FileName = "sqlite-browser/DB Browser for SQLite.exe" } };
         static readonly Stopwatch Stopwatch = new Stopwatch();
         static readonly ISynchronousServerSocket SynchronousServerSocket = new SynchronousServerSocket("127.0.0.1", 18880);
 
         [DllImport("kernel32.dll")]
         static extern IntPtr GetConsoleWindow();
+
+        [DllImport("User32.dll")]
+        static extern bool IsIconic(IntPtr handle);
 
         static void Main()
         {
@@ -31,6 +35,7 @@ namespace Helix.Gui
             ShowWindow(GetConsoleWindow(), 0);
 
             var closeButtonWasClicked = false;
+            var sqLiteProcessMainWindowHandle = IntPtr.Zero;
             SynchronousServerSocket.On("btn-start-clicked", configurationJsonString =>
             {
                 CrawlerBot.OnEventBroadcast += OnStartProgressUpdated;
@@ -131,9 +136,30 @@ namespace Helix.Gui
                 });
                 StopWorking();
             });
+            SynchronousServerSocket.On("btn-preview-clicked", _ =>
+            {
+                if (sqLiteProcessMainWindowHandle == IntPtr.Zero)
+                {
+                    SqLiteProcess.Start();
+
+                    // TODO: More investigation needed.
+                    /* Wait for MainWindowHandle to be available.
+                     * For some reasons, accessing MainWindowHandle too early causes it to be always IntPtr.Zero.
+                     */
+                    Thread.Sleep(2000);
+
+                    sqLiteProcessMainWindowHandle = SqLiteProcess.MainWindowHandle;
+                }
+
+                if (IsIconic(sqLiteProcessMainWindowHandle)) ShowWindow(sqLiteProcessMainWindowHandle, 9);
+                SetForegroundWindow(sqLiteProcessMainWindowHandle);
+            });
             GuiProcess.Start();
             ManualResetEvent.WaitOne();
+            SqLiteProcess.CloseMainWindow();
+            SqLiteProcess.Close();
             SynchronousServerSocket.Dispose();
+            GuiProcess.CloseMainWindow();
             GuiProcess.Close();
 
             void StopWorking()
@@ -201,6 +227,9 @@ namespace Helix.Gui
                 Stopwatch.Stop();
             });
         }
+
+        [DllImport("User32.dll")]
+        static extern bool SetForegroundWindow(IntPtr handle);
 
         [DllImport("user32.dll")]
         static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
