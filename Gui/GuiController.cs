@@ -18,6 +18,7 @@ namespace Helix.Gui
         static Task _constantRedrawTask;
         static readonly Process GuiProcess = new Process { StartInfo = { FileName = "ui/electron.exe" } };
         static readonly ManualResetEvent ManualResetEvent = new ManualResetEvent(false);
+        static readonly object OperationLock = new object();
         static readonly Process SqLiteProcess = new Process { StartInfo = { FileName = "sqlite-browser/DB Browser for SQLite.exe" } };
         static readonly Stopwatch Stopwatch = new Stopwatch();
         static readonly ISynchronousServerSocket SynchronousServerSocket = new SynchronousServerSocket("127.0.0.1", 18880);
@@ -31,11 +32,11 @@ namespace Helix.Gui
         static void Main()
         {
             /* Hide the console windows.
-             * TODO: Will be removed and replaced with built-in .Net Core 3.0 feature. */
+             * TODO: Will be removed and replaced with built-in .NET Core 3.0 feature. */
             ShowWindow(GetConsoleWindow(), 0);
 
             var closeButtonWasClicked = false;
-            var sqLiteProcessMainWindowHandle = IntPtr.Zero;
+            var sqLiteBrowserIsRunning = false;
             SynchronousServerSocket.On("btn-start-clicked", configurationJsonString =>
             {
                 CrawlerBot.OnEventBroadcast += OnStartProgressUpdated;
@@ -138,26 +139,37 @@ namespace Helix.Gui
             });
             SynchronousServerSocket.On("btn-preview-clicked", _ =>
             {
-                if (sqLiteProcessMainWindowHandle == IntPtr.Zero)
+                if (!Monitor.TryEnter(OperationLock)) return;
+                try
                 {
-                    SqLiteProcess.Start();
-
-                    // TODO: More investigation needed.
-                    /* Wait for MainWindowHandle to be available.
-                     * For some reasons, accessing MainWindowHandle too early causes it to be always IntPtr.Zero.
-                     */
-                    Thread.Sleep(2000);
-
-                    sqLiteProcessMainWindowHandle = SqLiteProcess.MainWindowHandle;
+                    if (sqLiteBrowserIsRunning)
+                    {
+                        if (IsIconic(SqLiteProcess.MainWindowHandle)) ShowWindow(SqLiteProcess.MainWindowHandle, 9);
+                        SetForegroundWindow(SqLiteProcess.MainWindowHandle);
+                    }
+                    else
+                    {
+                        SqLiteProcess.Start();
+                        Thread.Sleep(TimeSpan.FromSeconds(2));
+                        sqLiteBrowserIsRunning = true;
+                        Task.Run(() =>
+                        {
+                            SqLiteProcess.WaitForExit();
+                            sqLiteBrowserIsRunning = false;
+                        });
+                    }
                 }
-
-                if (IsIconic(sqLiteProcessMainWindowHandle)) ShowWindow(sqLiteProcessMainWindowHandle, 9);
-                SetForegroundWindow(sqLiteProcessMainWindowHandle);
+                finally { Monitor.Exit(OperationLock); }
             });
+
             GuiProcess.Start();
             ManualResetEvent.WaitOne();
-            SqLiteProcess.CloseMainWindow();
-            SqLiteProcess.Close();
+            lock (OperationLock)
+            {
+                if (!sqLiteBrowserIsRunning) return;
+                SqLiteProcess.CloseMainWindow();
+                SqLiteProcess.Close();
+            }
             SynchronousServerSocket.Dispose();
             GuiProcess.CloseMainWindow();
             GuiProcess.Close();
