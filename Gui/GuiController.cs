@@ -16,12 +16,15 @@ namespace Helix.Gui
     public static class GuiController
     {
         static Task _constantRedrawTask;
+        static Process _sqLiteProcess;
         static readonly Process GuiProcess = new Process { StartInfo = { FileName = "ui/electron.exe" } };
         static readonly ManualResetEvent ManualResetEvent = new ManualResetEvent(false);
         static readonly object OperationLock = new object();
-        static readonly Process SqLiteProcess = new Process { StartInfo = { FileName = "sqlite-browser/DB Browser for SQLite.exe" } };
         static readonly Stopwatch Stopwatch = new Stopwatch();
         static readonly ISynchronousServerSocket SynchronousServerSocket = new SynchronousServerSocket("127.0.0.1", 18880);
+
+        [DllImport("USER32.DLL", CharSet = CharSet.Unicode)]
+        static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
 
         [DllImport("kernel32.dll")]
         static extern IntPtr GetConsoleWindow();
@@ -36,7 +39,6 @@ namespace Helix.Gui
             ShowWindow(GetConsoleWindow(), 0);
 
             var closeButtonWasClicked = false;
-            var sqLiteBrowserIsRunning = false;
             SynchronousServerSocket.On("btn-start-clicked", configurationJsonString =>
             {
                 CrawlerBot.OnEventBroadcast += OnStartProgressUpdated;
@@ -113,6 +115,27 @@ namespace Helix.Gui
                     }
                     Redraw(new Frame { StatusText = @event.Message });
                 }
+                void RedrawEvery(TimeSpan timeSpan)
+                {
+                    _constantRedrawTask = Task.Run(() =>
+                    {
+                        Stopwatch.Restart();
+                        while (!CrawlerState.Completed.HasFlag(CrawlerBot.CrawlerState))
+                        {
+                            Redraw(new Frame
+                            {
+                                VerifiedUrlCount = CrawlerBot.Statistics?.VerifiedUrlCount,
+                                ValidUrlCount = CrawlerBot.Statistics?.ValidUrlCount,
+                                BrokenUrlCount = CrawlerBot.Statistics?.BrokenUrlCount,
+                                MillisecondsAveragePageLoadTime = CrawlerBot.Statistics?.MillisecondsAveragePageLoadTime,
+                                RemainingWorkload = CrawlerBot.RemainingWorkload,
+                                ElapsedTime = Stopwatch.Elapsed.ToString("hh' : 'mm' : 'ss")
+                            });
+                            Thread.Sleep(timeSpan);
+                        }
+                        Stopwatch.Stop();
+                    });
+                }
             });
             SynchronousServerSocket.On("btn-close-clicked", _ =>
             {
@@ -142,20 +165,25 @@ namespace Helix.Gui
                 if (!Monitor.TryEnter(OperationLock)) return;
                 try
                 {
-                    if (sqLiteBrowserIsRunning)
+                    if (_sqLiteProcess != null)
                     {
-                        if (IsIconic(SqLiteProcess.MainWindowHandle)) ShowWindow(SqLiteProcess.MainWindowHandle, 9);
-                        SetForegroundWindow(SqLiteProcess.MainWindowHandle);
+                        const int swRestore = 9;
+                        if (IsIconic(_sqLiteProcess.MainWindowHandle)) ShowWindow(_sqLiteProcess.MainWindowHandle, swRestore);
+                        SetForegroundWindow(_sqLiteProcess.MainWindowHandle);
                     }
                     else
                     {
-                        SqLiteProcess.Start();
-                        Thread.Sleep(TimeSpan.FromSeconds(2));
-                        sqLiteBrowserIsRunning = true;
+                        _sqLiteProcess = Process.Start("sqlite-browser/DB Browser for SQLite.exe");
+                        var sqLiteProcessMainWindowHandle = IntPtr.Zero;
+                        while (sqLiteProcessMainWindowHandle == IntPtr.Zero)
+                        {
+                            sqLiteProcessMainWindowHandle = FindWindow(null, "DB Browser for SQLite");
+                            Thread.Sleep(100);
+                        }
                         Task.Run(() =>
                         {
-                            SqLiteProcess.WaitForExit();
-                            sqLiteBrowserIsRunning = false;
+                            _sqLiteProcess.WaitForExit();
+                            _sqLiteProcess = null;
                         });
                     }
                 }
@@ -166,9 +194,8 @@ namespace Helix.Gui
             ManualResetEvent.WaitOne();
             lock (OperationLock)
             {
-                if (!sqLiteBrowserIsRunning) return;
-                SqLiteProcess.CloseMainWindow();
-                SqLiteProcess.Close();
+                _sqLiteProcess?.CloseMainWindow();
+                _sqLiteProcess?.Close();
             }
             SynchronousServerSocket.Dispose();
             GuiProcess.CloseMainWindow();
@@ -217,28 +244,6 @@ namespace Helix.Gui
         }
 
         static void Redraw(Frame frame) { SynchronousServerSocket.Send(new Message { Payload = JsonConvert.SerializeObject(frame) }); }
-
-        static void RedrawEvery(TimeSpan timeSpan)
-        {
-            _constantRedrawTask = Task.Run(() =>
-            {
-                Stopwatch.Restart();
-                while (!CrawlerState.Completed.HasFlag(CrawlerBot.CrawlerState))
-                {
-                    Redraw(new Frame
-                    {
-                        VerifiedUrlCount = CrawlerBot.Statistics?.VerifiedUrlCount,
-                        ValidUrlCount = CrawlerBot.Statistics?.ValidUrlCount,
-                        BrokenUrlCount = CrawlerBot.Statistics?.BrokenUrlCount,
-                        MillisecondsAveragePageLoadTime = CrawlerBot.Statistics?.MillisecondsAveragePageLoadTime,
-                        RemainingWorkload = CrawlerBot.RemainingWorkload,
-                        ElapsedTime = Stopwatch.Elapsed.ToString("hh' : 'mm' : 'ss")
-                    });
-                    Thread.Sleep(timeSpan);
-                }
-                Stopwatch.Stop();
-            });
-        }
 
         [DllImport("User32.dll")]
         static extern bool SetForegroundWindow(IntPtr handle);

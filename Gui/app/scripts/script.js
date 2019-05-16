@@ -1,6 +1,8 @@
 ﻿const {remote, ipcRenderer} = require("electron");
 const socket = new require("net").Socket();
 
+const endOfTransmissionCharacter = '\4';
+
 const htmlElement = document.getElementById("html");
 const titleBar = document.getElementById("title-bar");
 
@@ -53,15 +55,19 @@ socket.connect(18880, "127.0.0.1", () => {
                 ElapsedTime: "-- : -- : --",
                 StatusText: "Initializing start sequence ..."
             });
-            socket.write(JSON.stringify({
-                text: "btn-start-clicked",
-                payload: JSON.stringify({
-                    StartUri: txtStartUri.value,
-                    DomainName: txtDomainName.value,
-                    VerifyExternalUrls: ckbVerifyExternalUrls.checked,
-                    UseWebBrowsers: ckbUseWebBrowsers.checked
-                })
-            }));
+            socket.write(
+                attachEndOfTransmissionCharacter(
+                    JSON.stringify({
+                        text: "btn-start-clicked",
+                        payload: JSON.stringify({
+                            StartUri: txtStartUri.value,
+                            DomainName: txtDomainName.value,
+                            VerifyExternalUrls: ckbVerifyExternalUrls.checked,
+                            UseWebBrowsers: ckbUseWebBrowsers.checked
+                        })
+                    })
+                )
+            );
         }
     });
 
@@ -73,7 +79,7 @@ socket.connect(18880, "127.0.0.1", () => {
 
     btnStop.addEventListener("click", () => {
         redraw({ShowWaitingOverlay: true});
-        socket.write(JSON.stringify({text: "btn-stop-clicked"}));
+        socket.write(attachEndOfTransmissionCharacter(JSON.stringify({text: "btn-stop-clicked"})));
     });
 
     btnMinimize.addEventListener("click", () => { remote.BrowserWindow.getFocusedWindow().minimize(); });
@@ -84,7 +90,7 @@ socket.connect(18880, "127.0.0.1", () => {
 
     btnPreview.addEventListener("click", () => {
         // redraw({ShowWaitingOverlay: true});
-        socket.write(JSON.stringify({text: "btn-preview-clicked"}));
+        socket.write(attachEndOfTransmissionCharacter(JSON.stringify({text: "btn-preview-clicked"})));
     });
 
     socket.on("data", byteStream => {
@@ -93,7 +99,6 @@ socket.connect(18880, "127.0.0.1", () => {
     });
 
     function reconstructFrame(byteStream) {
-        const endOfTransmissionCharacter = '\4';
         return new TextDecoder("utf-8").decode(byteStream)
             .split(endOfTransmissionCharacter)
             .filter(jsonMessage => jsonMessage)
@@ -190,3 +195,5 @@ function hideWaitingOverlay() {
     clearInterval(waitingCountdown);
     waitingCountdown = null;
 }
+
+function attachEndOfTransmissionCharacter(message) { return `${message}${endOfTransmissionCharacter}`; }

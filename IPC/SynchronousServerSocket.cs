@@ -37,11 +37,15 @@ namespace Helix.IPC
                 {
                     Array.Clear(byteBuffer, 0, byteBuffer.Length);
                     var receivedByteCount = _incomingConnectionHandlerSocket.Receive(byteBuffer);
-                    var textMessageFromClient = Encoding.ASCII.GetString(byteBuffer, 0, receivedByteCount);
-                    if (string.IsNullOrEmpty(textMessageFromClient)) continue;
+                    var receivedTextData = Encoding.ASCII.GetString(byteBuffer, 0, receivedByteCount);
+                    if (string.IsNullOrEmpty(receivedTextData)) continue;
 
-                    var messageFromClient = JsonConvert.DeserializeObject<Message>(textMessageFromClient);
-                    if (_actions.TryGetValue(messageFromClient.Text, out var action)) action(messageFromClient.Payload);
+                    foreach (var receivedTextMessage in receivedTextData.Split(EndOfTransmissionCharacter))
+                    {
+                        if (string.IsNullOrWhiteSpace(receivedTextMessage)) continue;
+                        var receivedMessage = JsonConvert.DeserializeObject<Message>(receivedTextMessage);
+                        if (_actions.TryGetValue(receivedMessage.Text, out var action)) action(receivedMessage.Payload);
+                    }
                 }
                 _incomingConnectionHandlerSocket.Shutdown(SocketShutdown.Both);
                 _incomingConnectionHandlerSocket.Close();
