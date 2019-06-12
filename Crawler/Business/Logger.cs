@@ -8,7 +8,7 @@ namespace Helix.Crawler
     public class Logger : FileLogger
     {
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public Logger(Configurations configurations) : base(configurations.PathToLogFile) { }
+        public Logger() : base(Configurations.PathToLogFile) { }
 
         public override void LogException(Exception exception)
         {

@@ -14,7 +14,6 @@ namespace Helix.Crawler
     {
         int _activeHttpTrafficCount;
         CancellationTokenSource _cancellationTokenSource;
-        readonly Configurations _configurations;
         readonly ILogger _logger;
         bool _objectDisposed;
         Resource _resourceBeingRendered;
@@ -34,7 +33,6 @@ namespace Helix.Crawler
             _logger = logger;
             _objectDisposed = false;
             _takeScreenshot = false;
-            _configurations = configurations;
 
             Task EnsureInternal(object _, SessionEventArgs networkTraffic)
             {
@@ -146,7 +144,7 @@ namespace Helix.Crawler
             if (resource.IsBroken) millisecondsPageLoadTime = null;
             if (!_takeScreenshot) return renderingResult;
 
-            var pathToDirectoryContainsScreenshotFiles = _configurations.PathToDirectoryContainsScreenshotFiles;
+            var pathToDirectoryContainsScreenshotFiles = Configurations.PathToDirectoryContainsScreenshotFiles;
             var pathToScreenshotFile = Path.Combine(pathToDirectoryContainsScreenshotFiles, $"{_resourceBeingRendered.Id}.png");
             _webBrowser.TryTakeScreenshot(pathToScreenshotFile, OnScreenshotTakingFailed);
             _takeScreenshot = false;

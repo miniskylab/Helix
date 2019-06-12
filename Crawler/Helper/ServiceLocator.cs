@@ -67,8 +67,8 @@ namespace Helix.Crawler
             IWebBrowser CreateAndConfigureWebBrowser()
             {
                 return new ChromiumWebBrowser(
-                    configurations.PathToChromiumExecutable,
-                    configurations.WorkingDirectory,
+                    Configurations.PathToChromiumExecutable,
+                    Configurations.WorkingDirectory,
                     configurations.HttpRequestTimeout.TotalSeconds,
                     configurations.UseIncognitoWebBrowser,
                     configurations.UseHeadlessWebBrowsers,
@@ -79,8 +79,8 @@ namespace Helix.Crawler
             {
                 if (_httpClient != null) return _httpClient;
                 var webBrowser = new ChromiumWebBrowser(
-                    configurations.PathToChromiumExecutable,
-                    configurations.WorkingDirectory
+                    Configurations.PathToChromiumExecutable,
+                    Configurations.WorkingDirectory
                 );
                 var userAgentString = webBrowser.GetUserAgentString();
                 webBrowser.Dispose();
@@ -98,7 +98,7 @@ namespace Helix.Crawler
             }
             ISqLitePersistence<VerificationResult> CreateAndConfigureSqLitePersistence()
             {
-                return new SqLitePersistence<VerificationResult>(configurations.PathToReportFile);
+                return new SqLitePersistence<VerificationResult>(Configurations.PathToReportFile);
             }
         }
 

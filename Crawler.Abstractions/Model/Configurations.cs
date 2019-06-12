@@ -9,17 +9,24 @@ namespace Helix.Crawler.Abstractions
     {
         public string DomainName { get; }
 
+        public static int GuiControllerPort { get; } = 18880;
+
         public TimeSpan HttpRequestTimeout { get; } = TimeSpan.FromMinutes(3);
 
         public int MaxHtmlRendererCount { get; } = 10;
 
-        public string PathToChromiumExecutable { get; } = Path.Combine(CurrentDirectory, "chromium/chrome.exe");
+        public static string PathToChromiumExecutable { get; } = Path.Combine(WorkingDirectory, "chromium/chrome.exe");
 
-        public string PathToDirectoryContainsScreenshotFiles { get; } = Path.Combine(CurrentDirectory, "screenshots");
+        public static string PathToDirectoryContainsScreenshotFiles { get; } = Path.Combine(WorkingDirectory, "screenshots");
 
-        public string PathToLogFile { get; } = Path.Combine(CurrentDirectory, "helix.log");
+        public static string PathToElectronJsExecutable { get; } = Path.Combine(WorkingDirectory, "ui/electron.exe");
 
-        public string PathToReportFile { get; } = Path.Combine(CurrentDirectory, "report.sqlite3");
+        public static string PathToLogFile { get; } = Path.Combine(WorkingDirectory, "helix.log");
+
+        public static string PathToReportFile { get; } = Path.Combine(WorkingDirectory, "report.sqlite3");
+
+        public static string PathToSqLiteBrowserExecutable { get; } =
+            Path.Combine(WorkingDirectory, "sqlite-browser/DB Browser for SQLite.exe");
 
         public int ResourceExtractorCount { get; } = 300;
 
@@ -35,9 +42,7 @@ namespace Helix.Crawler.Abstractions
 
         public bool VerifyExternalUrls { get; }
 
-        public string WorkingDirectory => CurrentDirectory;
-
-        static string CurrentDirectory => Path.GetDirectoryName(Assembly.GetEntryAssembly()?.Location);
+        public static string WorkingDirectory => Path.GetDirectoryName(Assembly.GetEntryAssembly()?.Location);
 
         public Configurations() { }
 

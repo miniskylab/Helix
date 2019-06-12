@@ -188,9 +188,9 @@ namespace Helix.Crawler
             void EnsureDirectoryContainsScreenshotFilesIsRecreated()
             {
                 BroadcastEvent(StartProgressUpdatedEvent("Re-creating directory containing screenshot files ..."));
-                if (Directory.Exists(configurations.PathToDirectoryContainsScreenshotFiles))
-                    Directory.Delete(configurations.PathToDirectoryContainsScreenshotFiles, true);
-                Directory.CreateDirectory(configurations.PathToDirectoryContainsScreenshotFiles);
+                if (Directory.Exists(Configurations.PathToDirectoryContainsScreenshotFiles))
+                    Directory.Delete(Configurations.PathToDirectoryContainsScreenshotFiles, true);
+                Directory.CreateDirectory(Configurations.PathToDirectoryContainsScreenshotFiles);
             }
             void ActivateMainWorkflow()
             {

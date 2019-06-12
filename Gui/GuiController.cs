@@ -18,14 +18,20 @@ namespace Helix.Gui
         static bool _closeButtonWasClicked;
         static Task _constantRedrawTask;
         static Process _sqLiteProcess;
-        static readonly Process GuiProcess = new Process { StartInfo = { FileName = "ui/electron.exe" } };
-        static readonly ManualResetEvent ManualResetEvent = new ManualResetEvent(false);
-        static readonly object OperationLock = new object();
-        static readonly Stopwatch Stopwatch = new Stopwatch();
-        static readonly ISynchronousServerSocket SynchronousServerSocket = new SynchronousServerSocket("127.0.0.1", 18880);
+        static readonly Process GuiProcess;
+        static readonly ManualResetEvent ManualResetEvent;
+        static readonly object OperationLock;
+        static readonly Stopwatch Stopwatch;
+        static readonly ISynchronousServerSocket SynchronousServerSocket;
 
-        [DllImport("USER32.DLL", CharSet = CharSet.Unicode)]
-        static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+        static GuiController()
+        {
+            GuiProcess = new Process { StartInfo = { FileName = Configurations.PathToElectronJsExecutable } };
+            ManualResetEvent = new ManualResetEvent(false);
+            OperationLock = new object();
+            Stopwatch = new Stopwatch();
+            SynchronousServerSocket = new SynchronousServerSocket("127.0.0.1", Configurations.GuiControllerPort);
+        }
 
         [DllImport("kernel32.dll")]
         static extern IntPtr GetConsoleWindow();
@@ -83,13 +89,15 @@ namespace Helix.Gui
                 }
                 else
                 {
-                    _sqLiteProcess = Process.Start("sqlite-browser/DB Browser for SQLite.exe");
-                    var sqLiteProcessMainWindowHandle = IntPtr.Zero;
-                    while (sqLiteProcessMainWindowHandle == IntPtr.Zero)
-                    {
-                        sqLiteProcessMainWindowHandle = FindWindow(null, "DB Browser for SQLite");
-                        Thread.Sleep(100);
-                    }
+                    _sqLiteProcess = Process.Start(
+                        Configurations.PathToSqLiteBrowserExecutable,
+                        $"-R -t DataTransferObjects {Configurations.PathToReportFile}" // TODO: Remove hard-coded [DataTransferObjects]
+                    );
+
+                    /* Wait for MainWindowHandle to be available.
+                     * TODO: Waiting for a fixed amount of time is not a good idea. Need to find another solution. */
+                    Thread.Sleep(2000);
+
                     Task.Run(() =>
                     {
                         _sqLiteProcess.WaitForExit();
