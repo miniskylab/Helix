@@ -36,7 +36,7 @@ namespace Helix.Crawler
                 .AddSingleton<IHardwareMonitor, HardwareMonitor>();
 
             var singletonServiceCollection = new ServiceCollection()
-                .AddSingleton(_ => (ILogger) Activator.CreateInstance(typeof(Logger), new Configurations()));
+                .AddSingleton(_ => (ILogger) Activator.CreateInstance(typeof(Logger)));
             SingletonServiceProvider = singletonServiceCollection.BuildServiceProvider();
 
             foreach (var singletonServiceDescriptor in singletonServiceCollection)
