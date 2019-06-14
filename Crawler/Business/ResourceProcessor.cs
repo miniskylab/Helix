@@ -27,6 +27,7 @@ namespace Helix.Crawler
             else if (contentType.StartsWith("audio/", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Audio;
             else if (contentType.StartsWith("video/", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Video;
             else if (contentType.StartsWith("font/", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Font;
+            else if (contentType.StartsWith("application/pdf", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Pdf;
             else if (contentType.StartsWith("application/javascript", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Script;
             else if (contentType.StartsWith("application/ecmascript", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Script;
             else if (contentType.StartsWith("application/octet-stream", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Blob;

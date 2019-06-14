@@ -7,14 +7,15 @@ namespace Helix.Crawler.Abstractions
     {
         Unknown = 0,
         Css = 1 << 0,
-        Image = 1 << 1,
-        Audio = 1 << 2,
-        Video = 1 << 3,
-        Font = 1 << 4,
-        Script = 1 << 5,
-        Blob = 1 << 6,
-        StaticAsset = Css | Image | Audio | Video | Font | Script | Blob,
+        Pdf = 1 << 1,
+        Image = 1 << 2,
+        Audio = 1 << 3,
+        Video = 1 << 4,
+        Font = 1 << 5,
+        Script = 1 << 6,
+        Blob = 1 << 7,
+        StaticAsset = Css | Image | Pdf | Audio | Video | Font | Script | Blob,
 
-        Html = 1 << 7
+        Html = 1 << 8
     }
 }
