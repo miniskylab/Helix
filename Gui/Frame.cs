@@ -20,6 +20,8 @@ namespace Helix.Gui
 
         public bool? DisableStopButton { [UsedImplicitly] get; set; }
 
+        public bool? DisablePreviewButton { [UsedImplicitly] get; set; }
+
         public string ElapsedTime { [UsedImplicitly] get; set; }
 
         [JsonConverter(typeof(StringEnumConverter))]

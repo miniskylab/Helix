@@ -89,7 +89,6 @@ socket.connect(18880, "127.0.0.1", () => {
     btnCloseAboutMeOverlay.addEventListener("click", () => { aboutMeOverlay.style.display = "none"; });
 
     btnPreview.addEventListener("click", () => {
-        // redraw({ShowWaitingOverlay: true});
         socket.write(attachEndOfTransmissionCharacter(JSON.stringify({text: "btn-preview-clicked"})));
     });
 
@@ -134,6 +133,9 @@ function redraw(frame) {
 
     if (frame.DisableCloseButton === true && !btnClose.hasAttribute("disabled")) btnClose.setAttribute("disabled", "");
     else if (frame.DisableCloseButton === false && btnClose.hasAttribute("disabled")) btnClose.removeAttribute("disabled");
+
+    if (frame.DisablePreviewButton === true && !btnPreview.hasAttribute("disabled")) btnPreview.setAttribute("disabled", "");
+    else if (frame.DisablePreviewButton === false && btnPreview.hasAttribute("disabled")) btnPreview.removeAttribute("disabled");
 
     if (frame.DisableConfigurationPanel === true && !configurationPanel.hasAttribute("disabled")) configurationPanel.setAttribute("disabled", "");
     else if (frame.DisableConfigurationPanel === false && configurationPanel.hasAttribute("disabled")) configurationPanel.removeAttribute("disabled");

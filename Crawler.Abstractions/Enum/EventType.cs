@@ -6,6 +6,7 @@
         ResourceVerified,
         StartProgressUpdated,
         StopProgressUpdated,
+        ReportFileCreated,
         Stopped
     }
 }

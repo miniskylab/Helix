@@ -147,6 +147,7 @@ namespace Helix.Crawler
                 MonitorHardwareResources();
                 WaitForCompletionInSeparateThread();
                 TryTransit(CrawlerCommand.Run);
+                BroadcastEvent(new Event { EventType = EventType.ReportFileCreated });
                 return true;
             }
             catch (Exception exception)

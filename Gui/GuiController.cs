@@ -36,7 +36,7 @@ namespace Helix.Gui
         [DllImport("kernel32.dll")]
         static extern IntPtr GetConsoleWindow();
 
-        [DllImport("User32.dll")]
+        [DllImport("user32.dll")]
         static extern bool IsIconic(IntPtr handle);
 
         static void Main()
@@ -110,7 +110,11 @@ namespace Helix.Gui
 
         static void OnBtnStartClicked(string configurationJsonString)
         {
+            _sqLiteProcess?.CloseMainWindow();
+            _sqLiteProcess?.Close();
+
             CrawlerBot.OnEventBroadcast += OnStartProgressUpdated;
+            CrawlerBot.OnEventBroadcast += OnReportFileCreated;
             CrawlerBot.OnEventBroadcast += OnResourceVerified;
             CrawlerBot.OnEventBroadcast += OnStopped;
 
@@ -120,6 +124,7 @@ namespace Helix.Gui
                 DisableStopButton = true,
                 DisableCloseButton = true,
                 DisableConfigurationPanel = true,
+                DisablePreviewButton = true,
                 BorderColor = BorderColor.Normal,
                 MainButtonFunctionality = MainButtonFunctionality.Start
             });
@@ -144,6 +149,21 @@ namespace Helix.Gui
                 });
             }
 
+            void OnStartProgressUpdated(Event @event)
+            {
+                if (@event.EventType != EventType.StartProgressUpdated)
+                {
+                    CrawlerBot.OnEventBroadcast -= OnStartProgressUpdated;
+                    return;
+                }
+                Redraw(new Frame { StatusText = @event.Message });
+            }
+            void OnReportFileCreated(Event @event)
+            {
+                if (@event.EventType != EventType.ReportFileCreated) return;
+                CrawlerBot.OnEventBroadcast -= OnReportFileCreated;
+                Redraw(new Frame { DisablePreviewButton = false });
+            }
             void OnStopped(Event @event)
             {
                 if (@event.EventType != EventType.Stopped) return;
@@ -174,15 +194,6 @@ namespace Helix.Gui
                     RemainingWorkload = CrawlerBot.RemainingWorkload,
                     ElapsedTime = Stopwatch.Elapsed.ToString("hh' : 'mm' : 'ss")
                 });
-            }
-            void OnStartProgressUpdated(Event @event)
-            {
-                if (@event.EventType != EventType.StartProgressUpdated)
-                {
-                    CrawlerBot.OnEventBroadcast -= OnStartProgressUpdated;
-                    return;
-                }
-                Redraw(new Frame { StatusText = @event.Message });
             }
             void RedrawEvery(TimeSpan timeSpan)
             {
@@ -233,7 +244,7 @@ namespace Helix.Gui
 
         static void Redraw(Frame frame) { SynchronousServerSocket.Send(new Message { Payload = JsonConvert.SerializeObject(frame) }); }
 
-        [DllImport("User32.dll")]
+        [DllImport("user32.dll")]
         static extern bool SetForegroundWindow(IntPtr handle);
 
         [DllImport("user32.dll")]
