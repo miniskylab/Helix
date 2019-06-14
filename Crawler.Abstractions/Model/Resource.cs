@@ -24,7 +24,9 @@ namespace Helix.Crawler.Abstractions
 
         public Uri Uri { get; set; }
 
-        public string AbsoluteUrl => OriginalUrl.EndsWith("/") ? Uri?.AbsoluteUri : Uri?.AbsoluteUri.TrimEnd('/');
+        public string AbsoluteUrl => Uri != null
+            ? OriginalUrl.EndsWith("/") ? Uri?.AbsoluteUri : Uri?.AbsoluteUri.TrimEnd('/')
+            : OriginalUrl;
 
         public bool IsBroken => StatusCode < 0 || 400 <= (int) StatusCode;
     }
