@@ -320,7 +320,7 @@ namespace Helix.Crawler
 
                     var isInternalResource = resource.IsInternal;
                     var isExtractedResource = resource.IsExtracted;
-                    var isInitialResource = _resourceScope.IsStartUri(resource.Uri);
+                    var isInitialResource = resource.Uri != null && _resourceScope.IsStartUri(resource.Uri);
                     var isNotStaticAsset = !ResourceType.StaticAsset.HasFlag(resource.ResourceType);
                     if (isInternalResource && isNotStaticAsset && !resourceIsTooBig && (isExtractedResource || isInitialResource))
                         _memory.MemorizeToBeRenderedResource(resource);
