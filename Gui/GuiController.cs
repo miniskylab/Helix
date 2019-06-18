@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -9,6 +10,7 @@ using Helix.Crawler;
 using Helix.Crawler.Abstractions;
 using Helix.IPC;
 using Helix.IPC.Abstractions;
+using JetBrains.Annotations;
 using Newtonsoft.Json;
 
 namespace Helix.Gui
@@ -30,14 +32,8 @@ namespace Helix.Gui
             ManualResetEvent = new ManualResetEvent(false);
             OperationLock = new object();
             Stopwatch = new Stopwatch();
-            SynchronousServerSocket = new SynchronousServerSocket("127.0.0.1", Configurations.GuiControllerPort);
+            SynchronousServerSocket = new SynchronousServerSocket(IPAddress.Loopback.ToString(), Configurations.GuiControllerPort);
         }
-
-        [DllImport("kernel32.dll")]
-        static extern IntPtr GetConsoleWindow();
-
-        [DllImport("user32.dll")]
-        static extern bool IsIconic(IntPtr handle);
 
         static void Main()
         {
@@ -45,24 +41,26 @@ namespace Helix.Gui
              * TODO: Will be removed and replaced with built-in .NET Core 3.0 feature. */
             ShowWindow(GetConsoleWindow(), 0);
 
-            SynchronousServerSocket.On("btn-start-clicked", OnBtnStartClicked);
-            SynchronousServerSocket.On("btn-close-clicked", OnBtnCloseClicked);
-            SynchronousServerSocket.On("btn-stop-clicked", OnBtnStopClicked);
-            SynchronousServerSocket.On("btn-preview-clicked", OnBtnPreviewClicked);
+            SynchronousServerSocket.OnReceived += message =>
+            {
+                var method = typeof(GuiController).GetMethod(message.Text, BindingFlags.NonPublic | BindingFlags.Static);
+                method.Invoke(null, string.IsNullOrWhiteSpace(message.Payload) ? null : new object[] { message.Payload });
+            };
 
             GuiProcess.Start();
             ManualResetEvent.WaitOne();
-            lock (OperationLock)
-            {
-                _sqLiteProcess?.CloseMainWindow();
-                _sqLiteProcess?.Close();
-            }
+
+            _sqLiteProcess?.CloseMainWindow();
+            _sqLiteProcess?.Close();
             SynchronousServerSocket.Dispose();
             GuiProcess.CloseMainWindow();
             GuiProcess.Close();
         }
 
-        static void OnBtnCloseClicked(string _)
+        #region Action
+
+        [UsedImplicitly]
+        static void Close()
         {
             _closeButtonWasClicked = true;
             Redraw(new Frame
@@ -76,7 +74,8 @@ namespace Helix.Gui
             ManualResetEvent.Dispose();
         }
 
-        static void OnBtnPreviewClicked(string _)
+        [UsedImplicitly]
+        static void Preview()
         {
             if (!Monitor.TryEnter(OperationLock)) return;
             try
@@ -85,7 +84,24 @@ namespace Helix.Gui
                 {
                     const int swRestore = 9;
                     if (IsIconic(_sqLiteProcess.MainWindowHandle)) ShowWindow(_sqLiteProcess.MainWindowHandle, swRestore);
+
+                    /* Due to a limitation of WinAPI SetForegroundWindow() method,
+                     * an ALT keypress is required before calling that WinAPI in order for it to work properly.
+                     *
+                     * See more:
+                     * https://stackoverflow.com/questions/20444735/issue-with-setforegroundwindow-in-net
+                     * https://www.roelvanlisdonk.nl/2014/09/05/reliable-bring-external-process-window-to-foreground-without-c/
+                     * https://stackoverflow.com/questions/10740346/setforegroundwindow-only-working-while-visual-studio-is-open
+                     */
+                    const int alt = 0xA4;
+                    const int extendedKey = 0x1;
+                    keybd_event(alt, 0x45, extendedKey | 0, 0);
+
                     SetForegroundWindow(_sqLiteProcess.MainWindowHandle);
+
+                    /* Release the ALT key */
+                    const int keyup = 0x2;
+                    keybd_event(alt, 0x45, extendedKey | keyup, 0);
                 }
                 else
                 {
@@ -108,7 +124,8 @@ namespace Helix.Gui
             finally { Monitor.Exit(OperationLock); }
         }
 
-        static void OnBtnStartClicked(string configurationJsonString)
+        [UsedImplicitly]
+        static void Start(string configurationJsonString)
         {
             _sqLiteProcess?.CloseMainWindow();
             _sqLiteProcess?.Close();
@@ -218,7 +235,8 @@ namespace Helix.Gui
             }
         }
 
-        static void OnBtnStopClicked(string _)
+        [UsedImplicitly]
+        static void Stop()
         {
             Redraw(new Frame
             {
@@ -228,6 +246,29 @@ namespace Helix.Gui
             });
             StopWorking();
         }
+
+        #endregion
+
+        #region Windows API
+
+        [DllImport("user32.dll")]
+        static extern bool SetForegroundWindow(IntPtr handle);
+
+        [DllImport("user32.dll")]
+        static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("kernel32.dll")]
+        static extern IntPtr GetConsoleWindow();
+
+        [DllImport("user32.dll")]
+        static extern bool IsIconic(IntPtr handle);
+
+        [DllImport("user32.dll")]
+        static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);
+
+        #endregion
+
+        #region Helper
 
         static void OnResourceVerified(Event @event)
         {
@@ -243,12 +284,6 @@ namespace Helix.Gui
         }
 
         static void Redraw(Frame frame) { SynchronousServerSocket.Send(new Message { Payload = JsonConvert.SerializeObject(frame) }); }
-
-        [DllImport("user32.dll")]
-        static extern bool SetForegroundWindow(IntPtr handle);
-
-        [DllImport("user32.dll")]
-        static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
         static void StopWorking()
         {
@@ -278,5 +313,7 @@ namespace Helix.Gui
                 Redraw(new Frame { StatusText = @event.Message });
             }
         }
+
+        #endregion
     }
 }

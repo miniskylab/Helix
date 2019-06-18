@@ -58,7 +58,7 @@ socket.connect(18880, "127.0.0.1", () => {
             socket.write(
                 attachEndOfTransmissionCharacter(
                     JSON.stringify({
-                        text: "btn-start-clicked",
+                        text: "Start",
                         payload: JSON.stringify({
                             StartUri: txtStartUri.value,
                             DomainName: txtDomainName.value,
@@ -73,13 +73,13 @@ socket.connect(18880, "127.0.0.1", () => {
 
     btnClose.addEventListener("click", () => {
         redraw({ShowWaitingOverlay: true});
-        socket.end(JSON.stringify({text: "btn-close-clicked"}));
+        socket.end(JSON.stringify({text: "Close"}));
         socket.on("end", () => { ipcRenderer.send("btn-close-clicked"); });
     });
 
     btnStop.addEventListener("click", () => {
         redraw({ShowWaitingOverlay: true});
-        socket.write(attachEndOfTransmissionCharacter(JSON.stringify({text: "btn-stop-clicked"})));
+        socket.write(attachEndOfTransmissionCharacter(JSON.stringify({text: "Stop"})));
     });
 
     btnMinimize.addEventListener("click", () => { remote.BrowserWindow.getFocusedWindow().minimize(); });
@@ -89,7 +89,7 @@ socket.connect(18880, "127.0.0.1", () => {
     btnCloseAboutMeOverlay.addEventListener("click", () => { aboutMeOverlay.style.display = "none"; });
 
     btnPreview.addEventListener("click", () => {
-        socket.write(attachEndOfTransmissionCharacter(JSON.stringify({text: "btn-preview-clicked"})));
+        socket.write(attachEndOfTransmissionCharacter(JSON.stringify({text: "Preview"})));
     });
 
     socket.on("data", byteStream => {

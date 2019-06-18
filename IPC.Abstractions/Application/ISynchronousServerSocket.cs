@@ -4,7 +4,7 @@ namespace Helix.IPC.Abstractions
 {
     public interface ISynchronousServerSocket : IDisposable
     {
-        void On(string textMessage, Action<string> action);
+        event Action<Message> OnReceived;
 
         void Send(Message message);
     }

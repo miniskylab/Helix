@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -13,11 +12,12 @@ namespace Helix.IPC
     public class SynchronousServerSocket : ISynchronousServerSocket
     {
         const char EndOfTransmissionCharacter = (char) 4;
-        readonly Dictionary<string, Action<string>> _actions;
         readonly CancellationTokenSource _cancellationTokenSource;
         Socket _incomingConnectionHandlerSocket;
         readonly Socket _incomingConnectionListenerSocket;
         readonly Task _incomingConnectionListeningTask;
+
+        public event Action<Message> OnReceived;
 
         public SynchronousServerSocket(string ipAddressString, int port)
         {
@@ -28,7 +28,6 @@ namespace Helix.IPC
             _incomingConnectionListenerSocket.Listen(1);
 
             var byteBuffer = new byte[1024];
-            _actions = new Dictionary<string, Action<string>>();
             _cancellationTokenSource = new CancellationTokenSource();
             _incomingConnectionListeningTask = Task.Run(() =>
             {
@@ -44,7 +43,7 @@ namespace Helix.IPC
                     {
                         if (string.IsNullOrWhiteSpace(receivedTextMessage)) continue;
                         var receivedMessage = JsonConvert.DeserializeObject<Message>(receivedTextMessage);
-                        if (_actions.TryGetValue(receivedMessage.Text, out var action)) action(receivedMessage.Payload);
+                        OnReceived?.Invoke(receivedMessage);
                     }
                 }
                 _incomingConnectionHandlerSocket.Shutdown(SocketShutdown.Both);
@@ -73,8 +72,6 @@ namespace Helix.IPC
 
             _cancellationTokenSource.Dispose();
         }
-
-        public void On(string textMessage, Action<string> action) { _actions[textMessage] = action; }
 
         public void Send(Message message)
         {
