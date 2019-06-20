@@ -9,24 +9,24 @@ using Helix.Persistence.Abstractions;
 
 namespace Helix.Crawler
 {
-    public static class CrawlerBot
+    public class CrawlerBot
     {
-        static IEventBroadcaster _eventBroadcaster;
-        static IHardwareMonitor _hardwareMonitor;
-        static IMemory _memory;
-        static IReportWriter _reportWriter;
-        static IResourceProcessor _resourceProcessor;
-        static IResourceScope _resourceScope;
-        static IScheduler _scheduler;
-        static Task _waitingForCompletionTask;
-        static readonly ILogger Logger;
-        static readonly StateMachine<CrawlerState, CrawlerCommand> StateMachine;
+        IEventBroadcaster _eventBroadcaster;
+        IHardwareMonitor _hardwareMonitor;
+        readonly ILogger _logger;
+        IMemory _memory;
+        IReportWriter _reportWriter;
+        IResourceProcessor _resourceProcessor;
+        IResourceScope _resourceScope;
+        IScheduler _scheduler;
+        readonly StateMachine<CrawlerState, CrawlerCommand> _stateMachine;
+        Task _waitingForCompletionTask;
 
-        public static IStatistics Statistics { get; private set; }
+        public IStatistics Statistics { get; private set; }
 
-        public static CrawlerState CrawlerState => StateMachine.CurrentState;
+        public CrawlerState CrawlerState => _stateMachine.CurrentState;
 
-        public static int RemainingWorkload
+        public int RemainingWorkload
         {
             get
             {
@@ -35,20 +35,16 @@ namespace Helix.Crawler
             }
         }
 
-        public static event Action<Event> OnEventBroadcast;
+        public event Action<Event> OnEventBroadcast;
 
-        static CrawlerBot()
+        public CrawlerBot()
         {
-            // TODO: A workaround for .Net Core 2.x bug. Should be removed in the future.
-            AppContext.SetSwitch("System.Net.Http.UseSocketsHttpHandler", false);
-            ServicePointManager.DefaultConnectionLimit = int.MaxValue;
-
-            Logger = ServiceLocator.Get<ILogger>();
-            StateMachine = new StateMachine<CrawlerState, CrawlerCommand>(
+            _logger = ServiceLocator.Get<ILogger>();
+            _stateMachine = new StateMachine<CrawlerState, CrawlerCommand>(
                 new Dictionary<Transition<CrawlerState, CrawlerCommand>, CrawlerState>
                 {
-                    { CreateTransition(CrawlerState.WaitingForActivation, CrawlerCommand.Stop), CrawlerState.Completed },
-                    { CreateTransition(CrawlerState.WaitingForActivation, CrawlerCommand.Activate), CrawlerState.WaitingToRun },
+                    { CreateTransition(CrawlerState.WaitingForInitialization, CrawlerCommand.Stop), CrawlerState.Completed },
+                    { CreateTransition(CrawlerState.WaitingForInitialization, CrawlerCommand.Initialize), CrawlerState.WaitingToRun },
                     { CreateTransition(CrawlerState.WaitingToRun, CrawlerCommand.Run), CrawlerState.Running },
                     { CreateTransition(CrawlerState.WaitingToRun, CrawlerCommand.Abort), CrawlerState.WaitingForStop },
                     { CreateTransition(CrawlerState.WaitingForStop, CrawlerCommand.Stop), CrawlerState.Completed },
@@ -57,12 +53,9 @@ namespace Helix.Crawler
                     { CreateTransition(CrawlerState.Completed, CrawlerCommand.MarkAsRanToCompletion), CrawlerState.RanToCompletion },
                     { CreateTransition(CrawlerState.Completed, CrawlerCommand.MarkAsCancelled), CrawlerState.Cancelled },
                     { CreateTransition(CrawlerState.Completed, CrawlerCommand.MarkAsFaulted), CrawlerState.Faulted },
-                    { CreateTransition(CrawlerState.Paused, CrawlerCommand.Resume), CrawlerState.Running },
-                    { CreateTransition(CrawlerState.Faulted, CrawlerCommand.Activate), CrawlerState.WaitingToRun },
-                    { CreateTransition(CrawlerState.RanToCompletion, CrawlerCommand.Activate), CrawlerState.WaitingToRun },
-                    { CreateTransition(CrawlerState.Cancelled, CrawlerCommand.Activate), CrawlerState.WaitingToRun }
+                    { CreateTransition(CrawlerState.Paused, CrawlerCommand.Resume), CrawlerState.Running }
                 },
-                CrawlerState.WaitingForActivation
+                CrawlerState.WaitingForInitialization
             );
 
             Transition<CrawlerState, CrawlerCommand> CreateTransition(CrawlerState fromState, CrawlerCommand command)
@@ -71,13 +64,19 @@ namespace Helix.Crawler
             }
         }
 
-        public static void Stop()
+        static CrawlerBot()
+        {
+            // TODO: A workaround for .Net Core 2.x bug. Should be removed in the future.
+            AppContext.SetSwitch("System.Net.Http.UseSocketsHttpHandler", false);
+            ServicePointManager.DefaultConnectionLimit = int.MaxValue;
+        }
+
+        public void Stop()
         {
             if (!TryTransit(CrawlerCommand.Stop)) return;
             var crawlerCommand = CrawlerCommand.MarkAsCancelled;
             try
             {
-                BroadcastEvent(StopProgressUpdatedEvent("Initializing stop sequence ..."));
                 StopMonitoringHardwareResources();
                 DeactivateMainWorkflow();
                 WaitForBackgroundTaskToComplete();
@@ -88,9 +87,8 @@ namespace Helix.Crawler
                     EventType = EventType.Stopped,
                     Message = Enum.GetName(typeof(CrawlerState), CrawlerState)
                 });
-                OnEventBroadcast = null;
             }
-            catch (Exception exception) { Logger.LogException(exception); }
+            catch (Exception exception) { _logger.LogException(exception); }
 
             void StopMonitoringHardwareResources()
             {
@@ -115,7 +113,7 @@ namespace Helix.Crawler
                 try { _waitingForCompletionTask.Wait(); }
                 catch (Exception exception)
                 {
-                    Logger.LogException(exception);
+                    _logger.LogException(exception);
                     crawlerCommand = CrawlerCommand.MarkAsFaulted;
                 }
                 finally { _waitingForCompletionTask = null; }
@@ -135,12 +133,11 @@ namespace Helix.Crawler
             }
         }
 
-        public static bool TryStart(Configurations configurations)
+        public bool TryStart(Configurations configurations)
         {
-            if (!TryTransit(CrawlerCommand.Activate)) return false;
+            if (!TryTransit(CrawlerCommand.Initialize)) return false;
             try
             {
-                EnsureFreshStart();
                 ConnectServices();
                 EnsureDirectoryContainsScreenshotFilesIsRecreated();
                 ActivateMainWorkflow();
@@ -152,7 +149,7 @@ namespace Helix.Crawler
             }
             catch (Exception exception)
             {
-                Logger.LogException(exception);
+                _logger.LogException(exception);
                 TryTransit(CrawlerCommand.Abort);
                 _waitingForCompletionTask = Task.FromException(exception);
 
@@ -160,20 +157,9 @@ namespace Helix.Crawler
                 return false;
             }
 
-            void EnsureFreshStart()
-            {
-                Logger.LogInfo("Initializing start sequence ...");
-                _resourceProcessor = null;
-                _eventBroadcaster = null;
-                _hardwareMonitor = null;
-                _resourceScope = null;
-                _reportWriter = null;
-                _scheduler = null;
-                _memory = null;
-            }
             void ConnectServices()
             {
-                Logger.LogInfo("Connecting services ...");
+                _logger.LogInfo("Connecting services ...");
                 ServiceLocator.CreateTransientServices(configurations);
                 Statistics = ServiceLocator.Get<IStatistics>();
                 _memory = ServiceLocator.Get<IMemory>();
@@ -206,7 +192,7 @@ namespace Helix.Crawler
             }
             void MonitorHardwareResources()
             {
-                Logger.LogInfo("Starting hardware monitor service ...");
+                _logger.LogInfo("Starting hardware monitor service ...");
                 _hardwareMonitor.StartMonitoring();
             }
             void WaitForCompletionInSeparateThread()
@@ -221,7 +207,7 @@ namespace Helix.Crawler
                             Task.Run(Verify, _scheduler.CancellationToken)
                         ).Wait();
                     }
-                    catch (Exception exception) { Logger.LogException(exception); }
+                    catch (Exception exception) { _logger.LogException(exception); }
                     finally
                     {
                         if (CrawlerState == CrawlerState.Running) Task.Run(Stop);
@@ -238,14 +224,14 @@ namespace Helix.Crawler
             }
         }
 
-        static void BroadcastEvent(Event @event)
+        void BroadcastEvent(Event @event)
         {
             OnEventBroadcast?.Invoke(@event);
             if (@event.EventType != EventType.ResourceVerified && !string.IsNullOrWhiteSpace(@event.Message))
-                Logger.LogInfo(@event.Message);
+                _logger.LogInfo(@event.Message);
         }
 
-        static void Extract()
+        void Extract()
         {
             while (_scheduler.RemainingWorkload != 0 && !_scheduler.CancellationToken.IsCancellationRequested)
                 _scheduler.CreateTask((resourceExtractor, toBeExtractedHtmlDocument) =>
@@ -257,7 +243,7 @@ namespace Helix.Crawler
                 });
         }
 
-        static void Render()
+        void Render()
         {
             while (_scheduler.RemainingWorkload != 0 && !_scheduler.CancellationToken.IsCancellationRequested)
                 _scheduler.CreateTask((htmlRenderer, toBeRenderedResource) =>
@@ -267,7 +253,7 @@ namespace Helix.Crawler
                         out var htmlText,
                         out var millisecondsPageLoadTime,
                         _scheduler.CancellationToken,
-                        Logger.LogException
+                        _logger.LogException
                     );
                     if (renderingFailed) return;
                     if (millisecondsPageLoadTime.HasValue)
@@ -281,17 +267,17 @@ namespace Helix.Crawler
                 });
         }
 
-        static bool TryTransit(CrawlerCommand crawlerCommand)
+        bool TryTransit(CrawlerCommand crawlerCommand)
         {
-            if (StateMachine.TryMoveNext(crawlerCommand)) return true;
+            if (_stateMachine.TryMoveNext(crawlerCommand)) return true;
 
             var commandName = Enum.GetName(typeof(CrawlerCommand), crawlerCommand);
-            Logger.LogInfo($"Transition from state [{StateMachine.CurrentState}] via [{commandName}] command failed.\n" +
-                           $"{Environment.StackTrace}");
+            _logger.LogInfo($"Transition from state [{_stateMachine.CurrentState}] via [{commandName}] command failed.\n" +
+                            $"{Environment.StackTrace}");
             return false;
         }
 
-        static void Verify()
+        void Verify()
         {
             while (_scheduler.RemainingWorkload != 0 && !_scheduler.CancellationToken.IsCancellationRequested)
                 _scheduler.CreateTask((resourceVerifier, resource) =>
@@ -315,8 +301,8 @@ namespace Helix.Crawler
                     var resourceSizeInMb = resource.Size / 1024f / 1024f;
                     var resourceIsTooBig = resourceSizeInMb > 10;
                     if (resourceIsTooBig)
-                        Logger.LogInfo($"Resource was not queued for rendering because it was too big ({resourceSizeInMb} MB) - " +
-                                       $"{resource.Uri}");
+                        _logger.LogInfo($"Resource was not queued for rendering because it was too big ({resourceSizeInMb} MB) - " +
+                                        $"{resource.Uri}");
 
                     var isInternalResource = resource.IsInternal;
                     var isExtractedResource = resource.IsExtracted;

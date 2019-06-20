@@ -17,8 +17,9 @@ namespace Helix.Gui
 {
     public static class GuiController
     {
-        static bool _closeButtonWasClicked;
         static Task _constantRedrawTask;
+        static CrawlerBot _crawlerBot;
+        static bool _isClosing;
         static Process _sqLiteProcess;
         static readonly Process GuiProcess;
         static readonly ManualResetEvent ManualResetEvent;
@@ -62,14 +63,14 @@ namespace Helix.Gui
         [UsedImplicitly]
         static void Close()
         {
-            _closeButtonWasClicked = true;
+            _isClosing = true;
             Redraw(new Frame
             {
                 ShowWaitingOverlay = true,
                 DisableStopButton = true,
                 DisableCloseButton = true
             });
-            if (!CrawlerState.Completed.HasFlag(CrawlerBot.CrawlerState)) StopWorking();
+            if (!CrawlerState.Completed.HasFlag(_crawlerBot.CrawlerState)) StopWorking();
             ManualResetEvent.Set();
             ManualResetEvent.Dispose();
         }
@@ -93,15 +94,15 @@ namespace Helix.Gui
                      * https://www.roelvanlisdonk.nl/2014/09/05/reliable-bring-external-process-window-to-foreground-without-c/
                      * https://stackoverflow.com/questions/10740346/setforegroundwindow-only-working-while-visual-studio-is-open
                      */
-                    const int alt = 0xA4;
+                    const int altKey = 0xA4;
                     const int extendedKey = 0x1;
-                    keybd_event(alt, 0x45, extendedKey | 0, 0);
+                    keybd_event(altKey, 0x45, extendedKey | 0, 0);
 
                     SetForegroundWindow(_sqLiteProcess.MainWindowHandle);
 
                     /* Release the ALT key */
-                    const int keyup = 0x2;
-                    keybd_event(alt, 0x45, extendedKey | keyup, 0);
+                    const int keyUp = 0x2;
+                    keybd_event(altKey, 0x45, extendedKey | keyUp, 0);
                 }
                 else
                 {
@@ -130,10 +131,11 @@ namespace Helix.Gui
             _sqLiteProcess?.CloseMainWindow();
             _sqLiteProcess?.Close();
 
-            CrawlerBot.OnEventBroadcast += OnStartProgressUpdated;
-            CrawlerBot.OnEventBroadcast += OnReportFileCreated;
-            CrawlerBot.OnEventBroadcast += OnResourceVerified;
-            CrawlerBot.OnEventBroadcast += OnStopped;
+            _crawlerBot = new CrawlerBot();
+            _crawlerBot.OnEventBroadcast += OnStartProgressUpdated;
+            _crawlerBot.OnEventBroadcast += OnReportFileCreated;
+            _crawlerBot.OnEventBroadcast += OnResourceVerified;
+            _crawlerBot.OnEventBroadcast += OnStopped;
 
             Redraw(new Frame
             {
@@ -145,11 +147,10 @@ namespace Helix.Gui
                 BorderColor = BorderColor.Normal,
                 MainButtonFunctionality = MainButtonFunctionality.Start
             });
-            if (CrawlerBot.TryStart(new Configurations(configurationJsonString)))
+            if (_crawlerBot.TryStart(new Configurations(configurationJsonString)))
             {
                 Redraw(new Frame
                 {
-                    // DisableMainButton = false,
                     DisableStopButton = false,
                     DisableCloseButton = false,
                     MainButtonFunctionality = MainButtonFunctionality.Pause
@@ -170,7 +171,7 @@ namespace Helix.Gui
             {
                 if (@event.EventType != EventType.StartProgressUpdated)
                 {
-                    CrawlerBot.OnEventBroadcast -= OnStartProgressUpdated;
+                    _crawlerBot.OnEventBroadcast -= OnStartProgressUpdated;
                     return;
                 }
                 Redraw(new Frame { StatusText = @event.Message });
@@ -178,7 +179,7 @@ namespace Helix.Gui
             void OnReportFileCreated(Event @event)
             {
                 if (@event.EventType != EventType.ReportFileCreated) return;
-                CrawlerBot.OnEventBroadcast -= OnReportFileCreated;
+                _crawlerBot.OnEventBroadcast -= OnReportFileCreated;
                 Redraw(new Frame { DisablePreviewButton = false });
             }
             void OnStopped(Event @event)
@@ -190,25 +191,25 @@ namespace Helix.Gui
                     DisableMainButton = false,
                     DisableConfigurationPanel = false,
                     MainButtonFunctionality = MainButtonFunctionality.Start,
-                    DisableCloseButton = _closeButtonWasClicked,
-                    ShowWaitingOverlay = _closeButtonWasClicked,
-                    BorderColor = CrawlerBot.CrawlerState == CrawlerState.Faulted ? BorderColor.Error : BorderColor.Normal,
-                    StatusText = CrawlerBot.CrawlerState == CrawlerState.Faulted
+                    DisableCloseButton = _isClosing,
+                    ShowWaitingOverlay = _isClosing,
+                    BorderColor = _crawlerBot.CrawlerState == CrawlerState.Faulted ? BorderColor.Error : BorderColor.Normal,
+                    StatusText = _crawlerBot.CrawlerState == CrawlerState.Faulted
                         ? "One or more errors occurred. Check the logs for more details."
-                        : CrawlerBot.CrawlerState == CrawlerState.RanToCompletion
+                        : _crawlerBot.CrawlerState == CrawlerState.RanToCompletion
                             ? "The crawling task has completed."
                             : $"{@event.Message}."
                 });
 
                 _constantRedrawTask?.Wait();
-                if (CrawlerBot.CrawlerState == CrawlerState.Faulted) return;
+                if (_crawlerBot.CrawlerState == CrawlerState.Faulted) return;
                 Redraw(new Frame
                 {
-                    VerifiedUrlCount = CrawlerBot.Statistics?.VerifiedUrlCount,
-                    ValidUrlCount = CrawlerBot.Statistics?.ValidUrlCount,
-                    BrokenUrlCount = CrawlerBot.Statistics?.BrokenUrlCount,
-                    MillisecondsAveragePageLoadTime = CrawlerBot.Statistics?.MillisecondsAveragePageLoadTime,
-                    RemainingWorkload = CrawlerBot.RemainingWorkload,
+                    VerifiedUrlCount = _crawlerBot.Statistics?.VerifiedUrlCount,
+                    ValidUrlCount = _crawlerBot.Statistics?.ValidUrlCount,
+                    BrokenUrlCount = _crawlerBot.Statistics?.BrokenUrlCount,
+                    MillisecondsAveragePageLoadTime = _crawlerBot.Statistics?.MillisecondsAveragePageLoadTime,
+                    RemainingWorkload = _crawlerBot.RemainingWorkload,
                     ElapsedTime = Stopwatch.Elapsed.ToString("hh' : 'mm' : 'ss")
                 });
             }
@@ -217,15 +218,15 @@ namespace Helix.Gui
                 _constantRedrawTask = Task.Run(() =>
                 {
                     Stopwatch.Restart();
-                    while (!CrawlerState.Completed.HasFlag(CrawlerBot.CrawlerState))
+                    while (!CrawlerState.Completed.HasFlag(_crawlerBot.CrawlerState))
                     {
                         Redraw(new Frame
                         {
-                            VerifiedUrlCount = CrawlerBot.Statistics?.VerifiedUrlCount,
-                            ValidUrlCount = CrawlerBot.Statistics?.ValidUrlCount,
-                            BrokenUrlCount = CrawlerBot.Statistics?.BrokenUrlCount,
-                            MillisecondsAveragePageLoadTime = CrawlerBot.Statistics?.MillisecondsAveragePageLoadTime,
-                            RemainingWorkload = CrawlerBot.RemainingWorkload,
+                            VerifiedUrlCount = _crawlerBot.Statistics?.VerifiedUrlCount,
+                            ValidUrlCount = _crawlerBot.Statistics?.ValidUrlCount,
+                            BrokenUrlCount = _crawlerBot.Statistics?.BrokenUrlCount,
+                            MillisecondsAveragePageLoadTime = _crawlerBot.Statistics?.MillisecondsAveragePageLoadTime,
+                            RemainingWorkload = _crawlerBot.RemainingWorkload,
                             ElapsedTime = Stopwatch.Elapsed.ToString("hh' : 'mm' : 'ss")
                         });
                         Thread.Sleep(timeSpan);
@@ -275,10 +276,10 @@ namespace Helix.Gui
             if (@event.EventType != EventType.ResourceVerified) return;
             Redraw(new Frame
             {
-                VerifiedUrlCount = CrawlerBot.Statistics?.VerifiedUrlCount,
-                ValidUrlCount = CrawlerBot.Statistics?.ValidUrlCount,
-                BrokenUrlCount = CrawlerBot.Statistics?.BrokenUrlCount,
-                RemainingWorkload = CrawlerBot.RemainingWorkload,
+                VerifiedUrlCount = _crawlerBot.Statistics?.VerifiedUrlCount,
+                ValidUrlCount = _crawlerBot.Statistics?.ValidUrlCount,
+                BrokenUrlCount = _crawlerBot.Statistics?.BrokenUrlCount,
+                RemainingWorkload = _crawlerBot.RemainingWorkload,
                 StatusText = @event.Message
             });
         }
@@ -289,9 +290,9 @@ namespace Helix.Gui
         {
             try
             {
-                CrawlerBot.OnEventBroadcast -= OnResourceVerified;
-                CrawlerBot.OnEventBroadcast += OnStopProgressUpdated;
-                CrawlerBot.Stop();
+                _crawlerBot.OnEventBroadcast -= OnResourceVerified;
+                _crawlerBot.OnEventBroadcast += OnStopProgressUpdated;
+                _crawlerBot.Stop();
 
                 var waitingTime = TimeSpan.FromMinutes(1);
                 if (_constantRedrawTask == null || _constantRedrawTask.Wait(waitingTime)) return;
