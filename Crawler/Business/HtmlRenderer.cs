@@ -13,8 +13,8 @@ namespace Helix.Crawler
     public class HtmlRenderer : IHtmlRenderer
     {
         int _activeHttpTrafficCount;
-        CancellationTokenSource _cancellationTokenSource;
         readonly ILogger _logger;
+        CancellationTokenSource _networkTrafficCts;
         bool _objectDisposed;
         Resource _resourceBeingRendered;
         bool _takeScreenshot;
@@ -45,7 +45,7 @@ namespace Helix.Crawler
                         networkTraffic.WebSession.Request.Host = networkTraffic.WebSession.Request.RequestUri.Host;
                     }
                     finally { Interlocked.Decrement(ref _activeHttpTrafficCount); }
-                }, _cancellationTokenSource.Token, TaskCreationOptions.None, PriorityTaskScheduler.Highest);
+                }, _networkTrafficCts.Token, TaskCreationOptions.None, PriorityTaskScheduler.Highest);
             }
             Task CaptureNetworkTraffic(object _, SessionEventArgs networkTraffic)
             {
@@ -81,7 +81,7 @@ namespace Helix.Crawler
                         OnResourceCaptured?.Invoke(resource);
                     }
                     finally { Interlocked.Decrement(ref _activeHttpTrafficCount); }
-                }, _cancellationTokenSource.Token, TaskCreationOptions.None, PriorityTaskScheduler.Highest);
+                }, _networkTrafficCts.Token, TaskCreationOptions.None, PriorityTaskScheduler.Highest);
 
                 bool TryFollowRedirects()
                 {
@@ -133,14 +133,13 @@ namespace Helix.Crawler
             Action<Exception> onFailed)
         {
             if (_objectDisposed) throw new ObjectDisposedException(nameof(HtmlRenderer));
-            _cancellationTokenSource?.Cancel();
-            while (_activeHttpTrafficCount > 0) Thread.Sleep(100);
-            _cancellationTokenSource?.Dispose();
-            _cancellationTokenSource = new CancellationTokenSource();
+            EnsureNetworkTrafficsAreHalted();
+
+            _networkTrafficCts = new CancellationTokenSource();
             _resourceBeingRendered = resource;
 
             var uri = resource.Uri;
-            var renderingResult = _webBrowser.TryRender(uri, out html, out millisecondsPageLoadTime, cancellationToken, onFailed);
+            var renderingResult = _webBrowser.TryRender(uri, out html, out millisecondsPageLoadTime, onFailed);
             if (resource.IsBroken) millisecondsPageLoadTime = null;
             if (!_takeScreenshot) return renderingResult;
 
@@ -151,6 +150,12 @@ namespace Helix.Crawler
 
             return renderingResult;
 
+            void EnsureNetworkTrafficsAreHalted()
+            {
+                _networkTrafficCts?.Cancel();
+                while (_activeHttpTrafficCount > 0) Thread.Sleep(100);
+                _networkTrafficCts?.Dispose();
+            }
             void OnScreenshotTakingFailed(Exception exception) { _logger.LogInfo($"Failed to take screenshot of [{uri}].\r\n{exception}"); }
         }
 

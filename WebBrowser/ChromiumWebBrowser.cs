@@ -5,7 +5,6 @@ using System.IO;
 using System.Management;
 using System.Net;
 using System.Text.RegularExpressions;
-using System.Threading;
 using System.Threading.Tasks;
 using Helix.WebBrowser.Abstractions;
 using OpenQA.Selenium;
@@ -145,126 +144,7 @@ namespace Helix.WebBrowser
             OpenWebBrowser(StartArguments);
         }
 
-        public void Dispose()
-        {
-            if (_objectDisposed) return;
-            _objectDisposed = true;
-
-            ReleaseUnmanagedResources();
-            GC.SuppressFinalize(this);
-        }
-
-        public string GetUserAgentString()
-        {
-            if (!string.IsNullOrEmpty(_userAgentString)) return _userAgentString;
-            try
-            {
-                OpenWebBrowser(new[] { "--incognito", $"--start-maximized {WaitingPage}" });
-                _userAgentString = (string) _chromeDriver.ExecuteScript("return navigator.userAgent");
-            }
-            finally { CloseWebBrowser(); }
-            return _userAgentString;
-        }
-
-        public bool TryRender(Uri uri, out string html, out long? millisecondsPageLoadTime, CancellationToken cancellationToken,
-            Action<Exception> onFailed = null)
-        {
-            CurrentUri = uri ?? throw new ArgumentNullException(nameof(uri));
-
-            html = null;
-            millisecondsPageLoadTime = null;
-            var renderingFailedErrorMessage = $"Chromium web browser failed to render the URI: {uri}";
-            if (_objectDisposed) throw new ObjectDisposedException(nameof(ChromiumWebBrowser));
-            try
-            {
-                if (!TryGoToUri())
-                {
-                    onFailed?.Invoke(new TimeoutException(renderingFailedErrorMessage));
-                    return false;
-                }
-
-                if (TryGetPageSource(out html))
-                {
-                    millisecondsPageLoadTime = _stopwatch.ElapsedMilliseconds;
-                    return true;
-                }
-                onFailed?.Invoke(new MemberAccessException($"Chromium web browser failed to obtain page source of the URI: {uri}"));
-                return false;
-            }
-            catch (OperationCanceledException operationCanceledException)
-            {
-                if (operationCanceledException.CancellationToken != cancellationToken) throw;
-                onFailed?.Invoke(new OperationCanceledException(renderingFailedErrorMessage, cancellationToken));
-                return false;
-            }
-            finally { _stopwatch.Reset(); }
-
-            bool TryGetPageSource(out string pageSource)
-            {
-                try { pageSource = _chromeDriver.PageSource; }
-                catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
-                {
-                    pageSource = null;
-                    return false;
-                }
-                return true;
-            }
-            bool TryGoToUri()
-            {
-                try
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    _httpProxyServer.BeforeResponse += BeforeResponse;
-                    _httpProxyServer.BeforeRequest += BeforeRequest;
-                    _stopwatch.Restart();
-                    _chromeDriver.Navigate().GoToUrl(uri);
-                    _stopwatch.Stop();
-                    return true;
-                }
-                catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
-                {
-                    _stopwatch.Stop();
-                    CloseWebBrowser(true);
-                    OpenWebBrowser(StartArguments);
-                    return false;
-                }
-                finally
-                {
-                    _httpProxyServer.BeforeRequest -= BeforeRequest;
-                    _httpProxyServer.BeforeResponse -= BeforeResponse;
-                }
-
-                Task BeforeRequest(object sender, SessionEventArgs networkTraffic)
-                {
-                    return this.BeforeRequest?.Invoke(sender, networkTraffic);
-                }
-                Task BeforeResponse(object sender, SessionEventArgs networkTraffic)
-                {
-                    return this.BeforeResponse?.Invoke(sender, networkTraffic);
-                }
-            }
-        }
-
-        public bool TryTakeScreenshot(string pathToScreenshotFile, Action<Exception> onFailed = null)
-        {
-            try
-            {
-                if (CurrentUri == null) throw new InvalidOperationException();
-                var pathToDirectoryContainsScreenshotFile = Directory.GetParent(pathToScreenshotFile);
-                if (!pathToDirectoryContainsScreenshotFile.Exists) pathToDirectoryContainsScreenshotFile.Create();
-
-                var screenShot = _chromeDriver.GetScreenshot();
-                Task.Run(() => { screenShot.SaveAsFile(pathToScreenshotFile, ScreenshotImageFormat.Png); });
-                return true;
-            }
-            catch (Exception exception)
-            {
-                onFailed?.Invoke(exception);
-                return false;
-            }
-        }
-
-        void CloseWebBrowser(bool forcibly = false)
+        public void CloseWebBrowser(bool forcibly = false)
         {
             if (forcibly || _chromeDriver == null) KillAllRelatedProcesses();
             else
@@ -293,6 +173,119 @@ namespace Helix.WebBrowser
             }
         }
 
+        public void Dispose()
+        {
+            if (_objectDisposed) return;
+            _objectDisposed = true;
+
+            ReleaseUnmanagedResources();
+            GC.SuppressFinalize(this);
+        }
+
+        public string GetUserAgentString()
+        {
+            if (!string.IsNullOrEmpty(_userAgentString)) return _userAgentString;
+            try
+            {
+                OpenWebBrowser(new[] { "--incognito", $"--start-maximized {WaitingPage}" });
+                _userAgentString = (string) _chromeDriver.ExecuteScript("return navigator.userAgent");
+            }
+            finally { CloseWebBrowser(); }
+            return _userAgentString;
+        }
+
+        public bool TryRender(Uri uri, out string html, out long? millisecondsPageLoadTime, Action<Exception> onFailed)
+        {
+            CurrentUri = uri ?? throw new ArgumentNullException(nameof(uri));
+
+            html = null;
+            millisecondsPageLoadTime = null;
+            var renderingFailedErrorMessage = $"Chromium web browser failed to render the URI: {uri}";
+            if (_objectDisposed) throw new ObjectDisposedException(nameof(ChromiumWebBrowser));
+
+            try
+            {
+                if (!TryGoToUri())
+                {
+                    onFailed?.Invoke(new Exception(renderingFailedErrorMessage));
+                    return false;
+                }
+
+                if (!TryGetPageSource(out html))
+                {
+                    onFailed?.Invoke(new MemberAccessException($"Chromium web browser failed to obtain page source of the URI: {uri}"));
+                    return false;
+                }
+
+                millisecondsPageLoadTime = _stopwatch.ElapsedMilliseconds;
+                return true;
+            }
+            finally { _stopwatch.Reset(); }
+
+            bool TryGoToUri()
+            {
+                try
+                {
+                    _httpProxyServer.BeforeResponse += BeforeResponse;
+                    _httpProxyServer.BeforeRequest += BeforeRequest;
+                    _stopwatch.Restart();
+                    _chromeDriver.Navigate().GoToUrl(uri);
+                    return true;
+                }
+                catch (NullReferenceException) when (_chromeDriver == null) { return false; }
+                catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
+                {
+                    CloseWebBrowser(true);
+                    OpenWebBrowser(StartArguments);
+                    return false;
+                }
+                finally
+                {
+                    _stopwatch.Stop();
+                    _httpProxyServer.BeforeRequest -= BeforeRequest;
+                    _httpProxyServer.BeforeResponse -= BeforeResponse;
+                }
+
+                Task BeforeRequest(object sender, SessionEventArgs networkTraffic)
+                {
+                    return this.BeforeRequest?.Invoke(sender, networkTraffic);
+                }
+                Task BeforeResponse(object sender, SessionEventArgs networkTraffic)
+                {
+                    return this.BeforeResponse?.Invoke(sender, networkTraffic);
+                }
+            }
+            bool TryGetPageSource(out string pageSource)
+            {
+                try { pageSource = _chromeDriver.PageSource; }
+                catch (Exception exception) when (exception is NullReferenceException || TimeoutExceptionOccurred(exception))
+                {
+                    pageSource = null;
+                    return false;
+                }
+                return true;
+            }
+        }
+
+        public bool TryTakeScreenshot(string pathToScreenshotFile, Action<Exception> onFailed)
+        {
+            try
+            {
+                if (CurrentUri == null) throw new InvalidOperationException();
+                var pathToDirectoryContainsScreenshotFile = Directory.GetParent(pathToScreenshotFile);
+                if (!pathToDirectoryContainsScreenshotFile.Exists) pathToDirectoryContainsScreenshotFile.Create();
+
+                var screenShot = _chromeDriver.GetScreenshot();
+                Task.Run(() => { screenShot.SaveAsFile(pathToScreenshotFile, ScreenshotImageFormat.Png); });
+                return true;
+            }
+            catch (Exception exception)
+            {
+                onFailed?.Invoke(exception);
+                return false;
+            }
+        }
+
         void OpenWebBrowser(IEnumerable<string> arguments)
         {
             _chromeDriverService = ChromeDriverService.CreateDefaultService(_pathToChromeDriverExecutable);
@@ -314,9 +307,9 @@ namespace Helix.WebBrowser
 
         void ReleaseUnmanagedResources()
         {
+            _stopwatch?.Stop();
             _httpProxyServer?.Stop();
             _httpProxyServer?.Dispose();
-            _httpProxyServer = null;
             CloseWebBrowser();
         }
 
