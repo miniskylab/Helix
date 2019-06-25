@@ -133,7 +133,7 @@ namespace Helix.Crawler
             Action<Exception> onFailed)
         {
             if (_objectDisposed) throw new ObjectDisposedException(nameof(HtmlRenderer));
-            EnsureNetworkTrafficsAreHalted();
+            EnsureNetworkTrafficIsHalted();
 
             _networkTrafficCts = new CancellationTokenSource();
             _resourceBeingRendered = resource;
@@ -150,7 +150,7 @@ namespace Helix.Crawler
 
             return renderingResult;
 
-            void EnsureNetworkTrafficsAreHalted()
+            void EnsureNetworkTrafficIsHalted()
             {
                 _networkTrafficCts?.Cancel();
                 while (_activeHttpTrafficCount > 0) Thread.Sleep(100);
