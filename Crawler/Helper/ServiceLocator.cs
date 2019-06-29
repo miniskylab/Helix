@@ -11,7 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Helix.Crawler
 {
-    static class ServiceLocator
+    internal static class ServiceLocator
     {
         static HttpClient _httpClient;
         static ServiceProvider _transientServiceProvider;
@@ -34,7 +34,7 @@ namespace Helix.Crawler
                 .AddSingleton<IMemory, Memory>()
                 .AddSingleton<IScheduler, Scheduler>()
                 .AddSingleton<IHardwareMonitor, HardwareMonitor>()
-                .AddSingleton<IContentTypeToResourceTypeDictionary, ContentTypeToResourceTypeDictionary>();
+                .AddSingleton<IHttpContentTypeToResourceTypeDictionary, HttpContentTypeToResourceTypeDictionary>();
 
             var singletonServiceCollection = new ServiceCollection()
                 .AddSingleton(_ => (ILogger) Activator.CreateInstance(typeof(Logger)));
@@ -79,7 +79,7 @@ namespace Helix.Crawler
             HttpClient CreateAndConfigureHttpClient()
             {
                 if (_httpClient != null) return _httpClient;
-                var webBrowser = new ChromiumWebBrowser(
+                IWebBrowser webBrowser = new ChromiumWebBrowser(
                     Configurations.PathToChromiumExecutable,
                     Configurations.WorkingDirectory
                 );
@@ -87,12 +87,12 @@ namespace Helix.Crawler
                 webBrowser.Dispose();
 
                 _httpClient = new HttpClient();
-                _httpClient.DefaultRequestHeaders.Accept.ParseAdd("*/*");
-                _httpClient.DefaultRequestHeaders.AcceptEncoding.ParseAdd("*");
-                _httpClient.DefaultRequestHeaders.AcceptLanguage.ParseAdd("*");
-                _httpClient.DefaultRequestHeaders.CacheControl = CacheControlHeaderValue.Parse("no-cache");
-                _httpClient.DefaultRequestHeaders.Pragma.ParseAdd("no-cache");
+                _httpClient.DefaultRequestHeaders.Accept.ParseAdd("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+                _httpClient.DefaultRequestHeaders.AcceptEncoding.ParseAdd("gzip, deflate, br");
+                _httpClient.DefaultRequestHeaders.AcceptLanguage.ParseAdd("en-US,en;q=0.9");
                 _httpClient.DefaultRequestHeaders.Upgrade.ParseAdd("1");
+                _httpClient.DefaultRequestHeaders.Pragma.ParseAdd("no-cache");
+                _httpClient.DefaultRequestHeaders.CacheControl = CacheControlHeaderValue.Parse("no-cache");
                 _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(userAgentString);
                 _httpClient.Timeout = configurations.HttpRequestTimeout;
                 return _httpClient;

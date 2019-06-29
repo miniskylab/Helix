@@ -18,9 +18,9 @@ namespace Helix.Gui
 
         public bool? DisableMainButton { [UsedImplicitly] get; set; }
 
-        public bool? DisableStopButton { [UsedImplicitly] get; set; }
-
         public bool? DisablePreviewButton { [UsedImplicitly] get; set; }
+
+        public bool? DisableStopButton { [UsedImplicitly] get; set; }
 
         public string ElapsedTime { [UsedImplicitly] get; set; }
 

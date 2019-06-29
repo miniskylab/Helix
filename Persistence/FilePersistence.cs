@@ -7,7 +7,7 @@ using Helix.Persistence.Abstractions;
 
 namespace Helix.Persistence
 {
-    class FilePersistence : IFilePersistence
+    internal class FilePersistence : IFilePersistence
     {
         readonly List<Task> _backgroundTasks;
         CancellationTokenSource _cancellationTokenSource;

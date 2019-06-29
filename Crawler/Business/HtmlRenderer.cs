@@ -24,7 +24,8 @@ namespace Helix.Crawler
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public HtmlRenderer(Configurations configurations, IWebBrowser webBrowser, IResourceScope resourceScope, IReportWriter reportWriter,
-            IResourceEnricher resourceEnricher, IContentTypeToResourceTypeDictionary contentTypeToResourceTypeDictionary, ILogger logger)
+            IResourceEnricher resourceEnricher, IHttpContentTypeToResourceTypeDictionary httpContentTypeToResourceTypeDictionary,
+            ILogger logger)
         {
             _webBrowser = webBrowser;
             _webBrowser.BeforeRequest += EnsureInternal;
@@ -41,8 +42,8 @@ namespace Helix.Crawler
                     Interlocked.Increment(ref _activeHttpTrafficCount);
                     try
                     {
-                        networkTraffic.WebSession.Request.RequestUri = resourceScope.Localize(networkTraffic.WebSession.Request.RequestUri);
-                        networkTraffic.WebSession.Request.Host = networkTraffic.WebSession.Request.RequestUri.Host;
+                        networkTraffic.HttpClient.Request.RequestUri = resourceScope.Localize(networkTraffic.HttpClient.Request.RequestUri);
+                        networkTraffic.HttpClient.Request.Host = networkTraffic.HttpClient.Request.RequestUri.Host;
                     }
                     finally { Interlocked.Decrement(ref _activeHttpTrafficCount); }
                 }, _networkTrafficCts.Token, TaskCreationOptions.None, PriorityTaskScheduler.Highest);
@@ -50,8 +51,8 @@ namespace Helix.Crawler
             Task CaptureNetworkTraffic(object _, SessionEventArgs networkTraffic)
             {
                 var parentUri = _webBrowser.CurrentUri;
-                var request = networkTraffic.WebSession.Request;
-                var response = networkTraffic.WebSession.Response;
+                var request = networkTraffic.HttpClient.Request;
+                var response = networkTraffic.HttpClient.Response;
                 var uriBeingRendered = _resourceBeingRendered.Uri;
                 return Task.Factory.StartNew(() =>
                 {
@@ -75,7 +76,7 @@ namespace Helix.Crawler
                             Uri = request.RequestUri,
                             StatusCode = (StatusCode) response.StatusCode,
                             Size = response.ContentLength,
-                            ResourceType = contentTypeToResourceTypeDictionary[response.ContentType]
+                            ResourceType = httpContentTypeToResourceTypeDictionary[response.ContentType]
                         };
                         resourceEnricher.Enrich(resource);
                         OnResourceCaptured?.Invoke(resource);

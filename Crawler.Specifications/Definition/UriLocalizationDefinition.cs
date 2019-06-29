@@ -6,7 +6,7 @@ using Newtonsoft.Json;
 
 namespace Helix.Crawler.Specifications
 {
-    class UriLocalizationDefinition : TheoryDescription<Configurations, Uri, Uri, Type>
+    internal class UriLocalizationDefinition : TheoryDescription<Configurations, Uri, Uri, Type>
     {
         public UriLocalizationDefinition()
         {

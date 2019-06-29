@@ -4,7 +4,7 @@ using Helix.Specifications;
 
 namespace Helix.Crawler.Specifications
 {
-    class ResourceEnrichmentDefinition : TheoryDescription<Resource, Resource, Type>
+    internal class ResourceEnrichmentDefinition : TheoryDescription<Resource, Resource, Type>
     {
         public ResourceEnrichmentDefinition()
         {

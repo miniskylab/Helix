@@ -5,7 +5,7 @@ using Helix.Specifications;
 
 namespace Helix.Crawler.Specifications
 {
-    class ResourceExtractionDefinition : TheoryDescription<HtmlDocument, IList<Resource>, Type>
+    internal class ResourceExtractionDefinition : TheoryDescription<HtmlDocument, IList<Resource>, Type>
     {
         public ResourceExtractionDefinition()
         {

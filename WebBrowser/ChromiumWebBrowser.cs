@@ -125,7 +125,7 @@ namespace Helix.WebBrowser
                             <div class=""inner-circle""></div>
                         </div>
                         <div class=""text"" style=""color: rgb(0, 183, 229);"">Helix is testing web browser ...</div>
-                        <div class=""text"" style=""color: rgb(255, 99, 71);"">Please do not attempt to manually close this web browser.</div>
+                        <div class=""text"" style=""color: rgb(255, 99, 71);"">Please do not close this web browser manually.</div>
                     </body>
                 </html>";
                 return Regex.Replace(html, "\\s+", " ");

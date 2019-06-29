@@ -6,16 +6,19 @@ namespace Helix.Crawler.Abstractions
     public enum ResourceType
     {
         Unknown = 0,
-        Css = 1 << 0,
-        Pdf = 1 << 1,
-        Image = 1 << 2,
-        Audio = 1 << 3,
-        Video = 1 << 4,
-        Font = 1 << 5,
-        Script = 1 << 6,
-        Blob = 1 << 7,
-        StaticAsset = Css | Image | Pdf | Audio | Video | Font | Script | Blob,
 
-        Html = 1 << 8
+        Html = 1 << 0,
+        Css = 1 << 1,
+        Script = 1 << 2,
+        Json = 1 << 3,
+        Xml = 1 << 4,
+        ServerSentEvent = 1 << 5,
+        Text = 1 << 6,
+
+        Image = 1 << 7,
+        Audio = 1 << 8,
+        Video = 1 << 9,
+        Font = 1 << 10,
+        Blob = 1 << 11
     }
 }

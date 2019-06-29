@@ -307,8 +307,8 @@ namespace Helix.Crawler
                     var isInternalResource = resource.IsInternal;
                     var isExtractedResource = resource.IsExtracted;
                     var isInitialResource = resource.Uri != null && _resourceScope.IsStartUri(resource.Uri);
-                    var isNotStaticAsset = !ResourceType.StaticAsset.HasFlag(resource.ResourceType);
-                    if (isInternalResource && isNotStaticAsset && !resourceIsTooBig && (isExtractedResource || isInitialResource))
+                    var isHtml = resource.ResourceType == ResourceType.Html;
+                    if (isInternalResource && isHtml && !resourceIsTooBig && (isExtractedResource || isInitialResource))
                         _memory.MemorizeToBeRenderedResource(resource);
                 });
         }

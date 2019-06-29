@@ -10,17 +10,17 @@ namespace Helix.Crawler
     public sealed class ResourceVerifier : IResourceVerifier
     {
         readonly Configurations _configurations;
-        readonly IContentTypeToResourceTypeDictionary _contentTypeToResourceTypeDictionary;
         readonly HttpClient _httpClient;
+        readonly IHttpContentTypeToResourceTypeDictionary _httpContentTypeToResourceTypeDictionary;
         bool _objectDisposed;
         Task<HttpResponseMessage> _sendingGETRequestTask;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public ResourceVerifier(Configurations configurations, IContentTypeToResourceTypeDictionary contentTypeToResourceTypeDictionary,
-            HttpClient httpClient)
+        public ResourceVerifier(IHttpContentTypeToResourceTypeDictionary httpContentTypeToResourceTypeDictionary,
+            Configurations configurations, HttpClient httpClient)
         {
             _configurations = configurations;
-            _contentTypeToResourceTypeDictionary = contentTypeToResourceTypeDictionary;
+            _httpContentTypeToResourceTypeDictionary = httpContentTypeToResourceTypeDictionary;
             _objectDisposed = false;
             _httpClient = httpClient;
         }
@@ -58,9 +58,10 @@ namespace Helix.Crawler
                     cancellationToken
                 );
                 var httpResponseMessage = _sendingGETRequestTask.Result;
+                var httpContentType = httpResponseMessage.Content.Headers.ContentType?.ToString();
                 resource.StatusCode = (StatusCode) httpResponseMessage.StatusCode;
                 resource.Size = httpResponseMessage.Content.Headers.ContentLength;
-                resource.ResourceType = _contentTypeToResourceTypeDictionary[httpResponseMessage.Content.Headers.ContentType?.ToString()];
+                resource.ResourceType = _httpContentTypeToResourceTypeDictionary[httpContentType];
                 verificationResult.ResourceType = Enum.GetName(typeof(ResourceType), resource.ResourceType);
             }
             catch (AggregateException aggregateException)
