@@ -18,7 +18,7 @@ namespace Helix.Specifications
             {
                 new ServiceDescriptor(typeof(IResourceExtractor), typeof(ResourceExtractor), ServiceLifetime.Transient),
                 new ServiceDescriptor(typeof(IResourceVerifier), typeof(ResourceVerifier), ServiceLifetime.Transient),
-                new ServiceDescriptor(typeof(IResourceProcessor), typeof(ResourceProcessor), ServiceLifetime.Transient),
+                new ServiceDescriptor(typeof(IResourceEnricher), typeof(ResourceEnricher), ServiceLifetime.Transient),
                 new ServiceDescriptor(typeof(IResourceScope), typeof(ResourceScope), ServiceLifetime.Transient),
                 new ServiceDescriptor(typeof(Configurations), new Configurations()),
                 new ServiceDescriptor(typeof(IMemory), typeof(Memory), ServiceLifetime.Singleton),

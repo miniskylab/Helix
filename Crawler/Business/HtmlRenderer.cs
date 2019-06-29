@@ -24,7 +24,7 @@ namespace Helix.Crawler
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public HtmlRenderer(Configurations configurations, IWebBrowser webBrowser, IResourceScope resourceScope, IReportWriter reportWriter,
-            IResourceProcessor resourceProcessor, ILogger logger)
+            IResourceEnricher resourceEnricher, IContentTypeToResourceTypeDictionary contentTypeToResourceTypeDictionary, ILogger logger)
         {
             _webBrowser = webBrowser;
             _webBrowser.BeforeRequest += EnsureInternal;
@@ -74,10 +74,10 @@ namespace Helix.Crawler
                             OriginalUrl = request.Url,
                             Uri = request.RequestUri,
                             StatusCode = (StatusCode) response.StatusCode,
-                            Size = response.ContentLength
+                            Size = response.ContentLength,
+                            ResourceType = contentTypeToResourceTypeDictionary[response.ContentType]
                         };
-                        resourceProcessor.Enrich(resource);
-                        resourceProcessor.Categorize(resource, response.ContentType);
+                        resourceEnricher.Enrich(resource);
                         OnResourceCaptured?.Invoke(resource);
                     }
                     finally { Interlocked.Decrement(ref _activeHttpTrafficCount); }

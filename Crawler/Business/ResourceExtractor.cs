@@ -6,10 +6,10 @@ namespace Helix.Crawler
 {
     public class ResourceExtractor : IResourceExtractor
     {
-        readonly IResourceProcessor _resourceProcessor;
+        readonly IResourceEnricher _resourceEnricher;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public ResourceExtractor(IResourceProcessor resourceProcessor) { _resourceProcessor = resourceProcessor; }
+        public ResourceExtractor(IResourceEnricher resourceEnricher) { _resourceEnricher = resourceEnricher; }
 
         public void ExtractResourcesFrom(HtmlDocument htmlDocument, Action<Resource> onResourceExtracted)
         {
@@ -26,7 +26,7 @@ namespace Helix.Crawler
                 var extractedUrl = anchorTag.Attributes["href"].Value;
                 if (IsNullOrWhiteSpace() || IsJavaScriptCode()) return;
                 onResourceExtracted.Invoke(
-                    _resourceProcessor.Enrich(new Resource
+                    _resourceEnricher.Enrich(new Resource
                     {
                         ParentUri = htmlDocument.Uri,
                         OriginalUrl = extractedUrl,

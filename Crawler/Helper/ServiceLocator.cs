@@ -24,7 +24,7 @@ namespace Helix.Crawler
                 .AddTransient<IHtmlRenderer, HtmlRenderer>()
                 .AddTransient<IResourceExtractor, ResourceExtractor>()
                 .AddTransient<IResourceVerifier, ResourceVerifier>()
-                .AddTransient<IResourceProcessor, ResourceProcessor>()
+                .AddTransient<IResourceEnricher, ResourceEnricher>()
                 .AddTransient<IResourceScope, ResourceScope>()
                 .AddSingleton<IEventBroadcaster, EventBroadcaster>()
                 .AddSingleton<IIncrementalIdGenerator, IncrementalIdGenerator>()
@@ -33,7 +33,8 @@ namespace Helix.Crawler
                 .AddSingleton<IReportWriter, ReportWriter>()
                 .AddSingleton<IMemory, Memory>()
                 .AddSingleton<IScheduler, Scheduler>()
-                .AddSingleton<IHardwareMonitor, HardwareMonitor>();
+                .AddSingleton<IHardwareMonitor, HardwareMonitor>()
+                .AddSingleton<IContentTypeToResourceTypeDictionary, ContentTypeToResourceTypeDictionary>();
 
             var singletonServiceCollection = new ServiceCollection()
                 .AddSingleton(_ => (ILogger) Activator.CreateInstance(typeof(Logger)));

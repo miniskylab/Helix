@@ -10,16 +10,17 @@ namespace Helix.Crawler
     public sealed class ResourceVerifier : IResourceVerifier
     {
         readonly Configurations _configurations;
+        readonly IContentTypeToResourceTypeDictionary _contentTypeToResourceTypeDictionary;
         readonly HttpClient _httpClient;
         bool _objectDisposed;
-        readonly IResourceProcessor _resourceProcessor;
         Task<HttpResponseMessage> _sendingGETRequestTask;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public ResourceVerifier(Configurations configurations, IResourceProcessor resourceProcessor, HttpClient httpClient)
+        public ResourceVerifier(Configurations configurations, IContentTypeToResourceTypeDictionary contentTypeToResourceTypeDictionary,
+            HttpClient httpClient)
         {
             _configurations = configurations;
-            _resourceProcessor = resourceProcessor;
+            _contentTypeToResourceTypeDictionary = contentTypeToResourceTypeDictionary;
             _objectDisposed = false;
             _httpClient = httpClient;
         }
@@ -59,8 +60,7 @@ namespace Helix.Crawler
                 var httpResponseMessage = _sendingGETRequestTask.Result;
                 resource.StatusCode = (StatusCode) httpResponseMessage.StatusCode;
                 resource.Size = httpResponseMessage.Content.Headers.ContentLength;
-
-                _resourceProcessor.Categorize(resource, httpResponseMessage.Content.Headers.ContentType?.ToString());
+                resource.ResourceType = _contentTypeToResourceTypeDictionary[httpResponseMessage.Content.Headers.ContentType?.ToString()];
                 verificationResult.ResourceType = Enum.GetName(typeof(ResourceType), resource.ResourceType);
             }
             catch (AggregateException aggregateException)

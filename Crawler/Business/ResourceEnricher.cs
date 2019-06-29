@@ -4,33 +4,16 @@ using Helix.Crawler.Abstractions;
 
 namespace Helix.Crawler
 {
-    public sealed class ResourceProcessor : IResourceProcessor
+    public sealed class ResourceEnricher : IResourceEnricher
     {
         readonly IIncrementalIdGenerator _incrementalIdGenerator;
         readonly IResourceScope _resourceScope;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public ResourceProcessor(IResourceScope resourceScope, IIncrementalIdGenerator incrementalIdGenerator)
+        public ResourceEnricher(IResourceScope resourceScope, IIncrementalIdGenerator incrementalIdGenerator)
         {
             _resourceScope = resourceScope;
             _incrementalIdGenerator = incrementalIdGenerator;
-        }
-
-        public void Categorize(Resource resource, string contentType)
-        {
-            if (resource == null) throw new ArgumentNullException();
-            if (contentType == null) return;
-            const StringComparison ordinalIgnoreCase = StringComparison.OrdinalIgnoreCase;
-            if (contentType.StartsWith("text/css", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Css;
-            if (contentType.StartsWith("text/html", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Html;
-            else if (contentType.StartsWith("image/", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Image;
-            else if (contentType.StartsWith("audio/", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Audio;
-            else if (contentType.StartsWith("video/", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Video;
-            else if (contentType.StartsWith("font/", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Font;
-            else if (contentType.StartsWith("application/pdf", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Pdf;
-            else if (contentType.StartsWith("application/javascript", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Script;
-            else if (contentType.StartsWith("application/ecmascript", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Script;
-            else if (contentType.StartsWith("application/octet-stream", ordinalIgnoreCase)) resource.ResourceType = ResourceType.Blob;
         }
 
         public Resource Enrich(Resource resource)

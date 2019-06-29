@@ -16,7 +16,7 @@ namespace Helix.Crawler
         readonly ILogger _logger;
         IMemory _memory;
         IReportWriter _reportWriter;
-        IResourceProcessor _resourceProcessor;
+        IResourceEnricher _resourceEnricher;
         IResourceScope _resourceScope;
         IScheduler _scheduler;
         readonly StateMachine<CrawlerState, CrawlerCommand> _stateMachine;
@@ -165,7 +165,7 @@ namespace Helix.Crawler
                 _memory = ServiceLocator.Get<IMemory>();
                 _resourceScope = ServiceLocator.Get<IResourceScope>();
                 _hardwareMonitor = ServiceLocator.Get<IHardwareMonitor>();
-                _resourceProcessor = ServiceLocator.Get<IResourceProcessor>();
+                _resourceEnricher = ServiceLocator.Get<IResourceEnricher>();
                 _reportWriter = ServiceLocator.Get<IReportWriter>();
                 _scheduler = ServiceLocator.Get<IScheduler>();
 
@@ -183,7 +183,7 @@ namespace Helix.Crawler
             {
                 BroadcastEvent(StartProgressUpdatedEvent("Activating main workflow ..."));
                 _memory.MemorizeToBeVerifiedResource(
-                    _resourceProcessor.Enrich(new Resource
+                    _resourceEnricher.Enrich(new Resource
                     {
                         ParentUri = null,
                         OriginalUrl = configurations.StartUri.AbsoluteUri

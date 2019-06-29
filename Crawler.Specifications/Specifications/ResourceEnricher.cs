@@ -5,18 +5,18 @@ using Xunit;
 
 namespace Helix.Crawler.Specifications
 {
-    public class ResourceProcessor : AbstractSpecifications
+    public class ResourceEnricher : AbstractSpecifications
     {
         [Theory]
         [ClassData(typeof(ResourceEnrichmentDefinition))]
         void EnrichResource(Resource resource, Resource expectedOutputResource, Type expectedExceptionType)
         {
-            var resourceProcessor = ServiceLocator.Get<IResourceProcessor>();
+            var resourceEnricher = ServiceLocator.Get<IResourceEnricher>();
             if (expectedExceptionType != null)
-                Assert.Throws(expectedExceptionType, () => { resourceProcessor.Enrich(resource); });
+                Assert.Throws(expectedExceptionType, () => { resourceEnricher.Enrich(resource); });
             else
             {
-                resourceProcessor.Enrich(resource);
+                resourceEnricher.Enrich(resource);
                 Assert.StrictEqual(expectedOutputResource?.ParentUri, resource?.ParentUri);
                 Assert.Equal(expectedOutputResource?.OriginalUrl, resource?.OriginalUrl);
                 Assert.StrictEqual(expectedOutputResource?.Uri, resource?.Uri);
