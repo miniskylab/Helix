@@ -162,7 +162,7 @@ namespace Helix.Crawler
                         if (renderingResult.HasValue) break;
                         if (cancellationToken.IsCancellationRequested)
                         {
-                            _webBrowser.CloseWebBrowser();
+                            _webBrowser.Restart(true);
                             break;
                         }
                         Thread.Sleep(1000);

@@ -151,35 +151,6 @@ namespace Helix.WebBrowser
             OpenWebBrowser(StartArguments);
         }
 
-        public void CloseWebBrowser(bool forcibly = false)
-        {
-            if (forcibly || _chromeDriver == null) KillAllRelatedProcesses();
-            else
-            {
-                try { _chromeDriver.Quit(); }
-                catch (WebDriverException webDriverException)
-                {
-                    if (webDriverException.InnerException?.GetType() != typeof(WebException)) throw;
-                    KillAllRelatedProcesses();
-                }
-            }
-            _chromeDriver = null;
-            _chromeDriverService = null;
-
-            void KillAllRelatedProcesses()
-            {
-                if (_chromeDriverService == null) return;
-                var childProcessQueryString = $"Select * From Win32_Process Where ParentProcessID={_chromeDriverService.ProcessId}";
-                var managementObjectSearcher = new ManagementObjectSearcher(childProcessQueryString);
-                foreach (var managementObject in managementObjectSearcher.Get())
-                {
-                    var processId = Convert.ToInt32(managementObject["ProcessID"]);
-                    Process.GetProcessById(processId).Kill();
-                }
-                Process.GetProcessById(_chromeDriverService.ProcessId).Kill();
-            }
-        }
-
         public void Dispose()
         {
             if (_objectDisposed) return;
@@ -199,6 +170,12 @@ namespace Helix.WebBrowser
             }
             finally { CloseWebBrowser(); }
             return _userAgentString;
+        }
+
+        public void Restart(bool forcibly = false)
+        {
+            CloseWebBrowser(forcibly);
+            OpenWebBrowser(StartArguments);
         }
 
         public bool TryRender(Uri uri, out string html, out long? millisecondsPageLoadTime, Action<Exception> onFailed)
@@ -290,6 +267,35 @@ namespace Helix.WebBrowser
             {
                 onFailed?.Invoke(exception);
                 return false;
+            }
+        }
+
+        void CloseWebBrowser(bool forcibly = false)
+        {
+            if (forcibly || _chromeDriver == null) KillAllRelatedProcesses();
+            else
+            {
+                try { _chromeDriver.Quit(); }
+                catch (WebDriverException webDriverException)
+                {
+                    if (webDriverException.InnerException?.GetType() != typeof(WebException)) throw;
+                    KillAllRelatedProcesses();
+                }
+            }
+            _chromeDriver = null;
+            _chromeDriverService = null;
+
+            void KillAllRelatedProcesses()
+            {
+                if (_chromeDriverService == null) return;
+                var childProcessQueryString = $"Select * From Win32_Process Where ParentProcessID={_chromeDriverService.ProcessId}";
+                var managementObjectSearcher = new ManagementObjectSearcher(childProcessQueryString);
+                foreach (var managementObject in managementObjectSearcher.Get())
+                {
+                    var processId = Convert.ToInt32(managementObject["ProcessID"]);
+                    Process.GetProcessById(processId).Kill();
+                }
+                Process.GetProcessById(_chromeDriverService.ProcessId).Kill();
             }
         }
 

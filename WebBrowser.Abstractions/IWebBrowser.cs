@@ -10,9 +10,9 @@ namespace Helix.WebBrowser.Abstractions
         event AsyncEventHandler<SessionEventArgs> BeforeRequest;
         event AsyncEventHandler<SessionEventArgs> BeforeResponse;
 
-        void CloseWebBrowser(bool forcibly = false);
-
         string GetUserAgentString();
+
+        void Restart(bool forcibly = false);
 
         bool TryRender(Uri uri, out string html, out long? millisecondsPageLoadTime, Action<Exception> onFailed = null);
 
