@@ -70,7 +70,10 @@ namespace Helix.Gui
                 DisableStopButton = true,
                 DisableCloseButton = true
             });
-            if (!CrawlerState.Completed.HasFlag(_crawlerBot.CrawlerState)) StopWorking();
+
+            var working = _crawlerBot != null && !CrawlerState.Completed.HasFlag(_crawlerBot.CrawlerState);
+            if (working) StopWorking();
+
             ManualResetEvent.Set();
             ManualResetEvent.Dispose();
         }
