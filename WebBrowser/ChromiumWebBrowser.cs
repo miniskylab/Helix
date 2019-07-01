@@ -282,14 +282,22 @@ namespace Helix.WebBrowser
                     KillAllRelatedProcesses();
                 }
             }
+
+            _chromeDriver?.Dispose();
+            _chromeDriverService.Dispose();
+
             _chromeDriver = null;
             _chromeDriverService = null;
 
             void KillAllRelatedProcesses()
             {
                 if (_chromeDriverService == null) return;
-                var childProcessQueryString = $"Select * From Win32_Process Where ParentProcessID={_chromeDriverService.ProcessId}";
-                var managementObjectSearcher = new ManagementObjectSearcher(childProcessQueryString);
+                var managementObjectSearcher = new ManagementObjectSearcher(
+                    "SELECT ProcessID, ParentProcessID, CreationDate " +
+                    "FROM Win32_Process " +
+                    $"WHERE ParentProcessID={_chromeDriverService.ProcessId} " +
+                    "ORDER BY CreationDate ASC"
+                );
                 foreach (var managementObject in managementObjectSearcher.Get())
                 {
                     var processId = Convert.ToInt32(managementObject["ProcessID"]);
