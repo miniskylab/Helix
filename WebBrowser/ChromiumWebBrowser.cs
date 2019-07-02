@@ -295,8 +295,7 @@ namespace Helix.WebBrowser
                 var managementObjectSearcher = new ManagementObjectSearcher(
                     "SELECT ProcessID, ParentProcessID, CreationDate " +
                     "FROM Win32_Process " +
-                    $"WHERE ParentProcessID={_chromeDriverService.ProcessId} " +
-                    "ORDER BY CreationDate ASC"
+                    $"WHERE ParentProcessID={_chromeDriverService.ProcessId}"
                 );
                 foreach (var managementObject in managementObjectSearcher.Get())
                 {
