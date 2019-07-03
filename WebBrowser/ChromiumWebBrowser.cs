@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Management;
 using System.Net;
+using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Helix.WebBrowser.Abstractions;
@@ -26,6 +27,7 @@ namespace Helix.WebBrowser
         readonly string _pathToChromeDriverExecutable;
         readonly string _pathToChromiumExecutable;
         readonly Stopwatch _stopwatch;
+        readonly object _terminationLock;
         readonly bool _useHeadlessWebBrowser;
         readonly bool _useIncognitoWebBrowser;
         static string _userAgentString;
@@ -140,6 +142,7 @@ namespace Helix.WebBrowser
         {
             _objectDisposed = false;
             _stopwatch = new Stopwatch();
+            _terminationLock = new object();
             _pathToChromiumExecutable = pathToChromiumExecutable;
             _pathToChromeDriverExecutable = pathToChromeDriverExecutable;
             _browserWindowSize = browserWindowSize == default ? (1024, 630) : browserWindowSize;
@@ -216,12 +219,24 @@ namespace Helix.WebBrowser
                     _chromeDriver.Navigate().GoToUrl(uri);
                     return true;
                 }
-                catch (NullReferenceException) when (_chromeDriver == null) { return false; }
+                catch (NullReferenceException nullReferenceException) when (InteractingWithAlreadyClosedWebBrowser(nullReferenceException))
+                {
+                    return false;
+                }
                 catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
                 {
                     CloseWebBrowser(true);
                     OpenWebBrowser(StartArguments);
                     return false;
+                }
+                catch (WebDriverException webDriverException) when (WebBrowserWasClosed(webDriverException))
+                {
+                    lock (_terminationLock)
+                    {
+                        var webBrowserIsNotClosed = _chromeDriver != null || _chromeDriverService != null;
+                        if (webBrowserIsNotClosed) throw;
+                        return false;
+                    }
                 }
                 finally
                 {
@@ -242,7 +257,7 @@ namespace Helix.WebBrowser
             bool TryGetPageSource(out string pageSource)
             {
                 try { pageSource = _chromeDriver.PageSource; }
-                catch (Exception exception) when (exception is NullReferenceException || TimeoutExceptionOccurred(exception))
+                catch (Exception exception) when (InteractingWithAlreadyClosedWebBrowser(exception) || TimeoutExceptionOccurred(exception))
                 {
                     pageSource = null;
                     return false;
@@ -272,22 +287,25 @@ namespace Helix.WebBrowser
 
         void CloseWebBrowser(bool forcibly = false)
         {
-            if (forcibly || _chromeDriver == null) KillAllRelatedProcesses();
-            else
+            lock (_terminationLock)
             {
-                try { _chromeDriver.Quit(); }
-                catch (WebDriverException webDriverException)
+                if (forcibly || _chromeDriver == null) KillAllRelatedProcesses();
+                else
                 {
-                    if (webDriverException.InnerException?.GetType() != typeof(WebException)) throw;
-                    KillAllRelatedProcesses();
+                    try { _chromeDriver.Quit(); }
+                    catch (WebDriverException webDriverException)
+                    {
+                        if (webDriverException.InnerException?.GetType() != typeof(WebException)) throw;
+                        KillAllRelatedProcesses();
+                    }
                 }
+
+                _chromeDriver?.Dispose();
+                _chromeDriverService.Dispose();
+
+                _chromeDriver = null;
+                _chromeDriverService = null;
             }
-
-            _chromeDriver?.Dispose();
-            _chromeDriverService.Dispose();
-
-            _chromeDriver = null;
-            _chromeDriverService = null;
 
             void KillAllRelatedProcesses()
             {
@@ -304,6 +322,11 @@ namespace Helix.WebBrowser
                 }
                 Process.GetProcessById(_chromeDriverService.ProcessId).Kill();
             }
+        }
+
+        bool InteractingWithAlreadyClosedWebBrowser(Exception exception)
+        {
+            return exception is NullReferenceException && _chromeDriver == null;
         }
 
         void OpenWebBrowser(IEnumerable<string> arguments)
@@ -345,6 +368,12 @@ namespace Helix.WebBrowser
         {
             return exception is WebDriverTimeoutException ||
                    exception.InnerException is WebException webException && webException.Status == WebExceptionStatus.Timeout;
+        }
+
+        static bool WebBrowserWasClosed(Exception exception)
+        {
+            return exception is WebDriverException webDriverException &&
+                   webDriverException.InnerException is WebException webException && webException.InnerException is HttpRequestException;
         }
 
         ~ChromiumWebBrowser() { ReleaseUnmanagedResources(); }
