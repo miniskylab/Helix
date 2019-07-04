@@ -6,6 +6,7 @@ using System.Management;
 using System.Net;
 using System.Net.Http;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Helix.WebBrowser.Abstractions;
 using OpenQA.Selenium;
@@ -24,10 +25,11 @@ namespace Helix.WebBrowser
         readonly TimeSpan _commandTimeout;
         ProxyServer _httpProxyServer;
         bool _objectDisposed;
+        readonly object _openClosedLock;
         readonly string _pathToChromeDriverExecutable;
         readonly string _pathToChromiumExecutable;
+        readonly object _renderingLock;
         readonly Stopwatch _stopwatch;
-        readonly object _terminationLock;
         readonly bool _useHeadlessWebBrowser;
         readonly bool _useIncognitoWebBrowser;
         static string _userAgentString;
@@ -142,7 +144,8 @@ namespace Helix.WebBrowser
         {
             _objectDisposed = false;
             _stopwatch = new Stopwatch();
-            _terminationLock = new object();
+            _renderingLock = new object();
+            _openClosedLock = new object();
             _pathToChromiumExecutable = pathToChromiumExecutable;
             _pathToChromeDriverExecutable = pathToChromeDriverExecutable;
             _browserWindowSize = browserWindowSize == default ? (1024, 630) : browserWindowSize;
@@ -177,24 +180,27 @@ namespace Helix.WebBrowser
 
         public void Restart(bool forcibly = false)
         {
-            CloseWebBrowser(forcibly);
-            OpenWebBrowser(StartArguments);
+            lock (_openClosedLock)
+            {
+                CloseWebBrowser(forcibly);
+                OpenWebBrowser(StartArguments);
+            }
         }
 
         public bool TryRender(Uri uri, out string html, out long? millisecondsPageLoadTime, Action<Exception> onFailed)
         {
-            CurrentUri = uri ?? throw new ArgumentNullException(nameof(uri));
-
-            html = null;
-            millisecondsPageLoadTime = null;
-            var renderingFailedErrorMessage = $"Chromium web browser failed to render the URI: {uri}";
-            if (_objectDisposed) throw new ObjectDisposedException(nameof(ChromiumWebBrowser));
-
             try
             {
+                Monitor.Enter(_renderingLock);
+                CurrentUri = uri ?? throw new ArgumentNullException(nameof(uri));
+                if (_objectDisposed) throw new ObjectDisposedException(nameof(ChromiumWebBrowser));
+
+                html = null;
+                millisecondsPageLoadTime = null;
+
                 if (!TryGoToUri())
                 {
-                    onFailed?.Invoke(new Exception(renderingFailedErrorMessage));
+                    onFailed?.Invoke(new Exception($"Chromium web browser failed to render the URI: {uri}"));
                     return false;
                 }
 
@@ -207,7 +213,11 @@ namespace Helix.WebBrowser
                 millisecondsPageLoadTime = _stopwatch.ElapsedMilliseconds;
                 return true;
             }
-            finally { _stopwatch.Reset(); }
+            finally
+            {
+                _stopwatch.Reset();
+                Monitor.Exit(_renderingLock);
+            }
 
             bool TryGoToUri()
             {
@@ -225,13 +235,12 @@ namespace Helix.WebBrowser
                 }
                 catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
                 {
-                    CloseWebBrowser(true);
-                    OpenWebBrowser(StartArguments);
+                    Restart(true);
                     return false;
                 }
                 catch (WebDriverException webDriverException) when (WebBrowserWasClosed(webDriverException))
                 {
-                    lock (_terminationLock)
+                    lock (_openClosedLock)
                     {
                         var webBrowserIsNotClosed = _chromeDriver != null || _chromeDriverService != null;
                         if (webBrowserIsNotClosed) throw;
@@ -287,9 +296,9 @@ namespace Helix.WebBrowser
 
         void CloseWebBrowser(bool forcibly = false)
         {
-            lock (_terminationLock)
+            lock (_openClosedLock)
             {
-                if (forcibly || _chromeDriver == null) KillAllRelatedProcesses();
+                if (forcibly) KillAllRelatedProcesses();
                 else
                 {
                     try { _chromeDriver.Quit(); }
@@ -331,21 +340,24 @@ namespace Helix.WebBrowser
 
         void OpenWebBrowser(IEnumerable<string> arguments)
         {
-            _chromeDriverService = ChromeDriverService.CreateDefaultService(_pathToChromeDriverExecutable);
-            _chromeDriverService.HideCommandPromptWindow = true;
-
-            var chromeOptions = new ChromeOptions
+            lock (_openClosedLock)
             {
-                BinaryLocation = _pathToChromiumExecutable,
-                Proxy = new Proxy
+                _chromeDriverService = ChromeDriverService.CreateDefaultService(_pathToChromeDriverExecutable);
+                _chromeDriverService.HideCommandPromptWindow = true;
+
+                var chromeOptions = new ChromeOptions
                 {
-                    HttpProxy = $"http://{IPAddress.Loopback}:{_httpProxyServer.ProxyEndPoints[0].Port}",
-                    FtpProxy = $"http://{IPAddress.Loopback}:{_httpProxyServer.ProxyEndPoints[0].Port}",
-                    SslProxy = $"http://{IPAddress.Loopback}:{_httpProxyServer.ProxyEndPoints[0].Port}"
-                }
-            };
-            foreach (var argument in arguments) chromeOptions.AddArguments(argument);
-            _chromeDriver = new ChromeDriver(_chromeDriverService, chromeOptions, _commandTimeout);
+                    BinaryLocation = _pathToChromiumExecutable,
+                    Proxy = new Proxy
+                    {
+                        HttpProxy = $"http://{IPAddress.Loopback}:{_httpProxyServer.ProxyEndPoints[0].Port}",
+                        FtpProxy = $"http://{IPAddress.Loopback}:{_httpProxyServer.ProxyEndPoints[0].Port}",
+                        SslProxy = $"http://{IPAddress.Loopback}:{_httpProxyServer.ProxyEndPoints[0].Port}"
+                    }
+                };
+                foreach (var argument in arguments) chromeOptions.AddArguments(argument);
+                _chromeDriver = new ChromeDriver(_chromeDriverService, chromeOptions, _commandTimeout);
+            }
         }
 
         void ReleaseUnmanagedResources()
