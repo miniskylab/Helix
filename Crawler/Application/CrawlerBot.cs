@@ -120,8 +120,8 @@ namespace Helix.Crawler
             }
             void ReleaseResources()
             {
-                BroadcastEvent(StopProgressUpdatedEvent("Releasing resources ..."));
-                ServiceLocator.DisposeTransientServices();
+                BroadcastEvent(StopProgressUpdatedEvent("Disposing services ..."));
+                ServiceLocator.DisposeServices();
             }
             Event StopProgressUpdatedEvent(string message = "")
             {
@@ -138,7 +138,7 @@ namespace Helix.Crawler
             if (!TryTransit(CrawlerCommand.Initialize)) return false;
             try
             {
-                ConnectServices();
+                InitializeAndConnectServices();
                 EnsureDirectoryContainsScreenshotFilesIsRecreated();
                 ActivateMainWorkflow();
                 MonitorHardwareResources();
@@ -157,10 +157,14 @@ namespace Helix.Crawler
                 return false;
             }
 
-            void ConnectServices()
+            void InitializeAndConnectServices()
             {
-                _logger.LogInfo("Connecting services ...");
-                ServiceLocator.CreateTransientServices(configurations);
+                _logger.LogInfo("Initializing services ...");
+                ServiceLocator.InitializeServices(configurations);
+
+                _eventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
+                BroadcastEvent(StartProgressUpdatedEvent("Connecting services ..."));
+
                 Statistics = ServiceLocator.Get<IStatistics>();
                 _memory = ServiceLocator.Get<IMemory>();
                 _resourceScope = ServiceLocator.Get<IResourceScope>();
@@ -168,9 +172,6 @@ namespace Helix.Crawler
                 _resourceEnricher = ServiceLocator.Get<IResourceEnricher>();
                 _reportWriter = ServiceLocator.Get<IReportWriter>();
                 _scheduler = ServiceLocator.Get<IScheduler>();
-
-                _eventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
-                _eventBroadcaster.OnEventBroadcast += BroadcastEvent;
             }
             void EnsureDirectoryContainsScreenshotFilesIsRecreated()
             {

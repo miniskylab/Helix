@@ -198,15 +198,15 @@ namespace Helix.WebBrowser
                 html = null;
                 millisecondsPageLoadTime = null;
 
-                if (!TryGoToUri())
+                if (!TryGoToUri(out var failureReason))
                 {
-                    onFailed?.Invoke(new Exception($"Chromium web browser failed to render the URI: {uri}"));
+                    onFailed?.Invoke(new Exception($"Chromium web browser failed to render the URI: {uri}\r\n{failureReason}"));
                     return false;
                 }
 
-                if (!TryGetPageSource(out html))
+                if (!TryGetPageSource(out html, out failureReason))
                 {
-                    onFailed?.Invoke(new MemberAccessException($"Chromium web browser failed to obtain page source of the URI: {uri}"));
+                    onFailed?.Invoke(new Exception($"Chromium web browser failed to obtain HTML of the URI: {uri}\r\n{failureReason}"));
                     return false;
                 }
 
@@ -219,10 +219,11 @@ namespace Helix.WebBrowser
                 Monitor.Exit(_renderingLock);
             }
 
-            bool TryGoToUri()
+            bool TryGoToUri(out string failureReason)
             {
                 try
                 {
+                    failureReason = string.Empty;
                     _httpProxyServer.BeforeResponse += BeforeResponse;
                     _httpProxyServer.BeforeRequest += BeforeRequest;
                     _stopwatch.Restart();
@@ -231,19 +232,20 @@ namespace Helix.WebBrowser
                 }
                 catch (NullReferenceException nullReferenceException) when (InteractingWithAlreadyClosedWebBrowser(nullReferenceException))
                 {
+                    failureReason = "-----> Chromium web browser is already closed.";
                     return false;
                 }
                 catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
                 {
                     Restart(true);
+                    failureReason = "-----> Chromium web browser waited too long for a response.";
                     return false;
                 }
                 catch (WebDriverException webDriverException) when (WebBrowserWasClosed(webDriverException))
                 {
                     lock (_openClosedLock)
                     {
-                        var webBrowserIsNotClosed = _chromeDriver != null || _chromeDriverService != null;
-                        if (webBrowserIsNotClosed) throw;
+                        failureReason = "-----> Chromium web browser was forcibly closed or restarted.";
                         return false;
                     }
                 }
@@ -263,12 +265,23 @@ namespace Helix.WebBrowser
                     return this.BeforeResponse?.Invoke(sender, networkTraffic);
                 }
             }
-            bool TryGetPageSource(out string pageSource)
+            bool TryGetPageSource(out string pageSource, out string failureReason)
             {
-                try { pageSource = _chromeDriver.PageSource; }
-                catch (Exception exception) when (InteractingWithAlreadyClosedWebBrowser(exception) || TimeoutExceptionOccurred(exception))
+                try
+                {
+                    failureReason = string.Empty;
+                    pageSource = _chromeDriver.PageSource;
+                }
+                catch (Exception exception) when (InteractingWithAlreadyClosedWebBrowser(exception))
                 {
                     pageSource = null;
+                    failureReason = "-----> Chromium web browser is already closed.";
+                    return false;
+                }
+                catch (Exception exception) when (TimeoutExceptionOccurred(exception))
+                {
+                    pageSource = null;
+                    failureReason = "-----> Chromium web browser waited too long for a response.";
                     return false;
                 }
                 return true;
