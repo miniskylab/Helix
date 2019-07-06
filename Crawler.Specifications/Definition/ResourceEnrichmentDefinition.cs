@@ -60,7 +60,14 @@ namespace Helix.Crawler.Specifications
         void DetectMalformedUris()
         {
             var parentUri = new Uri("http://www.helix.com");
-            const string originalUrl = "http:///malformed-uri";
+            var originalUrl = "http:///malformed-uri";
+            AddTheoryDescription(
+                new Resource { ParentUri = parentUri, OriginalUrl = originalUrl },
+                new Resource { ParentUri = parentUri, OriginalUrl = originalUrl, StatusCode = StatusCode.MalformedUri }
+            );
+
+            parentUri = new Uri("https://www.helix.com");
+            originalUrl = "http:/incompatible-scheme";
             AddTheoryDescription(
                 new Resource { ParentUri = parentUri, OriginalUrl = originalUrl },
                 new Resource { ParentUri = parentUri, OriginalUrl = originalUrl, StatusCode = StatusCode.MalformedUri }
@@ -82,6 +89,7 @@ namespace Helix.Crawler.Specifications
         {
             const StatusCode statusCode = StatusCode.UriSchemeNotSupported;
             var parentUri = new Uri("http://www.helix.com");
+
             var originalUrl = "ftp://www.sanity.com";
             AddTheoryDescription(
                 new Resource { ParentUri = parentUri, OriginalUrl = originalUrl },

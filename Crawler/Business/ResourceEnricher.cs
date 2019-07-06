@@ -42,7 +42,8 @@ namespace Helix.Crawler
                     return true;
                 }
 
-                resource.Uri = new Uri(resource.ParentUri, resource.OriginalUrl);
+                if (!Uri.TryCreate(resource.ParentUri, resource.OriginalUrl, out var absoluteUri)) return false;
+                resource.Uri = absoluteUri;
                 return true;
             }
             bool UriSchemeIsNotSupported() { return resource.Uri.Scheme != "http" && resource.Uri.Scheme != "https"; }
