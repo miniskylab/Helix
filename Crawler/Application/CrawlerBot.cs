@@ -163,6 +163,7 @@ namespace Helix.Crawler
                 ServiceLocator.InitializeServices(configurations);
 
                 _eventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
+                _eventBroadcaster.OnEventBroadcast += BroadcastEvent;
                 BroadcastEvent(StartProgressUpdatedEvent("Connecting services ..."));
 
                 Statistics = ServiceLocator.Get<IStatistics>();

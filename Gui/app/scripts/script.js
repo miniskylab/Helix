@@ -35,7 +35,7 @@ const btnClose = document.getElementById("btn-close");
 const btnPreview = document.getElementById("btn-preview");
 const btnCloseAboutMeOverlay = document.getElementById("btn-close-about-me-overlay");
 
-let waitingCountdown = null;
+let waitingCountdownTimer = null;
 
 socket.connect(18880, "127.0.0.1", () => {
 
@@ -175,13 +175,13 @@ function mainButtonIsStartButton() { return btnMain.firstElementChild.className 
 function mainButtonIsPauseButton() { return btnMain.firstElementChild.className === "controls__pause-icon"; }
 
 function showWaitingOverlay(waitingTimeInSecond = 0, onTimeup = () => {}) {
-    if (waitingCountdown) return;
+    if (waitingCountdownTimer) return;
     const getWaitingOverlaySubTitle = (remainingTime) => `(Please allow up to <div style='display:inline-block;color:#FF6347;'>${remainingTime}</div> seconds)`;
     waitingOverlaySubtitle.innerHTML = getWaitingOverlaySubTitle(waitingTimeInSecond);
     lblWaitingOverlayMessage.textContent = "Initializing stop sequence ...";
     waitingOverlay.style.display = "block";
 
-    waitingCountdown = setInterval(() => {
+    waitingCountdownTimer = setInterval(() => {
         waitingTimeInSecond--;
         waitingOverlaySubtitle.innerHTML = getWaitingOverlaySubTitle(waitingTimeInSecond);
         if (waitingTimeInSecond === 0) {
@@ -192,10 +192,10 @@ function showWaitingOverlay(waitingTimeInSecond = 0, onTimeup = () => {}) {
 }
 
 function hideWaitingOverlay() {
-    if (!waitingCountdown) return;
+    if (!waitingCountdownTimer) return;
     waitingOverlay.style.display = "none";
-    clearInterval(waitingCountdown);
-    waitingCountdown = null;
+    clearInterval(waitingCountdownTimer);
+    waitingCountdownTimer = null;
 }
 
 function attachEndOfTransmissionCharacter(message) { return `${message}${endOfTransmissionCharacter}`; }
