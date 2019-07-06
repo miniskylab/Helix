@@ -14,7 +14,7 @@ namespace Helix.Crawler
         {
             if (resource == null || resource.Uri == null) throw new ArgumentNullException();
             if (IsStartUri(resource.Uri)) return true;
-            if (resource.Uri.Authority.Equals(_configurations.DomainName, StringComparison.OrdinalIgnoreCase)) return true;
+            if (resource.Uri.Authority.Equals(_configurations.RemoteHost, StringComparison.OrdinalIgnoreCase)) return true;
 
             if (resource.ParentUri == null) throw new ArgumentException();
             return resource.Uri.Authority.Equals(resource.ParentUri.Authority, StringComparison.OrdinalIgnoreCase);
@@ -29,7 +29,7 @@ namespace Helix.Crawler
         public Uri Localize(Uri uri)
         {
             if (uri == null) throw new ArgumentNullException();
-            if (!uri.Authority.Equals(_configurations.DomainName, StringComparison.OrdinalIgnoreCase)) return uri;
+            if (!uri.Authority.Equals(_configurations.RemoteHost, StringComparison.OrdinalIgnoreCase)) return uri;
 
             var uriBuilder = new UriBuilder(uri) { Host = _configurations.StartUri.Host, Port = _configurations.StartUri.Port };
             return uriBuilder.Uri;

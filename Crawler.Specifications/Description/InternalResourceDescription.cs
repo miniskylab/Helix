@@ -11,9 +11,9 @@ namespace Helix.Crawler.Specifications
         public InternalResourceDescription()
         {
             ShareHostNameWithParent();
-            MatchConfiguredDomainName();
-            IsStartUriUsingDomainName();
-            IsStartUriUsingIpAddress();
+            MatchConfiguredRemoteHost();
+            IsStartUriByHostName();
+            IsStartUriByIpAddress();
 
             IsNotInternalResourceInAllOtherCases();
 
@@ -27,7 +27,7 @@ namespace Helix.Crawler.Specifications
             AddTheoryDescription(p2: resource);
         }
 
-        void IsStartUriUsingDomainName()
+        void IsStartUriByHostName()
         {
             var resource = new Resource { ParentUri = null, Uri = new Uri("http://www.helix.com") };
             var configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
@@ -37,24 +37,24 @@ namespace Helix.Crawler.Specifications
             AddTheoryDescription(configurations, resource, true);
         }
 
-        void IsStartUriUsingIpAddress()
+        void IsStartUriByIpAddress()
         {
             var resource = new Resource { ParentUri = null, Uri = new Uri("http://www.helix.com") };
             var configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
             {
                 { nameof(Configurations.StartUri), "http://192.168.1.2" },
-                { nameof(Configurations.DomainName), "www.helix.com" }
+                { nameof(Configurations.RemoteHost), "www.helix.com" }
             }));
             AddTheoryDescription(configurations, resource, true);
         }
 
-        void MatchConfiguredDomainName()
+        void MatchConfiguredRemoteHost()
         {
             var resource = new Resource { ParentUri = new Uri("http://192.168.1.2/parent"), Uri = new Uri("http://www.helix.com/child") };
             var configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
             {
                 { nameof(Configurations.StartUri), "http://192.168.1.2" },
-                { nameof(Configurations.DomainName), "www.helix.com" }
+                { nameof(Configurations.RemoteHost), "www.helix.com" }
             }));
             AddTheoryDescription(configurations, resource, true);
 
@@ -62,7 +62,7 @@ namespace Helix.Crawler.Specifications
             configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
             {
                 { nameof(Configurations.StartUri), "http://192.168.1.2" },
-                { nameof(Configurations.DomainName), "helix.com" }
+                { nameof(Configurations.RemoteHost), "helix.com" }
             }));
             AddTheoryDescription(configurations, resource);
         }

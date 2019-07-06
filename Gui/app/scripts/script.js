@@ -7,7 +7,7 @@ const htmlElement = document.getElementById("html");
 const titleBar = document.getElementById("title-bar");
 
 const txtStartUri = document.getElementById("txt-start-uri");
-const txtDomainName = document.getElementById("txt-domain-name");
+const txtRemoteHost = document.getElementById("txt-remote-host");
 const ckbVerifyExternalUrls = document.getElementById("ckb-verify-external-urls");
 const ckbUseWebBrowsers = document.getElementById("ckb-use-web-browsers");
 
@@ -61,7 +61,7 @@ socket.connect(18880, "127.0.0.1", () => {
                         text: "Start",
                         payload: JSON.stringify({
                             StartUri: txtStartUri.value,
-                            DomainName: txtDomainName.value,
+                            HostName: txtRemoteHost.value,
                             VerifyExternalUrls: ckbVerifyExternalUrls.checked,
                             UseWebBrowsers: ckbUseWebBrowsers.checked
                         })

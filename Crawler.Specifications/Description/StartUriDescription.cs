@@ -22,7 +22,7 @@ namespace Helix.Crawler.Specifications
             var configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
             {
                 { nameof(Configurations.StartUri), "http://192.168.1.2" },
-                { nameof(Configurations.DomainName), "www.helix.com" }
+                { nameof(Configurations.RemoteHost), "www.helix.com" }
             }));
             AddTheoryDescription(configurations, new Uri("http://www.helix.com"));
             AddTheoryDescription(p2: new Uri("http://www.helix.com/anything"));

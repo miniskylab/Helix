@@ -7,8 +7,6 @@ namespace Helix.Crawler.Abstractions
 {
     public class Configurations
     {
-        public string DomainName { get; }
-
         public static int GuiControllerPort { get; } = 18880;
 
         public TimeSpan HttpRequestTimeout { get; } = TimeSpan.FromMinutes(3);
@@ -27,6 +25,8 @@ namespace Helix.Crawler.Abstractions
 
         public static string PathToSqLiteBrowserExecutable { get; } =
             Path.Combine(WorkingDirectory, "sqlite-browser/DB Browser for SQLite.exe");
+
+        public string RemoteHost { get; }
 
         public int ResourceExtractorCount { get; } = 300;
 
@@ -52,8 +52,8 @@ namespace Helix.Crawler.Abstractions
             VerifyExternalUrls = (bool) (tokens.SelectToken(nameof(VerifyExternalUrls)) ?? false);
             StartUri = ValidateStartUri((string) tokens.SelectToken(nameof(StartUri)) ?? string.Empty);
 
-            DomainName = ((string) tokens.SelectToken(nameof(DomainName)) ?? string.Empty).ToLower();
-            if (string.IsNullOrWhiteSpace(DomainName)) DomainName = "_";
+            RemoteHost = ((string) tokens.SelectToken(nameof(RemoteHost)) ?? string.Empty).ToLower();
+            if (string.IsNullOrWhiteSpace(RemoteHost)) RemoteHost = "_";
         }
 
         static Uri ValidateStartUri(string startUrl)
