@@ -4,15 +4,17 @@ using Helix.Specifications;
 
 namespace Helix.Crawler.Specifications
 {
-    internal class ResourceEnrichmentDefinition : TheoryDescription<Resource, Resource, Type>
+    internal class ResourceEnrichmentDescription : TheoryDescription<Resource, Resource, Type>
     {
-        public ResourceEnrichmentDefinition()
+        public ResourceEnrichmentDescription()
         {
             CreateUriFromOriginalUrl();
+
             DetectMalformedUris();
             ConvertRelativeToAbsoluteUrl();
             SupportOnlyHttpAndHttpsSchemes();
             StripFragments();
+
             ThrowExceptionIfArgumentNull();
         }
 

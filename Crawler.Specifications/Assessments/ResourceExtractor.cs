@@ -9,8 +9,8 @@ namespace Helix.Crawler.Specifications
     public class ResourceExtractor : AbstractSpecifications
     {
         [Theory]
-        [ClassData(typeof(ResourceExtractionDefinition))]
-        void ExtractResourcesFromHtmlDocument(HtmlDocument htmlDocument, IList<Resource> expectedOutputResources,
+        [ClassData(typeof(ResourceExtractionDescription))]
+        void ExtractResourcesFromHtmlDocument(HtmlDocument inputHtmlDocument, IList<Resource> expectedOutputResources,
             Type expectedExceptionType)
         {
             var resourceExtractedEventRaiseCount = 0;
@@ -20,12 +20,12 @@ namespace Helix.Crawler.Specifications
                 Assert.True(resourceExtractedEventRaiseCount == 0);
                 Assert.Throws(
                     expectedExceptionType,
-                    () => resourceExtractor.ExtractResourcesFrom(htmlDocument, OnResourceExtracted)
+                    () => resourceExtractor.ExtractResourcesFrom(inputHtmlDocument, OnResourceExtracted)
                 );
             }
             else
             {
-                resourceExtractor.ExtractResourcesFrom(htmlDocument, OnResourceExtracted);
+                resourceExtractor.ExtractResourcesFrom(inputHtmlDocument, OnResourceExtracted);
                 Assert.Equal(expectedOutputResources.Count, resourceExtractedEventRaiseCount);
             }
 

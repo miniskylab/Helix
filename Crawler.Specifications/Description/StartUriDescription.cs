@@ -6,13 +6,15 @@ using Newtonsoft.Json;
 
 namespace Helix.Crawler.Specifications
 {
-    internal class StartUriDefinition : TheoryDescription<Configurations, Uri, bool, Type>
+    internal class StartUriDescription : TheoryDescription<Configurations, Uri, bool, Type>
     {
-        public StartUriDefinition()
+        public StartUriDescription()
         {
             MatchConfiguredStartUri();
-            ThrowExceptionIfArgumentNull();
+
             IsNotStartUriInAllOtherCases();
+
+            ThrowExceptionIfArgumentNull();
         }
 
         void IsNotStartUriInAllOtherCases()

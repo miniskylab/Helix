@@ -5,14 +5,16 @@ using Helix.Specifications;
 
 namespace Helix.Crawler.Specifications
 {
-    internal class ResourceExtractionDefinition : TheoryDescription<HtmlDocument, IList<Resource>, Type>
+    internal class ResourceExtractionDescription : TheoryDescription<HtmlDocument, IList<Resource>, Type>
     {
-        public ResourceExtractionDefinition()
+        public ResourceExtractionDescription()
         {
             ExtractResourcesFromHtmlDocument();
+
             IgnoreAnchorTagsWithoutHrefAttribute();
             IgnoreAnchorTagsWithHrefAttributeContainingEmptyOrWhiteSpaceCharactersOnly();
             IgnoreAnchorTagsWithHrefAttributeContainingJavaScriptCode();
+
             ThrowExceptionIfArgumentNull();
         }
 

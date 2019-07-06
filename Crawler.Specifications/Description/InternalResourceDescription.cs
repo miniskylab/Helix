@@ -1,32 +1,30 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using Helix.Crawler.Abstractions;
 using Helix.Specifications;
 using Newtonsoft.Json;
 
 namespace Helix.Crawler.Specifications
 {
-    internal class InternalResourceDefinition : TheoryDescription<Configurations, Resource, bool, Type>
+    internal class InternalResourceDescription : TheoryDescription<Configurations, Resource, bool, Type>
     {
-        public InternalResourceDefinition()
+        public InternalResourceDescription()
         {
             ShareHostNameWithParent();
             MatchConfiguredDomainName();
             IsStartUriUsingDomainName();
             IsStartUriUsingIpAddress();
 
+            IsNotInternalResourceInAllOtherCases();
+
             ThrowExceptionIfArgumentNull();
             ThrowExceptionIfArgumentIsNotValid();
-
-            IsNotInternalResourceInAllOtherCases();
         }
 
-        [SuppressMessage("ReSharper", "RedundantArgumentDefaultValue")]
         void IsNotInternalResourceInAllOtherCases()
         {
             var resource = new Resource { ParentUri = new Uri("http://www.helix.com"), Uri = new Uri("http://www.sanity.com/anything") };
-            AddTheoryDescription(p2: resource, p3: false);
+            AddTheoryDescription(p2: resource);
         }
 
         void IsStartUriUsingDomainName()
@@ -50,7 +48,6 @@ namespace Helix.Crawler.Specifications
             AddTheoryDescription(configurations, resource, true);
         }
 
-        [SuppressMessage("ReSharper", "RedundantArgumentDefaultValue")]
         void MatchConfiguredDomainName()
         {
             var resource = new Resource { ParentUri = new Uri("http://192.168.1.2/parent"), Uri = new Uri("http://www.helix.com/child") };
@@ -67,7 +64,7 @@ namespace Helix.Crawler.Specifications
                 { nameof(Configurations.StartUri), "http://192.168.1.2" },
                 { nameof(Configurations.DomainName), "helix.com" }
             }));
-            AddTheoryDescription(configurations, resource, false);
+            AddTheoryDescription(configurations, resource);
         }
 
         void ShareHostNameWithParent()

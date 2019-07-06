@@ -6,26 +6,28 @@ using Newtonsoft.Json;
 
 namespace Helix.Crawler.Specifications
 {
-    internal class UriLocalizationDefinition : TheoryDescription<Configurations, Uri, Uri, Type>
+    internal class UriLocalizationDescription : TheoryDescription<Configurations, Uri, Uri, Type>
     {
-        public UriLocalizationDefinition()
+        public UriLocalizationDescription()
         {
-            ReplaceDomainNameMatchingConfiguredWithStartUriAuthority();
-            DoesNothingToUriWhoseAuthorityIsDifferentFromTheConfiguredDomainName();
+            ReplaceHostNameMatchingConfigurationsWithHostNameOfStartUri();
+
+            DoesNothingToUriWhoseHostNameIsDifferentFromTheConfiguredHostName();
+
             ThrowExceptionIfArgumentNull();
         }
 
-        void DoesNothingToUriWhoseAuthorityIsDifferentFromTheConfiguredDomainName()
+        void DoesNothingToUriWhoseHostNameIsDifferentFromTheConfiguredHostName()
         {
             var configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
             {
-                { nameof(Configurations.StartUri), "http://www.helix.com" },
+                { nameof(Configurations.StartUri), "http://www.sanity.com" },
                 { nameof(Configurations.DomainName), "www.helix.com" }
             }));
             AddTheoryDescription(configurations, new Uri("http://www.sanity.com/anything"), new Uri("http://www.sanity.com/anything"));
         }
 
-        void ReplaceDomainNameMatchingConfiguredWithStartUriAuthority()
+        void ReplaceHostNameMatchingConfigurationsWithHostNameOfStartUri()
         {
             var configurations = new Configurations(JsonConvert.SerializeObject(new Dictionary<string, string>
             {
