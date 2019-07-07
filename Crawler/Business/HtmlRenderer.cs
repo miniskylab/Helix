@@ -139,37 +139,19 @@ namespace Helix.Crawler
             _networkTrafficCts = new CancellationTokenSource();
             _resourceBeingRendered = resource;
 
-            bool? renderingResult = null;
             var uri = resource.Uri;
-            EnsureCancellable();
-            renderingResult = _webBrowser.TryRender(uri, out html, out millisecondsPageLoadTime, onFailed);
+            var renderingResult = _webBrowser.TryRender(uri, out html, out millisecondsPageLoadTime, cancellationToken, onFailed);
 
             if (resource.IsBroken) millisecondsPageLoadTime = null;
-            if (!_takeScreenshot) return renderingResult.Value;
+            if (!_takeScreenshot) return renderingResult;
 
             var pathToDirectoryContainsScreenshotFiles = Configurations.PathToDirectoryContainsScreenshotFiles;
             var pathToScreenshotFile = Path.Combine(pathToDirectoryContainsScreenshotFiles, $"{_resourceBeingRendered.Id}.png");
             _webBrowser.TryTakeScreenshot(pathToScreenshotFile, OnScreenshotTakingFailed);
             _takeScreenshot = false;
 
-            return renderingResult.Value;
+            return renderingResult;
 
-            void EnsureCancellable()
-            {
-                Task.Run(() =>
-                {
-                    while (true)
-                    {
-                        if (renderingResult.HasValue) break;
-                        if (cancellationToken.IsCancellationRequested)
-                        {
-                            _webBrowser.Restart(true);
-                            break;
-                        }
-                        Thread.Sleep(1000);
-                    }
-                }, cancellationToken);
-            }
             void EnsureNetworkTrafficIsHalted()
             {
                 _networkTrafficCts?.Cancel();

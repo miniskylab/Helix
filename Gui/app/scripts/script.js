@@ -53,7 +53,7 @@ socket.connect(18880, "127.0.0.1", () => {
                 RemainingWorkload: "-",
                 MillisecondsAveragePageLoadTime: "-",
                 ElapsedTime: "-- : -- : --",
-                StatusText: "Initializing start sequence ..."
+                StatusText: "Initializing services ..."
             });
             socket.write(
                 attachEndOfTransmissionCharacter(

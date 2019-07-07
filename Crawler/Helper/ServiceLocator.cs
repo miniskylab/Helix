@@ -112,7 +112,9 @@ namespace Helix.Crawler
             }
             ISqLitePersistence<VerificationResult> CreateAndConfigureSqLitePersistence()
             {
-                return new SqLitePersistence<VerificationResult>(Configurations.PathToReportFile);
+                var sqLitePersistence = new SqLitePersistence<VerificationResult>(Configurations.PathToReportFile);
+                Get<IEventBroadcaster>().Broadcast(new Event { EventType = EventType.ReportFileCreated });
+                return sqLitePersistence;
             }
         }
     }
