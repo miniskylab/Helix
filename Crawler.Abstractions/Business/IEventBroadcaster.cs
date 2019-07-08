@@ -2,7 +2,7 @@
 
 namespace Helix.Crawler.Abstractions
 {
-    public interface IEventBroadcaster
+    public interface IEventBroadcaster : IDisposable
     {
         event Action<Event> OnEventBroadcast;
 

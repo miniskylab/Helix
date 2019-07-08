@@ -6,7 +6,7 @@ using Helix.Crawler.Abstractions;
 
 namespace Helix.Crawler
 {
-    public class EventBroadcaster : IEventBroadcaster, IDisposable
+    public class EventBroadcaster : IEventBroadcaster
     {
         CancellationTokenSource _cancellationTokenSource;
         BlockingCollection<Event> _events;
@@ -48,8 +48,12 @@ namespace Helix.Crawler
 
         void ReleaseUnmanagedResources()
         {
-            _events?.Dispose();
-            _events = null;
+            if (_events != null)
+            {
+                while (_events.Count > 0) Thread.Sleep(300);
+                _events.Dispose();
+                _events = null;
+            }
 
             _cancellationTokenSource?.Cancel();
             _cancellationTokenSource?.Dispose();

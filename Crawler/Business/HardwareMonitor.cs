@@ -43,7 +43,7 @@ namespace Helix.Crawler
                         const int millisecondSampleInterval = 1000;
                         Thread.Sleep(millisecondSampleInterval);
 
-                        const float bufferRate = 1.3f;
+                        const float bufferRate = 1.5f;
                         cpuUsageSamples.Add((int) MathF.Ceiling(performanceCounter.NextValue() * bufferRate));
 
                         var millisecondTotalElapsedTime = cpuUsageSamples.Count * millisecondSampleInterval;
