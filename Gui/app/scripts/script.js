@@ -117,6 +117,7 @@ function redraw(frame) {
     if (notNullAndUndefined(frame.MillisecondsAveragePageLoadTime)) lblAveragePageLoadTime.textContent = frame.MillisecondsAveragePageLoadTime.toLocaleString("en-US", {maximumFractionDigits: 0});
     if (isNumeric(frame.MillisecondsAveragePageLoadTime)) lblAveragePageLoadTimeUnitOfMeasure.style.visibility = "visible";
     if (notNullAndUndefined(frame.ElapsedTime)) lblElapsedTime.textContent = frame.ElapsedTime;
+    if (notNullAndUndefined(frame.StatusText)) lblStatusText.textContent = frame.StatusText;
 
     if (frame.ShowWaitingOverlay === true) showWaitingOverlay(120, () => { dialogOverlay.style.display = "block"; });
     else if (frame.ShowWaitingOverlay === false) {
@@ -124,9 +125,7 @@ function redraw(frame) {
         dialogOverlay.style.display = "none";
     }
 
-    if (notNullAndUndefined(frame.StatusText)) waitingOverlay.style.display === "block"
-        ? lblWaitingOverlayMessage.textContent = frame.StatusText
-        : lblStatusText.textContent = frame.StatusText;
+    if (notNullAndUndefined(frame.WaitingOverlayProgressText)) lblWaitingOverlayMessage.textContent = frame.WaitingOverlayProgressText;
 
     if (frame.DisableStopButton === true && !btnStop.hasAttribute("disabled")) btnStop.setAttribute("disabled", "");
     else if (frame.DisableStopButton === false && btnStop.hasAttribute("disabled")) btnStop.removeAttribute("disabled");

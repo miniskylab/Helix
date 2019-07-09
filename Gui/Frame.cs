@@ -1,4 +1,3 @@
-using JetBrains.Annotations;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 
@@ -8,36 +7,38 @@ namespace Helix.Gui
     public class Frame
     {
         [JsonConverter(typeof(StringEnumConverter))]
-        public BorderColor? BorderColor { [UsedImplicitly] get; set; }
+        public BorderColor? BorderColor { get; set; }
 
-        public int? BrokenUrlCount { [UsedImplicitly] get; set; }
+        public int? BrokenUrlCount { get; set; }
 
-        public bool? DisableCloseButton { [UsedImplicitly] get; set; }
+        public bool? DisableCloseButton { get; set; }
 
-        public bool? DisableConfigurationPanel { [UsedImplicitly] get; set; }
+        public bool? DisableConfigurationPanel { get; set; }
 
-        public bool? DisableMainButton { [UsedImplicitly] get; set; }
+        public bool? DisableMainButton { get; set; }
 
-        public bool? DisablePreviewButton { [UsedImplicitly] get; set; }
+        public bool? DisablePreviewButton { get; set; }
 
-        public bool? DisableStopButton { [UsedImplicitly] get; set; }
+        public bool? DisableStopButton { get; set; }
 
-        public string ElapsedTime { [UsedImplicitly] get; set; }
+        public string ElapsedTime { get; set; }
 
         [JsonConverter(typeof(StringEnumConverter))]
-        public MainButtonFunctionality? MainButtonFunctionality { [UsedImplicitly] get; set; }
+        public MainButtonFunctionality? MainButtonFunctionality { get; set; }
 
-        public double? MillisecondsAveragePageLoadTime { [UsedImplicitly] get; set; }
+        public double? MillisecondsAveragePageLoadTime { get; set; }
 
-        public int? RemainingWorkload { [UsedImplicitly] get; set; }
+        public int? RemainingWorkload { get; set; }
 
-        public bool? ShowWaitingOverlay { [UsedImplicitly] get; set; }
+        public bool? ShowWaitingOverlay { get; set; }
 
-        public string StatusText { [UsedImplicitly] get; set; }
+        public string StatusText { get; set; }
 
-        public int? ValidUrlCount { [UsedImplicitly] get; set; }
+        public int? ValidUrlCount { get; set; }
 
-        public int? VerifiedUrlCount { [UsedImplicitly] get; set; }
+        public int? VerifiedUrlCount { get; set; }
+
+        public string WaitingOverlayProgressText { get; set; }
     }
 
     public enum MainButtonFunctionality

@@ -278,13 +278,13 @@ namespace Helix.WebBrowser
                     pageSource = _chromeDriver.PageSource;
                     return true;
                 }
-                catch (Exception exception) when (InteractingWithAlreadyClosedWebBrowser(exception))
+                catch (NullReferenceException nullReferenceException) when (InteractingWithAlreadyClosedWebBrowser(nullReferenceException))
                 {
                     pageSource = null;
                     failureReason = "-----> Chromium web browser is already closed.";
                     return false;
                 }
-                catch (Exception exception) when (TimeoutExceptionOccurred(exception))
+                catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
                 {
                     pageSource = null;
                     failureReason = "-----> Chromium web browser waited too long for a response.";
@@ -328,8 +328,9 @@ namespace Helix.WebBrowser
                     try { _chromeDriver.Quit(); }
                     catch (WebDriverException webDriverException)
                     {
-                        if (webDriverException.InnerException?.GetType() != typeof(WebException)) throw;
-                        KillAllRelatedProcesses();
+                        var chromiumBrowserDoesNotRespondToCommand = webDriverException.InnerException?.GetType() == typeof(WebException);
+                        if (chromiumBrowserDoesNotRespondToCommand) KillAllRelatedProcesses();
+                        else throw;
                     }
                 }
 

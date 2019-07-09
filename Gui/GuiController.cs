@@ -293,7 +293,6 @@ namespace Helix.Gui
         {
             try
             {
-                _crawlerBot.OnEventBroadcast -= OnResourceVerified;
                 _crawlerBot.OnEventBroadcast += OnStopProgressUpdated;
                 _crawlerBot.Stop();
 
@@ -314,7 +313,7 @@ namespace Helix.Gui
             void OnStopProgressUpdated(Event @event)
             {
                 if (@event.EventType != EventType.StopProgressUpdated) return;
-                Redraw(new Frame { StatusText = @event.Message });
+                Redraw(new Frame { WaitingOverlayProgressText = @event.Message });
             }
         }
 
