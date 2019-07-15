@@ -254,6 +254,11 @@ namespace Helix.WebBrowser
                     failureReason = "-----> Chromium web browser was forcibly closed.";
                     return false;
                 }
+                catch (Exception exception)
+                {
+                    failureReason = $"-----> {exception}";
+                    return false;
+                }
                 finally
                 {
                     _pageLoadTimeStopwatch.Stop();
@@ -294,6 +299,12 @@ namespace Helix.WebBrowser
                 {
                     pageSource = null;
                     failureReason = "-----> Chromium web browser was forcibly closed.";
+                    return false;
+                }
+                catch (Exception exception)
+                {
+                    pageSource = null;
+                    failureReason = $"-----> {exception}";
                     return false;
                 }
             }
