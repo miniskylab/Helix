@@ -158,7 +158,7 @@ namespace Helix.Crawler
                 while (_activeHttpTrafficCount > 0) Thread.Sleep(100);
                 _networkTrafficCts?.Dispose();
             }
-            void OnScreenshotTakingFailed(Exception exception) { _logger.LogInfo($"Failed to take screenshot of [{uri}].\r\n{exception}"); }
+            void OnScreenshotTakingFailed(Exception exception) { _logger.LogInfo($"Failed to take screenshot of [{uri}].\r\n-----> {exception}"); }
         }
 
         void ReleaseUnmanagedResources()

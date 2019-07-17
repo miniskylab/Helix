@@ -191,13 +191,17 @@ namespace Helix.WebBrowser
 
                 if (!TryGoToUri(out var failureReason))
                 {
-                    onFailed?.Invoke(new Exception($"Chromium web browser failed to render the URI: {uri}\r\n{failureReason}"));
+                    onFailed?.Invoke(
+                        new Exception($"Chromium web browser failed to render the URI: {uri}\r\n-----> {failureReason}")
+                    );
                     return false;
                 }
 
                 if (!TryGetPageSource(out html, out failureReason))
                 {
-                    onFailed?.Invoke(new Exception($"Chromium web browser failed to obtain HTML of the URI: {uri}\r\n{failureReason}"));
+                    onFailed?.Invoke(
+                        new Exception($"Chromium web browser failed to obtain HTML of the URI: {uri}\r\n-----> {failureReason}")
+                    );
                     return false;
                 }
 
@@ -240,23 +244,23 @@ namespace Helix.WebBrowser
                 }
                 catch (NullReferenceException nullReferenceException) when (InteractingWithAlreadyClosedWebBrowser(nullReferenceException))
                 {
-                    failureReason = "-----> Chromium web browser is already closed.";
+                    failureReason = "Chromium web browser is already closed.";
                     return false;
                 }
                 catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
                 {
                     RestartWebBrowser(true);
-                    failureReason = "-----> Chromium web browser waited too long for a response.";
+                    failureReason = "Chromium web browser waited too long for a response.";
                     return false;
                 }
                 catch (WebDriverException webDriverException) when (WebBrowserUnreachable(webDriverException))
                 {
-                    failureReason = "-----> Chromium web browser was forcibly closed.";
+                    failureReason = "Chromium web browser was forcibly closed.";
                     return false;
                 }
                 catch (Exception exception)
                 {
-                    failureReason = $"-----> {exception}";
+                    failureReason = $"{exception}";
                     return false;
                 }
                 finally
@@ -286,25 +290,25 @@ namespace Helix.WebBrowser
                 catch (NullReferenceException nullReferenceException) when (InteractingWithAlreadyClosedWebBrowser(nullReferenceException))
                 {
                     pageSource = null;
-                    failureReason = "-----> Chromium web browser is already closed.";
+                    failureReason = "Chromium web browser is already closed.";
                     return false;
                 }
                 catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
                 {
                     pageSource = null;
-                    failureReason = "-----> Chromium web browser waited too long for a response.";
+                    failureReason = "Chromium web browser waited too long for a response.";
                     return false;
                 }
                 catch (WebDriverException webDriverException) when (WebBrowserUnreachable(webDriverException))
                 {
                     pageSource = null;
-                    failureReason = "-----> Chromium web browser was forcibly closed.";
+                    failureReason = "Chromium web browser was forcibly closed.";
                     return false;
                 }
                 catch (Exception exception)
                 {
                     pageSource = null;
-                    failureReason = $"-----> {exception}";
+                    failureReason = $"{exception}";
                     return false;
                 }
             }
@@ -321,6 +325,22 @@ namespace Helix.WebBrowser
                 var screenShot = _chromeDriver.GetScreenshot();
                 Task.Run(() => { screenShot.SaveAsFile(pathToScreenshotFile, ScreenshotImageFormat.Png); });
                 return true;
+            }
+            catch (NullReferenceException nullReferenceException) when (InteractingWithAlreadyClosedWebBrowser(nullReferenceException))
+            {
+                onFailed?.Invoke(new WebDriverException("Chromium web browser is already closed."));
+                return false;
+            }
+            catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
+            {
+                RestartWebBrowser(true);
+                onFailed?.Invoke(new WebDriverException("Chromium web browser waited too long for a response."));
+                return false;
+            }
+            catch (WebDriverException webDriverException) when (WebBrowserUnreachable(webDriverException))
+            {
+                onFailed?.Invoke(new WebDriverException("Chromium web browser was forcibly closed."));
+                return false;
             }
             catch (Exception exception)
             {
