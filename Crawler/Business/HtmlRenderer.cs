@@ -4,8 +4,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Helix.Core;
 using Helix.Crawler.Abstractions;
-using Helix.Persistence.Abstractions;
 using Helix.WebBrowser.Abstractions;
+using log4net;
 using Titanium.Web.Proxy.EventArguments;
 
 namespace Helix.Crawler
@@ -13,7 +13,7 @@ namespace Helix.Crawler
     public class HtmlRenderer : IHtmlRenderer
     {
         int _activeHttpTrafficCount;
-        readonly ILogger _logger;
+        readonly ILog _log;
         CancellationTokenSource _networkTrafficCts;
         bool _objectDisposed;
         Resource _resourceBeingRendered;
@@ -25,13 +25,13 @@ namespace Helix.Crawler
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public HtmlRenderer(Configurations configurations, IWebBrowser webBrowser, IResourceScope resourceScope, IReportWriter reportWriter,
             IResourceEnricher resourceEnricher, IHttpContentTypeToResourceTypeDictionary httpContentTypeToResourceTypeDictionary,
-            ILogger logger)
+            ILog log)
         {
             _webBrowser = webBrowser;
             _webBrowser.BeforeRequest += EnsureInternal;
             _webBrowser.BeforeResponse += CaptureNetworkTraffic;
 
-            _logger = logger;
+            _log = log;
             _objectDisposed = false;
             _takeScreenshot = false;
 
@@ -108,7 +108,7 @@ namespace Helix.Crawler
                     if (response.StatusCode == (int) _resourceBeingRendered.StatusCode) return;
                     var newStatusCode = response.StatusCode;
                     var oldStatusCode = (int) _resourceBeingRendered.StatusCode;
-                    logger.LogInfo($"StatusCode changed from [{oldStatusCode}] to [{newStatusCode}] at [{_resourceBeingRendered.Uri}]");
+                    log.Info($"StatusCode changed from [{oldStatusCode}] to [{newStatusCode}] at [{_resourceBeingRendered.Uri}]");
 
                     _resourceBeingRendered.StatusCode = (StatusCode) response.StatusCode;
                     reportWriter.UpdateStatusCode(_resourceBeingRendered.Id, (StatusCode) response.StatusCode);
@@ -158,7 +158,10 @@ namespace Helix.Crawler
                 while (_activeHttpTrafficCount > 0) Thread.Sleep(100);
                 _networkTrafficCts?.Dispose();
             }
-            void OnScreenshotTakingFailed(Exception exception) { _logger.LogInfo($"Failed to take screenshot of [{uri}].\r\n-----> {exception}"); }
+            void OnScreenshotTakingFailed(Exception exception)
+            {
+                _log.Info($"Failed to take screenshot of [{uri}].\r\n-----> {exception}");
+            }
         }
 
         void ReleaseUnmanagedResources()

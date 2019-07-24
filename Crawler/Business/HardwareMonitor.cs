@@ -7,14 +7,14 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Helix.Crawler.Abstractions;
-using Helix.Persistence.Abstractions;
+using log4net;
 
 namespace Helix.Crawler
 {
     public class HardwareMonitor : IHardwareMonitor
     {
         CancellationTokenSource _cancellationTokenSource;
-        readonly ILogger _logger;
+        readonly ILog _log;
         Task _samplingTask;
 
         public bool IsRunning { get; private set; }
@@ -23,7 +23,7 @@ namespace Helix.Crawler
         public event Action<int, int> OnLowCpuAndMemoryUsage;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public HardwareMonitor(ILogger logger) { _logger = logger; }
+        public HardwareMonitor(ILog log) { _log = log; }
 
         public void StartMonitoring(double millisecondSampleDuration, float highCpuUsageThreshold, float lowCpuUsageThreshold,
             float highMemoryUsageThreshold, float lowMemoryUsageThreshold)
@@ -88,7 +88,7 @@ namespace Helix.Crawler
         {
             var performanceInformation = new PerformanceInformation();
             if (!GetPerformanceInfo(out performanceInformation, Marshal.SizeOf(performanceInformation)))
-                _logger.LogInfo($"Failed to get performance information. Default value used is: {performanceInformation}");
+                _log.Info($"Failed to get performance information. Default value used is: {performanceInformation}");
 
             var totalMemory = performanceInformation.PhysicalTotal.ToInt64();
             var consumedMemory = totalMemory - performanceInformation.PhysicalAvailable.ToInt64();

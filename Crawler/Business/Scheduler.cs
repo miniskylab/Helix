@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Helix.Core;
 using Helix.Crawler.Abstractions;
-using Helix.Persistence.Abstractions;
+using log4net;
 
 namespace Helix.Crawler
 {
@@ -12,7 +12,7 @@ namespace Helix.Crawler
         CancellationTokenSource _cancellationTokenSource;
         readonly IEventBroadcaster _eventBroadcaster;
         readonly object _extractionLock;
-        readonly ILogger _logger;
+        readonly ILog _log;
         readonly IMemory _memory;
         readonly INetworkServicePool _networkServicePool;
         bool _objectDisposed;
@@ -50,10 +50,10 @@ namespace Helix.Crawler
         }
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public Scheduler(IMemory memory, ILogger logger, INetworkServicePool networkServicePool, IEventBroadcaster eventBroadcaster)
+        public Scheduler(IMemory memory, ILog log, INetworkServicePool networkServicePool, IEventBroadcaster eventBroadcaster)
         {
             _memory = memory;
-            _logger = logger;
+            _log = log;
             _networkServicePool = networkServicePool;
             _eventBroadcaster = eventBroadcaster;
             _objectDisposed = false;
@@ -105,7 +105,7 @@ namespace Helix.Crawler
                     () =>
                     {
                         try { taskDescription(resourceExtractor, toBeExtractedHtmlDocument); }
-                        catch (Exception exception) { _logger.LogException(exception); }
+                        catch (Exception exception) { _log.Error(null, exception); }
                         finally { ReleaseResourceExtractor(); }
                     },
                     CancellationToken
@@ -121,7 +121,7 @@ namespace Helix.Crawler
             catch (Exception exception)
             {
                 if (exception is EverythingIsDoneException) return;
-                _logger.LogException(exception);
+                _log.Error(null, exception);
             }
 
             void GetResourceExtractorAndToBeExtractedHtmlDocument()
@@ -197,13 +197,13 @@ namespace Helix.Crawler
             catch (Exception exception)
             {
                 if (exception is EverythingIsDoneException) return;
-                _logger.LogException(exception);
+                _log.Error(null, exception);
             }
 
             void ExecuteTaskDescription()
             {
                 try { taskDescription(htmlRenderer, toBeRenderedResource); }
-                catch (Exception exception) { _logger.LogException(exception); }
+                catch (Exception exception) { _log.Error(null, exception); }
                 finally { ReleaseHtmlRenderer(); }
             }
             void GetHtmlRendererAndToBeRenderedResource()
@@ -259,7 +259,7 @@ namespace Helix.Crawler
                     () =>
                     {
                         try { taskDescription(resourceVerifier, toBeVerifiedResource); }
-                        catch (Exception exception) { _logger.LogException(exception); }
+                        catch (Exception exception) { _log.Error(null, exception); }
                         finally { ReleaseResourceVerifier(); }
                     },
                     CancellationToken
@@ -275,7 +275,7 @@ namespace Helix.Crawler
             catch (Exception exception)
             {
                 if (exception is EverythingIsDoneException) return;
-                _logger.LogException(exception);
+                _log.Error(null, exception);
             }
 
             void GetResourceVerifierAndToBeVerifiedResource()

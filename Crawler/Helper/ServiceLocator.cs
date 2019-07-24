@@ -2,11 +2,17 @@ using System;
 using System.Data;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Reflection;
 using Helix.Crawler.Abstractions;
 using Helix.Persistence;
 using Helix.Persistence.Abstractions;
 using Helix.WebBrowser;
 using Helix.WebBrowser.Abstractions;
+using log4net;
+using log4net.Appender;
+using log4net.Core;
+using log4net.Layout;
+using log4net.Repository.Hierarchy;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Helix.Crawler
@@ -36,8 +42,10 @@ namespace Helix.Crawler
                 .AddSingleton<IHardwareMonitor, HardwareMonitor>()
                 .AddSingleton<IHttpContentTypeToResourceTypeDictionary, HttpContentTypeToResourceTypeDictionary>();
 
+            ConfigureLogging();
+
             var applicationWideSingletonServiceCollection = new ServiceCollection()
-                .AddSingleton(_ => (ILogger) Activator.CreateInstance(typeof(Logger)));
+                .AddSingleton(_ => LogManager.GetLogger(Assembly.GetEntryAssembly(), nameof(Helix)));
             ApplicationWideSingletonServiceProvider = applicationWideSingletonServiceCollection.BuildServiceProvider();
 
             foreach (var applicationWideSingletonServiceDescriptor in applicationWideSingletonServiceCollection)
@@ -46,12 +54,35 @@ namespace Helix.Crawler
                     ApplicationWideSingletonServiceProvider.GetService(applicationWideSingletonServiceDescriptor.ServiceType)
                 );
 
-            AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
+            AppDomain.CurrentDomain.ProcessExit += (_, __) =>
             {
-                ApplicationWideSingletonServiceProvider.GetService<ILogger>().LogInfo("Disposing application-wide singleton services ...");
-                ApplicationWideSingletonServiceProvider.GetService<ILogger>().Dispose();
+                ApplicationWideSingletonServiceProvider.GetService<ILog>().Info("Disposing application-wide singleton services ...");
+                ApplicationWideSingletonServiceProvider.GetService<ILog>().Logger.Repository.Shutdown();
                 ApplicationWideSingletonServiceProvider.Dispose();
             };
+
+            void ConfigureLogging()
+            {
+                var patternLayout = new PatternLayout
+                    { ConversionPattern = "[%date] [%30thread] [%5level] [%10logger] - %message%newline" };
+                patternLayout.ActivateOptions();
+
+                var hierarchy = (Hierarchy) LogManager.GetRepository(Assembly.GetEntryAssembly());
+                var rollingFileAppender = new RollingFileAppender
+                {
+                    File = $"logs\\{nameof(Helix)}.{DateTime.Now:yyyyMMdd-HHmmss}.log",
+                    AppendToFile = false,
+                    PreserveLogFileNameExtension = true,
+                    RollingStyle = RollingFileAppender.RollingMode.Size,
+                    MaxSizeRollBackups = -1,
+                    MaximumFileSize = "1GB",
+                    Layout = patternLayout
+                };
+                rollingFileAppender.ActivateOptions();
+                hierarchy.Root.AddAppender(rollingFileAppender);
+                hierarchy.Root.Level = Level.Debug;
+                hierarchy.Configured = true;
+            }
         }
 
         public static void DisposeServices()

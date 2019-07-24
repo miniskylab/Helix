@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
 using Helix.Crawler.Abstractions;
-using Helix.Persistence.Abstractions;
+using log4net;
 
 namespace Helix.Crawler
 {
@@ -11,17 +11,17 @@ namespace Helix.Crawler
     {
         readonly IEventBroadcaster _eventBroadcaster;
         BlockingCollection<IHtmlRenderer> _htmlRendererPool;
-        readonly ILogger _logger;
+        readonly ILog _log;
         bool _objectDisposed;
         BlockingCollection<IResourceExtractor> _resourceExtractorPool;
         BlockingCollection<IResourceVerifier> _resourceVerifierPool;
         Statistics _statistics;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public NetworkServicePool(Configurations configurations, ILogger logger, IEventBroadcaster eventBroadcaster, IMemory memory,
+        public NetworkServicePool(Configurations configurations, ILog log, IEventBroadcaster eventBroadcaster, IMemory memory,
             IHardwareMonitor hardwareMonitor)
         {
-            _logger = logger;
+            _log = log;
             _objectDisposed = false;
             _statistics = new Statistics();
             _eventBroadcaster = eventBroadcaster;
@@ -65,7 +65,7 @@ namespace Helix.Crawler
                     CreateHtmlRenderer();
 
                     var createdHtmlRendererCount = _statistics.CreatedHtmlRendererCount;
-                    _logger.LogInfo(
+                    _log.Info(
                         $"Low CPU usage ({averageCpuUsage}%) and low memory usage ({memoryUsage}%) detected. " +
                         $"Browser count increased from {createdHtmlRendererCount - 1} to {createdHtmlRendererCount}."
                     );
@@ -81,17 +81,17 @@ namespace Helix.Crawler
 
                     var createdHtmlRendererCount = _statistics.CreatedHtmlRendererCount;
                     if (averageCpuUsage != null && memoryUsage != null)
-                        _logger.LogInfo(
+                        _log.Info(
                             $"High CPU usage ({averageCpuUsage}%) and high memory usage ({memoryUsage}%) detected. " +
                             $"Browser count decreased from {createdHtmlRendererCount + 1} to {createdHtmlRendererCount}."
                         );
                     else if (averageCpuUsage != null)
-                        _logger.LogInfo(
+                        _log.Info(
                             $"High CPU usage ({averageCpuUsage}%) detected. " +
                             $"Browser count decreased from {createdHtmlRendererCount + 1} to {createdHtmlRendererCount}."
                         );
                     else
-                        _logger.LogInfo(
+                        _log.Info(
                             $"High memory usage ({memoryUsage}%) detected. " +
                             $"Browser count decreased from {createdHtmlRendererCount + 1} to {createdHtmlRendererCount}."
                         );
@@ -220,7 +220,7 @@ namespace Helix.Crawler
                     );
 
                 if (string.IsNullOrEmpty(orphanedResourceErrorMessage)) return;
-                _logger.LogInfo($"Orphaned resources detected!{orphanedResourceErrorMessage}");
+                _log.Info($"Orphaned resources detected!{orphanedResourceErrorMessage}");
 
                 string GetErrorMessage(int createdCount, string resourceName, int disposedCount)
                 {

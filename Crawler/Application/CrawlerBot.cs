@@ -5,7 +5,7 @@ using System.Net;
 using System.Threading.Tasks;
 using Helix.Core;
 using Helix.Crawler.Abstractions;
-using Helix.Persistence.Abstractions;
+using log4net;
 
 namespace Helix.Crawler
 {
@@ -13,7 +13,7 @@ namespace Helix.Crawler
     {
         IEventBroadcaster _eventBroadcaster;
         IHardwareMonitor _hardwareMonitor;
-        readonly ILogger _logger;
+        readonly ILog _log;
         IMemory _memory;
         IReportWriter _reportWriter;
         IResourceEnricher _resourceEnricher;
@@ -39,7 +39,7 @@ namespace Helix.Crawler
 
         public CrawlerBot()
         {
-            _logger = ServiceLocator.Get<ILogger>();
+            _log = ServiceLocator.Get<ILog>();
             _stateMachine = new StateMachine<CrawlerState, CrawlerCommand>(
                 new Dictionary<Transition<CrawlerState, CrawlerCommand>, CrawlerState>
                 {
@@ -88,7 +88,7 @@ namespace Helix.Crawler
                     Message = Enum.GetName(typeof(CrawlerState), CrawlerState)
                 });
             }
-            catch (Exception exception) { _logger.LogException(exception); }
+            catch (Exception exception) { _log.Error(null, exception); }
 
             void StopMonitoringHardwareResources()
             {
@@ -113,7 +113,7 @@ namespace Helix.Crawler
                 try { _waitingForCompletionTask.Wait(); }
                 catch (Exception exception)
                 {
-                    _logger.LogException(exception);
+                    _log.Error(null, exception);
                     crawlerCommand = CrawlerCommand.MarkAsFaulted;
                 }
                 finally { _waitingForCompletionTask = null; }
@@ -147,7 +147,7 @@ namespace Helix.Crawler
             }
             catch (Exception exception)
             {
-                _logger.LogException(exception);
+                _log.Error(null, exception);
                 TryTransit(CrawlerCommand.Abort);
                 _waitingForCompletionTask = Task.FromException(exception);
 
@@ -157,7 +157,7 @@ namespace Helix.Crawler
 
             void InitializeAndConnectServices()
             {
-                _logger.LogInfo("Initializing services ...");
+                _log.Info("Initializing services ...");
                 ServiceLocator.InitializeServices(configurations);
 
                 _eventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
@@ -165,7 +165,7 @@ namespace Helix.Crawler
                 {
                     OnEventBroadcast?.Invoke(@event);
                     if (@event.EventType != EventType.ResourceVerified && !string.IsNullOrWhiteSpace(@event.Message))
-                        _logger.LogInfo(@event.Message);
+                        _log.Info(@event.Message);
                 };
                 _eventBroadcaster.Broadcast(StartProgressUpdatedEvent("Connecting services ..."));
 
@@ -204,7 +204,7 @@ namespace Helix.Crawler
                             Task.Run(Verify, _scheduler.CancellationToken)
                         ).Wait();
                     }
-                    catch (Exception exception) { _logger.LogException(exception); }
+                    catch (Exception exception) { _log.Error(null, exception); }
                     finally
                     {
                         if (CrawlerState == CrawlerState.Running) Task.Run(Stop);
@@ -221,7 +221,7 @@ namespace Helix.Crawler
                                 out var htmlText,
                                 out var millisecondsPageLoadTime,
                                 _scheduler.CancellationToken,
-                                _logger.LogException
+                                exception => { _log.Error(null, exception); }
                             );
                             if (renderingFailed) return;
                             if (millisecondsPageLoadTime.HasValue)
@@ -269,8 +269,8 @@ namespace Helix.Crawler
                             var resourceSizeInMb = resource.Size / 1024f / 1024f;
                             var resourceIsTooBig = resourceSizeInMb > 10;
                             if (resourceIsTooBig)
-                                _logger.LogInfo($"Resource was not queued for rendering because it was too big ({resourceSizeInMb} MB) - " +
-                                                $"{resource.Uri}");
+                                _log.Info($"Resource was not queued for rendering because it was too big ({resourceSizeInMb} MB) - " +
+                                          $"{resource.Uri}");
 
                             var isInternalResource = resource.IsInternal;
                             var isExtractedResource = resource.IsExtracted;
@@ -283,7 +283,7 @@ namespace Helix.Crawler
             }
             void MonitorHardwareResources()
             {
-                _logger.LogInfo("Starting hardware monitor service ...");
+                _log.Info("Starting hardware monitor service ...");
                 _hardwareMonitor.StartMonitoring();
             }
             Event StartProgressUpdatedEvent(string message)
@@ -301,8 +301,8 @@ namespace Helix.Crawler
             if (_stateMachine.TryMoveNext(crawlerCommand)) return true;
 
             var commandName = Enum.GetName(typeof(CrawlerCommand), crawlerCommand);
-            _logger.LogInfo($"Transition from state [{_stateMachine.CurrentState}] via [{commandName}] command failed.\n" +
-                            $"{Environment.StackTrace}");
+            _log.Info($"Transition from state [{_stateMachine.CurrentState}] via [{commandName}] command failed.\n" +
+                      $"{Environment.StackTrace}");
             return false;
         }
     }
