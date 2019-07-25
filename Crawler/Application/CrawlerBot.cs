@@ -88,7 +88,10 @@ namespace Helix.Crawler
                     Message = Enum.GetName(typeof(CrawlerState), CrawlerState)
                 });
             }
-            catch (Exception exception) { _log.Error(null, exception); }
+            catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(_scheduler.CancellationToken))
+            {
+                _log.Error("One or more errors occured when stopping crawling.", exception);
+            }
 
             void StopMonitoringHardwareResources()
             {
@@ -111,10 +114,10 @@ namespace Helix.Crawler
                 _eventBroadcaster.Broadcast(StopProgressUpdatedEvent("Waiting for background tasks to complete ..."));
 
                 try { _waitingForCompletionTask.Wait(); }
-                catch (Exception exception)
+                catch (Exception)
                 {
-                    _log.Error(null, exception);
                     crawlerCommand = CrawlerCommand.MarkAsFaulted;
+                    throw;
                 }
                 finally { _waitingForCompletionTask = null; }
             }
@@ -145,9 +148,9 @@ namespace Helix.Crawler
                 TryTransit(CrawlerCommand.Run);
                 return true;
             }
-            catch (Exception exception)
+            catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(_scheduler.CancellationToken))
             {
-                _log.Error(null, exception);
+                _log.Error("One or more errors occured when trying to start crawling.", exception);
                 TryTransit(CrawlerCommand.Abort);
                 _waitingForCompletionTask = Task.FromException(exception);
 
@@ -204,7 +207,10 @@ namespace Helix.Crawler
                             Task.Run(Verify, _scheduler.CancellationToken)
                         ).Wait();
                     }
-                    catch (Exception exception) { _log.Error(null, exception); }
+                    catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(_scheduler.CancellationToken))
+                    {
+                        _log.Error("One or more errors occured when activating main workflow", exception);
+                    }
                     finally
                     {
                         if (CrawlerState == CrawlerState.Running) Task.Run(Stop);
@@ -221,7 +227,7 @@ namespace Helix.Crawler
                                 out var htmlText,
                                 out var millisecondsPageLoadTime,
                                 _scheduler.CancellationToken,
-                                exception => { _log.Error(null, exception); }
+                                exception => { _log.Error("One or more errors occured when trying to render an URL.", exception); }
                             );
                             if (renderingFailed) return;
                             if (millisecondsPageLoadTime.HasValue)

@@ -105,7 +105,10 @@ namespace Helix.Crawler
                     () =>
                     {
                         try { taskDescription(resourceExtractor, toBeExtractedHtmlDocument); }
-                        catch (Exception exception) { _log.Error(null, exception); }
+                        catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(CancellationToken))
+                        {
+                            _log.Error("One or more errors occured.", exception);
+                        }
                         finally { ReleaseResourceExtractor(); }
                     },
                     CancellationToken
@@ -118,10 +121,10 @@ namespace Helix.Crawler
                     TaskContinuationOptions.OnlyOnCanceled | TaskContinuationOptions.ExecuteSynchronously
                 );
             }
-            catch (Exception exception)
+            catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(CancellationToken))
             {
                 if (exception is EverythingIsDoneException) return;
-                _log.Error(null, exception);
+                _log.Error("One or more errors occured.", exception);
             }
 
             void GetResourceExtractorAndToBeExtractedHtmlDocument()
@@ -194,16 +197,19 @@ namespace Helix.Crawler
                     TaskContinuationOptions.OnlyOnCanceled | TaskContinuationOptions.ExecuteSynchronously
                 );
             }
-            catch (Exception exception)
+            catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(CancellationToken))
             {
                 if (exception is EverythingIsDoneException) return;
-                _log.Error(null, exception);
+                _log.Error("One or more errors occured.", exception);
             }
 
             void ExecuteTaskDescription()
             {
                 try { taskDescription(htmlRenderer, toBeRenderedResource); }
-                catch (Exception exception) { _log.Error(null, exception); }
+                catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(CancellationToken))
+                {
+                    _log.Error("One or more errors occured.", exception);
+                }
                 finally { ReleaseHtmlRenderer(); }
             }
             void GetHtmlRendererAndToBeRenderedResource()
@@ -259,7 +265,10 @@ namespace Helix.Crawler
                     () =>
                     {
                         try { taskDescription(resourceVerifier, toBeVerifiedResource); }
-                        catch (Exception exception) { _log.Error(null, exception); }
+                        catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(CancellationToken))
+                        {
+                            _log.Error("One or more errors occured.", exception);
+                        }
                         finally { ReleaseResourceVerifier(); }
                     },
                     CancellationToken
@@ -272,10 +281,10 @@ namespace Helix.Crawler
                     TaskContinuationOptions.OnlyOnCanceled | TaskContinuationOptions.ExecuteSynchronously
                 );
             }
-            catch (Exception exception)
+            catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(CancellationToken))
             {
                 if (exception is EverythingIsDoneException) return;
-                _log.Error(null, exception);
+                _log.Error("One or more errors occured.", exception);
             }
 
             void GetResourceVerifierAndToBeVerifiedResource()
