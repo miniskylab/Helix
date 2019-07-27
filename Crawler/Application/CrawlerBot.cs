@@ -161,8 +161,8 @@ namespace Helix.Crawler
 
             void InitializeAndConnectServices()
             {
-                _log.Info("Initializing services ...");
-                ServiceLocator.InitializeServices(configurations);
+                _log.Info("Setting up and configuring services ...");
+                ServiceLocator.SetupAndConfigureServices(configurations);
 
                 _eventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
                 _eventBroadcaster.OnEventBroadcast += @event =>
@@ -228,7 +228,7 @@ namespace Helix.Crawler
                                 out var htmlText,
                                 out var millisecondsPageLoadTime,
                                 _scheduler.CancellationToken,
-                                exception => { _log.Error("One or more errors occured when trying to render an URL.", exception); }
+                                exception => { _log.Info("One or more errors occured when trying to render an URL.", exception); }
                             );
                             if (renderingFailed) return;
                             if (millisecondsPageLoadTime.HasValue)

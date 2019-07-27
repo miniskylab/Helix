@@ -1,6 +1,5 @@
 using System;
 using System.Diagnostics;
-using System.IO;
 using System.Net;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -11,6 +10,7 @@ using Helix.Crawler.Abstractions;
 using Helix.IPC;
 using Helix.IPC.Abstractions;
 using JetBrains.Annotations;
+using log4net;
 using Newtonsoft.Json;
 
 namespace Helix.Gui
@@ -20,6 +20,7 @@ namespace Helix.Gui
         static Task _constantRedrawTask;
         static CrawlerBot _crawlerBot;
         static bool _isClosing;
+        static readonly ILog _log;
         static Process _sqLiteProcess;
         static readonly ISynchronousServerSocket CommunicationSocketToGui;
         static readonly Stopwatch ElapsedTimeStopwatch;
@@ -29,6 +30,7 @@ namespace Helix.Gui
 
         static GuiController()
         {
+            _log = LogManager.GetLogger(Assembly.GetEntryAssembly(), MethodBase.GetCurrentMethod().DeclaringType);
             GuiProcess = new Process { StartInfo = { FileName = Configurations.PathToElectronJsExecutable } };
             ManualResetEvent = new ManualResetEvent(false);
             OperationLock = new object();
@@ -298,16 +300,11 @@ namespace Helix.Gui
 
                 var waitingTime = TimeSpan.FromMinutes(1);
                 if (_constantRedrawTask == null || _constantRedrawTask.Wait(waitingTime)) return;
-
-                var errorMessage = $"Constant redrawing task failed to finish after {waitingTime.TotalSeconds} seconds.";
-                File.AppendAllText(
-                    Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()?.Location), "debug.log"),
-                    $"\r\n[{DateTime.Now:yyyy/MM/dd HH:mm:ss}] {errorMessage}"
-                );
+                _log.Error($"Constant redrawing task failed to finish after {waitingTime.TotalSeconds} seconds.");
             }
             catch (Exception exception)
             {
-                File.AppendAllText("debug.log", $"\r\n[{DateTime.Now:yyyy/MM/dd HH:mm:ss}] {exception}");
+                _log.Error("One or more errors occured when stopping working.", exception);
             }
 
             void OnStopProgressUpdated(Event @event)

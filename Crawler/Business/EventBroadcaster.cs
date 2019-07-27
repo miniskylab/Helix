@@ -9,6 +9,7 @@ namespace Helix.Crawler
     public class EventBroadcaster : IEventBroadcaster
     {
         CancellationTokenSource _cancellationTokenSource;
+        readonly Task _eventBroadcastTask;
         BlockingCollection<Event> _events;
         bool _objectDisposed;
 
@@ -21,13 +22,17 @@ namespace Helix.Crawler
             _events = new BlockingCollection<Event>();
             _cancellationTokenSource = new CancellationTokenSource();
 
-            Task.Run(() =>
+            _eventBroadcastTask = Task.Run(() =>
             {
-                while (!_cancellationTokenSource.IsCancellationRequested)
+                while (!CancellationRequestedAndNoEventInQueue())
                 {
                     var @event = _events.Take(_cancellationTokenSource.Token);
+                    if (@event == null) continue;
+
                     OnEventBroadcast?.Invoke(@event);
                 }
+
+                bool CancellationRequestedAndNoEventInQueue() => _cancellationTokenSource.IsCancellationRequested && _events.Count == 0;
             }, _cancellationTokenSource.Token);
         }
 
@@ -48,16 +53,16 @@ namespace Helix.Crawler
 
         void ReleaseUnmanagedResources()
         {
-            if (_events != null)
-            {
-                while (_events.Count > 0) Thread.Sleep(300);
-                _events.Dispose();
-                _events = null;
-            }
-
             _cancellationTokenSource?.Cancel();
+            _eventBroadcastTask?.Wait();
+            _eventBroadcastTask?.Dispose();
+
             _cancellationTokenSource?.Dispose();
             _cancellationTokenSource = null;
+
+            if (_events == null) return;
+            _events.Dispose();
+            _events = null;
         }
 
         ~EventBroadcaster() { ReleaseUnmanagedResources(); }
