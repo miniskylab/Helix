@@ -114,8 +114,9 @@ namespace Helix.Crawler
                 _eventBroadcaster.Broadcast(StopProgressUpdatedEvent("Waiting for background tasks to complete ..."));
 
                 try { _waitingForCompletionTask.Wait(); }
-                catch (Exception)
+                catch (Exception exception)
                 {
+                    if (exception.IsAcknowledgingOperationCancelledException(_scheduler.CancellationToken)) return;
                     crawlerCommand = CrawlerCommand.MarkAsFaulted;
                     throw;
                 }

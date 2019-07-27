@@ -21,19 +21,19 @@ namespace Helix.Gui
         static CrawlerBot _crawlerBot;
         static bool _isClosing;
         static Process _sqLiteProcess;
+        static readonly ISynchronousServerSocket CommunicationSocketToGui;
+        static readonly Stopwatch ElapsedTimeStopwatch;
         static readonly Process GuiProcess;
         static readonly ManualResetEvent ManualResetEvent;
         static readonly object OperationLock;
-        static readonly Stopwatch Stopwatch;
-        static readonly ISynchronousServerSocket SynchronousServerSocket;
 
         static GuiController()
         {
             GuiProcess = new Process { StartInfo = { FileName = Configurations.PathToElectronJsExecutable } };
             ManualResetEvent = new ManualResetEvent(false);
             OperationLock = new object();
-            Stopwatch = new Stopwatch();
-            SynchronousServerSocket = new SynchronousServerSocket(IPAddress.Loopback.ToString(), Configurations.GuiControllerPort);
+            ElapsedTimeStopwatch = new Stopwatch();
+            CommunicationSocketToGui = new SynchronousServerSocket(IPAddress.Loopback.ToString(), Configurations.GuiControllerPort);
         }
 
         static void Main()
@@ -42,7 +42,7 @@ namespace Helix.Gui
              * TODO: Will be removed and replaced with built-in .NET Core 3.0 feature. */
             ShowWindow(GetConsoleWindow(), 0);
 
-            SynchronousServerSocket.OnReceived += message =>
+            CommunicationSocketToGui.OnReceived += message =>
             {
                 var method = typeof(GuiController).GetMethod(message.Text, BindingFlags.NonPublic | BindingFlags.Static);
                 method.Invoke(null, string.IsNullOrWhiteSpace(message.Payload) ? null : new object[] { message.Payload });
@@ -53,7 +53,7 @@ namespace Helix.Gui
 
             _sqLiteProcess?.CloseMainWindow();
             _sqLiteProcess?.Close();
-            SynchronousServerSocket.Dispose();
+            CommunicationSocketToGui.Dispose();
             GuiProcess.CloseMainWindow();
             GuiProcess.Close();
         }
@@ -213,14 +213,14 @@ namespace Helix.Gui
                     BrokenUrlCount = _crawlerBot.Statistics?.BrokenUrlCount,
                     MillisecondsAveragePageLoadTime = _crawlerBot.Statistics?.MillisecondsAveragePageLoadTime,
                     RemainingWorkload = _crawlerBot.RemainingWorkload,
-                    ElapsedTime = Stopwatch.Elapsed.ToString("hh' : 'mm' : 'ss")
+                    ElapsedTime = ElapsedTimeStopwatch.Elapsed.ToString("hh' : 'mm' : 'ss")
                 });
             }
             void RedrawEvery(TimeSpan timeSpan)
             {
                 _constantRedrawTask = Task.Run(() =>
                 {
-                    Stopwatch.Restart();
+                    ElapsedTimeStopwatch.Restart();
                     while (!CrawlerState.Completed.HasFlag(_crawlerBot.CrawlerState))
                     {
                         Redraw(new Frame
@@ -230,11 +230,11 @@ namespace Helix.Gui
                             BrokenUrlCount = _crawlerBot.Statistics?.BrokenUrlCount,
                             MillisecondsAveragePageLoadTime = _crawlerBot.Statistics?.MillisecondsAveragePageLoadTime,
                             RemainingWorkload = _crawlerBot.RemainingWorkload,
-                            ElapsedTime = Stopwatch.Elapsed.ToString("hh' : 'mm' : 'ss")
+                            ElapsedTime = ElapsedTimeStopwatch.Elapsed.ToString("hh' : 'mm' : 'ss")
                         });
                         Thread.Sleep(timeSpan);
                     }
-                    Stopwatch.Stop();
+                    ElapsedTimeStopwatch.Stop();
                 });
             }
         }
@@ -287,7 +287,7 @@ namespace Helix.Gui
             });
         }
 
-        static void Redraw(Frame frame) { SynchronousServerSocket.Send(new Message { Payload = JsonConvert.SerializeObject(frame) }); }
+        static void Redraw(Frame frame) { CommunicationSocketToGui.Send(new Message { Payload = JsonConvert.SerializeObject(frame) }); }
 
         static void StopWorking()
         {

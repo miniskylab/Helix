@@ -19,52 +19,24 @@ namespace Helix.Crawler
 {
     internal static class ServiceLocator
     {
+        static ServiceProvider _applicationWideSingletonServiceProvider;
         static HttpClient _httpClient;
+        static IServiceCollection _serviceCollection;
         static ServiceProvider _serviceProvider;
-        static readonly ServiceProvider ApplicationWideSingletonServiceProvider;
-        static readonly IServiceCollection ServiceCollection;
 
         static ServiceLocator()
         {
-            ServiceCollection = new ServiceCollection()
-                .AddTransient<IHtmlRenderer, HtmlRenderer>()
-                .AddTransient<IResourceExtractor, ResourceExtractor>()
-                .AddTransient<IResourceVerifier, ResourceVerifier>()
-                .AddTransient<IResourceEnricher, ResourceEnricher>()
-                .AddTransient<IResourceScope, ResourceScope>()
-                .AddSingleton<IEventBroadcaster, EventBroadcaster>()
-                .AddSingleton<IIncrementalIdGenerator, IncrementalIdGenerator>()
-                .AddSingleton<IStatistics, Statistics>()
-                .AddSingleton<INetworkServicePool, NetworkServicePool>()
-                .AddSingleton<IReportWriter, ReportWriter>()
-                .AddSingleton<IMemory, Memory>()
-                .AddSingleton<IScheduler, Scheduler>()
-                .AddSingleton<IHardwareMonitor, HardwareMonitor>()
-                .AddSingleton<IHttpContentTypeToResourceTypeDictionary, HttpContentTypeToResourceTypeDictionary>();
-
             ConfigureLogging();
-
-            var applicationWideSingletonServiceCollection = new ServiceCollection()
-                .AddSingleton(_ => LogManager.GetLogger(Assembly.GetEntryAssembly(), nameof(Helix)));
-            ApplicationWideSingletonServiceProvider = applicationWideSingletonServiceCollection.BuildServiceProvider();
-
-            foreach (var applicationWideSingletonServiceDescriptor in applicationWideSingletonServiceCollection)
-                ServiceCollection.AddSingleton(
-                    applicationWideSingletonServiceDescriptor.ServiceType,
-                    ApplicationWideSingletonServiceProvider.GetService(applicationWideSingletonServiceDescriptor.ServiceType)
-                );
-
-            AppDomain.CurrentDomain.ProcessExit += (_, __) =>
-            {
-                ApplicationWideSingletonServiceProvider.GetService<ILog>().Info("Disposing application-wide singleton services ...");
-                ApplicationWideSingletonServiceProvider.GetService<ILog>().Logger.Repository.Shutdown();
-                ApplicationWideSingletonServiceProvider.Dispose();
-            };
+            RegisterServicesHavingPerExecutionLifetime();
+            RegisterApplicationWideSingletonServices();
+            DisposeApplicationWideSingletonServicesWhenQuiting();
 
             void ConfigureLogging()
             {
                 var patternLayout = new PatternLayout
-                    { ConversionPattern = "[%date] [%30thread] [%5level] [%10logger] - %message%newline" };
+                {
+                    ConversionPattern = "[%date] [%30thread] [%5level] [%10logger] - %message%newline"
+                };
                 patternLayout.ActivateOptions();
 
                 var hierarchy = (Hierarchy) LogManager.GetRepository(Assembly.GetEntryAssembly());
@@ -83,6 +55,45 @@ namespace Helix.Crawler
                 hierarchy.Root.Level = Level.Debug;
                 hierarchy.Configured = true;
             }
+            void RegisterServicesHavingPerExecutionLifetime()
+            {
+                _serviceCollection = new ServiceCollection()
+                    .AddTransient<IHtmlRenderer, HtmlRenderer>()
+                    .AddTransient<IResourceExtractor, ResourceExtractor>()
+                    .AddTransient<IResourceVerifier, ResourceVerifier>()
+                    .AddTransient<IResourceEnricher, ResourceEnricher>()
+                    .AddTransient<IResourceScope, ResourceScope>()
+                    .AddSingleton<IEventBroadcaster, EventBroadcaster>()
+                    .AddSingleton<IIncrementalIdGenerator, IncrementalIdGenerator>()
+                    .AddSingleton<IStatistics, Statistics>()
+                    .AddSingleton<INetworkServicePool, NetworkServicePool>()
+                    .AddSingleton<IReportWriter, ReportWriter>()
+                    .AddSingleton<IMemory, Memory>()
+                    .AddSingleton<IScheduler, Scheduler>()
+                    .AddSingleton<IHardwareMonitor, HardwareMonitor>()
+                    .AddSingleton<IHttpContentTypeToResourceTypeDictionary, HttpContentTypeToResourceTypeDictionary>();
+            }
+            void RegisterApplicationWideSingletonServices()
+            {
+                var applicationWideSingletonServiceCollection = new ServiceCollection()
+                    .AddSingleton(_ => LogManager.GetLogger(Assembly.GetEntryAssembly(), MethodBase.GetCurrentMethod().DeclaringType));
+                _applicationWideSingletonServiceProvider = applicationWideSingletonServiceCollection.BuildServiceProvider();
+
+                foreach (var applicationWideSingletonServiceDescriptor in applicationWideSingletonServiceCollection)
+                    _serviceCollection.AddSingleton(
+                        applicationWideSingletonServiceDescriptor.ServiceType,
+                        _applicationWideSingletonServiceProvider.GetService(applicationWideSingletonServiceDescriptor.ServiceType)
+                    );
+            }
+            void DisposeApplicationWideSingletonServicesWhenQuiting()
+            {
+                AppDomain.CurrentDomain.ProcessExit += (_, __) =>
+                {
+                    _applicationWideSingletonServiceProvider.GetService<ILog>().Info("Disposing application-wide singleton services ...");
+                    _applicationWideSingletonServiceProvider.GetService<ILog>().Logger.Repository.Shutdown();
+                    _applicationWideSingletonServiceProvider.Dispose();
+                };
+            }
         }
 
         public static void DisposeServices()
@@ -95,14 +106,14 @@ namespace Helix.Crawler
 
         public static TService Get<TService>() where TService : class
         {
-            return _serviceProvider?.GetService<TService>() ?? ApplicationWideSingletonServiceProvider.GetService<TService>();
+            return _serviceProvider?.GetService<TService>() ?? _applicationWideSingletonServiceProvider.GetService<TService>();
         }
 
         public static void InitializeServices(Configurations configurations)
         {
             if (_serviceProvider?.GetService<Configurations>() != null) throw new InvalidConstraintException();
             DisposeServices();
-            _serviceProvider = ServiceCollection
+            _serviceProvider = _serviceCollection
                 .AddTransient(_ => CreateAndConfigureWebBrowser())
                 .AddTransient(_ => CreateAndConfigureSqLitePersistence())
                 .AddSingleton(CreateAndConfigureHttpClient())
