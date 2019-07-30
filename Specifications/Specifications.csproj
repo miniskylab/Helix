@@ -7,9 +7,9 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="HtmlAgilityPack" Version="1.11.8" />
+        <PackageReference Include="HtmlAgilityPack" Version="1.11.12" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.2.0" />
-        <PackageReference Include="Titanium.Web.Proxy" Version="3.0.907" />
+        <PackageReference Include="Titanium.Web.Proxy" Version="3.1.1021" />
         <PackageReference Include="xunit" Version="2.4.1" />
     </ItemGroup>
 
