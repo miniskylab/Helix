@@ -18,8 +18,9 @@ namespace Helix.Crawler
         Statistics _statistics;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public NetworkServicePool(Configurations configurations, ILog log, IEventBroadcaster eventBroadcaster, IMemory memory,
-            IHardwareMonitor hardwareMonitor)
+        public NetworkServicePool(Configurations configurations, IEventBroadcaster eventBroadcaster, IHardwareMonitor hardwareMonitor,
+            IMemory memory, ILog log, Func<IResourceExtractor> getResourceExtractor, Func<IResourceVerifier> getResourceVerifier,
+            Func<IHtmlRenderer> getHtmlRenderer)
         {
             _log = log;
             _objectDisposed = false;
@@ -42,7 +43,7 @@ namespace Helix.Crawler
                 {
                     for (var resourceExtractorId = 0; resourceExtractorId < configurations.ResourceExtractorCount; resourceExtractorId++)
                     {
-                        var resourceExtractor = ServiceLocator.Get<IResourceExtractor>();
+                        var resourceExtractor = getResourceExtractor();
                         _resourceExtractorPool.Add(resourceExtractor);
                         _statistics.CreatedResourceExtractorCount++;
                     }
@@ -51,7 +52,7 @@ namespace Helix.Crawler
                 {
                     for (var resourceVerifierId = 0; resourceVerifierId < configurations.ResourceVerifierCount; resourceVerifierId++)
                     {
-                        var resourceVerifier = ServiceLocator.Get<IResourceVerifier>();
+                        var resourceVerifier = getResourceVerifier();
                         _resourceVerifierPool.Add(resourceVerifier);
                         _statistics.CreatedResourceVerifierCount++;
                     }
@@ -99,7 +100,7 @@ namespace Helix.Crawler
             }
             void CreateHtmlRenderer()
             {
-                var htmlRenderer = ServiceLocator.Get<IHtmlRenderer>();
+                var htmlRenderer = getHtmlRenderer();
                 htmlRenderer.OnResourceCaptured += memory.MemorizeToBeVerifiedResource;
                 _htmlRendererPool.Add(htmlRenderer);
                 _statistics.CreatedHtmlRendererCount++;

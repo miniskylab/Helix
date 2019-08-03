@@ -20,17 +20,17 @@ namespace Helix.Gui
         static Task _constantRedrawTask;
         static CrawlerBot _crawlerBot;
         static bool _isClosing;
-        static readonly ILog _log;
         static Process _sqLiteProcess;
         static readonly ISynchronousServerSocket CommunicationSocketToGui;
         static readonly Stopwatch ElapsedTimeStopwatch;
         static readonly Process GuiProcess;
+        static readonly ILog Log;
         static readonly ManualResetEvent ManualResetEvent;
         static readonly object OperationLock;
 
         static GuiController()
         {
-            _log = LogManager.GetLogger(Assembly.GetEntryAssembly(), MethodBase.GetCurrentMethod().DeclaringType);
+            Log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
             GuiProcess = new Process { StartInfo = { FileName = Configurations.PathToElectronJsExecutable } };
             ManualResetEvent = new ManualResetEvent(false);
             OperationLock = new object();
@@ -300,11 +300,11 @@ namespace Helix.Gui
 
                 var waitingTime = TimeSpan.FromMinutes(1);
                 if (_constantRedrawTask == null || _constantRedrawTask.Wait(waitingTime)) return;
-                _log.Error($"Constant redrawing task failed to finish after {waitingTime.TotalSeconds} seconds.");
+                Log.Error($"Constant redrawing task failed to finish after {waitingTime.TotalSeconds} seconds.");
             }
             catch (Exception exception)
             {
-                _log.Error("One or more errors occured when stopping working.", exception);
+                Log.Error("One or more errors occured when stopping working.", exception);
             }
 
             void OnStopProgressUpdated(Event @event)

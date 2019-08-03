@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Reflection;
 using System.Threading.Tasks;
 using Helix.Core;
 using Helix.Crawler.Abstractions;
@@ -9,7 +10,7 @@ using log4net;
 
 namespace Helix.Crawler
 {
-    public class CrawlerBot
+    public partial class CrawlerBot
     {
         IEventBroadcaster _eventBroadcaster;
         IHardwareMonitor _hardwareMonitor;
@@ -39,7 +40,7 @@ namespace Helix.Crawler
 
         public CrawlerBot()
         {
-            _log = ServiceLocator.Get<ILog>();
+            _log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
             _stateMachine = new StateMachine<CrawlerState, CrawlerCommand>(
                 new Dictionary<Transition<CrawlerState, CrawlerCommand>, CrawlerState>
                 {

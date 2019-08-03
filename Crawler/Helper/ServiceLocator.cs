@@ -1,8 +1,11 @@
 using System;
 using System.Data;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Reflection;
+using Autofac;
+using Autofac.Core;
 using Helix.Crawler.Abstractions;
 using Helix.Persistence;
 using Helix.Persistence.Abstractions;
@@ -13,146 +16,169 @@ using log4net.Appender;
 using log4net.Core;
 using log4net.Layout;
 using log4net.Repository.Hierarchy;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Helix.Crawler
 {
-    internal static class ServiceLocator
+    public partial class CrawlerBot
     {
-        static HttpClient _httpClient;
-        static ServiceProvider _immortalServiceProvider;
-        static IServiceCollection _serviceCollection;
-        static ServiceProvider _serviceProvider;
-
-        static ServiceLocator()
+        static class ServiceLocator
         {
-            ConfigureLogging();
-            RegisterServices();
-            SetupImmortalServices();
-            DisposeImmortalServicesWhenQuiting();
+            static IContainer _serviceContainer;
 
-            void ConfigureLogging()
+            public static void DisposeServices()
             {
-                var patternLayout = new PatternLayout { ConversionPattern = "[%date] [%5level] [%4thread] [%logger] - %message%newline" };
-                patternLayout.ActivateOptions();
+                _serviceContainer?.Dispose();
+                _serviceContainer = null;
+            }
 
-                var hierarchy = (Hierarchy) LogManager.GetRepository(Assembly.GetEntryAssembly());
-                var rollingFileAppender = new RollingFileAppender
+            public static TService Get<TService>() where TService : class { return _serviceContainer?.Resolve<TService>(); }
+
+            public static void SetupAndConfigureServices(Configurations configurations)
+            {
+                if (_serviceContainer?.Resolve<Configurations>() != null) throw new InvalidConstraintException();
+
+                var containerBuilder = new ContainerBuilder();
+                RegisterLoggingService();
+                RegisterTransientServicesByConvention();
+                RegisterTransientServicesRequiringConfigurations();
+                RegisterSingletonServices();
+                _serviceContainer = containerBuilder.Build();
+
+                void RegisterLoggingService()
                 {
-                    File = $"logs\\{nameof(Helix)}.{DateTime.Now:yyyyMMdd-HHmmss}.log",
-                    AppendToFile = false,
-                    PreserveLogFileNameExtension = true,
-                    RollingStyle = RollingFileAppender.RollingMode.Size,
-                    MaxSizeRollBackups = -1,
-                    MaximumFileSize = "1GB",
-                    Layout = patternLayout
-                };
-                rollingFileAppender.ActivateOptions();
-                hierarchy.Root.AddAppender(rollingFileAppender);
-                hierarchy.Root.Level = Level.Debug;
-                hierarchy.Configured = true;
-            }
-            void RegisterServices()
-            {
-                _serviceCollection = new ServiceCollection()
-                    .AddTransient<IHtmlRenderer, HtmlRenderer>()
-                    .AddTransient<IResourceExtractor, ResourceExtractor>()
-                    .AddTransient<IResourceVerifier, ResourceVerifier>()
-                    .AddTransient<IResourceEnricher, ResourceEnricher>()
-                    .AddTransient<IResourceScope, ResourceScope>()
-                    .AddSingleton<IEventBroadcaster, EventBroadcaster>()
-                    .AddSingleton<IIncrementalIdGenerator, IncrementalIdGenerator>()
-                    .AddSingleton<IStatistics, Statistics>()
-                    .AddSingleton<INetworkServicePool, NetworkServicePool>()
-                    .AddSingleton<IReportWriter, ReportWriter>()
-                    .AddSingleton<IMemory, Memory>()
-                    .AddSingleton<IScheduler, Scheduler>()
-                    .AddSingleton<IHardwareMonitor, HardwareMonitor>()
-                    .AddSingleton<IHttpContentTypeToResourceTypeDictionary, HttpContentTypeToResourceTypeDictionary>();
-            }
-            void SetupImmortalServices()
-            {
-                var immortalServiceCollection = new ServiceCollection()
-                    .AddSingleton(_ => LogManager.GetLogger(Assembly.GetEntryAssembly(), nameof(ServiceLocator)));
-                _immortalServiceProvider = immortalServiceCollection.BuildServiceProvider();
+                    ConfigureLog4Net();
+                    containerBuilder.RegisterModule<Log4NetModule>();
 
-                foreach (var immortalServiceDescriptor in immortalServiceCollection)
-                    _serviceCollection.AddSingleton(
-                        immortalServiceDescriptor.ServiceType,
-                        _immortalServiceProvider.GetService(immortalServiceDescriptor.ServiceType)
-                    );
-            }
-            void DisposeImmortalServicesWhenQuiting()
-            {
-                AppDomain.CurrentDomain.ProcessExit += (_, __) =>
+                    void ConfigureLog4Net()
+                    {
+                        var patternLayout = new PatternLayout
+                        {
+                            ConversionPattern = "[%date] [%5level] [%4thread] [%logger] - %message%newline"
+                        };
+                        patternLayout.ActivateOptions();
+
+                        var hierarchy = (Hierarchy) LogManager.GetRepository(Assembly.GetEntryAssembly());
+                        var rollingFileAppender = new RollingFileAppender
+                        {
+                            File = $"logs\\{nameof(Helix)}.{DateTime.Now:yyyyMMdd-HHmmss}.log",
+                            AppendToFile = false,
+                            PreserveLogFileNameExtension = true,
+                            RollingStyle = RollingFileAppender.RollingMode.Size,
+                            MaxSizeRollBackups = -1,
+                            MaximumFileSize = "1GB",
+                            Layout = patternLayout
+                        };
+                        rollingFileAppender.ActivateOptions();
+                        hierarchy.Root.AddAppender(rollingFileAppender);
+                        hierarchy.Root.Level = Level.Debug;
+                        hierarchy.Configured = true;
+                    }
+                }
+                void RegisterTransientServicesByConvention()
                 {
-                    _immortalServiceProvider.GetService<ILog>().Info("Disposing immortal services ...");
-                    _immortalServiceProvider.Dispose();
-                };
+                    var filteredTypes = Assembly.GetExecutingAssembly().GetTypes()
+                        .Where(type => type.IsClass && !type.IsAbstract && !type.IsNested && !type.IsCompilerGenerated());
+                    foreach (var filteredType in filteredTypes)
+                    {
+                        var matchingInterfaceType = filteredType.GetInterface($"I{filteredType.Name}");
+                        if (matchingInterfaceType == null) continue;
+                        containerBuilder.RegisterType(filteredType).As(matchingInterfaceType);
+                    }
+                }
+                void RegisterTransientServicesRequiringConfigurations()
+                {
+                    containerBuilder.Register(_ => CreateAndConfigureWebBrowser()).As<IWebBrowser>().SingleInstance();
+                    containerBuilder.Register(_ => CreateAndConfigureSqLitePersistence()).As<ISqLitePersistence<VerificationResult>>()
+                        .SingleInstance();
+
+                    IWebBrowser CreateAndConfigureWebBrowser()
+                    {
+                        return new ChromiumWebBrowser(
+                            Configurations.PathToChromiumExecutable,
+                            Configurations.WorkingDirectory,
+                            configurations.HttpRequestTimeout.TotalSeconds,
+                            configurations.UseIncognitoWebBrowser,
+                            configurations.UseHeadlessWebBrowsers,
+                            (1920, 1080)
+                        );
+                    }
+                    ISqLitePersistence<VerificationResult> CreateAndConfigureSqLitePersistence()
+                    {
+                        var sqLitePersistence = new SqLitePersistence<VerificationResult>(Configurations.PathToReportFile);
+                        Get<IEventBroadcaster>().Broadcast(new Event { EventType = EventType.ReportFileCreated });
+                        return sqLitePersistence;
+                    }
+                }
+                void RegisterSingletonServices()
+                {
+                    containerBuilder.RegisterInstance(configurations).AsSelf().SingleInstance();
+                    containerBuilder.RegisterType<EventBroadcaster>().As<IEventBroadcaster>().SingleInstance();
+                    containerBuilder.RegisterType<IncrementalIdGenerator>().As<IIncrementalIdGenerator>().SingleInstance();
+                    containerBuilder.RegisterType<Statistics>().As<IStatistics>().SingleInstance();
+                    containerBuilder.RegisterType<ReportWriter>().As<IReportWriter>().SingleInstance();
+                    containerBuilder.RegisterType<Memory>().As<IMemory>().SingleInstance();
+                    containerBuilder.RegisterType<Scheduler>().As<IScheduler>().SingleInstance();
+                    containerBuilder.RegisterType<HardwareMonitor>().As<IHardwareMonitor>().SingleInstance();
+                    containerBuilder.Register(_ => CreateAndConfigureHttpClient()).SingleInstance();
+                    containerBuilder.RegisterType<NetworkServicePool>().As<INetworkServicePool>()
+                        .WithParameters(new[]
+                        {
+                            Parameter<IResourceExtractor>(),
+                            Parameter<IResourceVerifier>(),
+                            Parameter<IHtmlRenderer>()
+                        })
+                        .SingleInstance();
+
+                    HttpClient CreateAndConfigureHttpClient()
+                    {
+                        IWebBrowser webBrowser = new ChromiumWebBrowser(
+                            Configurations.PathToChromiumExecutable,
+                            Configurations.WorkingDirectory
+                        );
+                        var userAgentString = webBrowser.GetUserAgentString();
+                        webBrowser.Dispose();
+
+                        var httpClient = new HttpClient();
+                        httpClient.DefaultRequestHeaders.Accept.ParseAdd(
+                            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+                        httpClient.DefaultRequestHeaders.AcceptEncoding.ParseAdd("gzip, deflate, br");
+                        httpClient.DefaultRequestHeaders.AcceptLanguage.ParseAdd("en-US,en;q=0.9");
+                        httpClient.DefaultRequestHeaders.Upgrade.ParseAdd("1");
+                        httpClient.DefaultRequestHeaders.Pragma.ParseAdd("no-cache");
+                        httpClient.DefaultRequestHeaders.CacheControl = CacheControlHeaderValue.Parse("no-cache");
+                        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(userAgentString);
+                        httpClient.Timeout = configurations.HttpRequestTimeout;
+                        return httpClient;
+                    }
+                    ResolvedParameter Parameter<T>()
+                    {
+                        return new ResolvedParameter(
+                            (parameterInfo, _) => parameterInfo.ParameterType == typeof(Func<T>),
+                            (_, componentContext) =>
+                            {
+                                var copiedComponentContext = componentContext.Resolve<IComponentContext>();
+                                return new Func<T>(copiedComponentContext.Resolve<T>);
+                            });
+                    }
+                }
             }
-        }
 
-        public static void DisposeServices()
-        {
-            _serviceProvider?.Dispose();
-            _serviceProvider = null;
-            _httpClient?.Dispose();
-            _httpClient = null;
-        }
-
-        public static TService Get<TService>() where TService : class
-        {
-            return _serviceProvider?.GetService<TService>() ?? _immortalServiceProvider.GetService<TService>();
-        }
-
-        public static void SetupAndConfigureServices(Configurations configurations)
-        {
-            if (_serviceProvider?.GetService<Configurations>() != null) throw new InvalidConstraintException();
-            DisposeServices();
-            _serviceProvider = _serviceCollection
-                .AddTransient(_ => CreateAndConfigureWebBrowser())
-                .AddTransient(_ => CreateAndConfigureSqLitePersistence())
-                .AddSingleton(CreateAndConfigureHttpClient())
-                .AddSingleton(configurations)
-                .BuildServiceProvider();
-
-            IWebBrowser CreateAndConfigureWebBrowser()
+            class Log4NetModule : Autofac.Module
             {
-                return new ChromiumWebBrowser(
-                    Configurations.PathToChromiumExecutable,
-                    Configurations.WorkingDirectory,
-                    configurations.HttpRequestTimeout.TotalSeconds,
-                    configurations.UseIncognitoWebBrowser,
-                    configurations.UseHeadlessWebBrowsers,
-                    (1920, 1080)
-                );
-            }
-            HttpClient CreateAndConfigureHttpClient()
-            {
-                if (_httpClient != null) return _httpClient;
-                IWebBrowser webBrowser = new ChromiumWebBrowser(
-                    Configurations.PathToChromiumExecutable,
-                    Configurations.WorkingDirectory
-                );
-                var userAgentString = webBrowser.GetUserAgentString();
-                webBrowser.Dispose();
-
-                _httpClient = new HttpClient();
-                _httpClient.DefaultRequestHeaders.Accept.ParseAdd("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
-                _httpClient.DefaultRequestHeaders.AcceptEncoding.ParseAdd("gzip, deflate, br");
-                _httpClient.DefaultRequestHeaders.AcceptLanguage.ParseAdd("en-US,en;q=0.9");
-                _httpClient.DefaultRequestHeaders.Upgrade.ParseAdd("1");
-                _httpClient.DefaultRequestHeaders.Pragma.ParseAdd("no-cache");
-                _httpClient.DefaultRequestHeaders.CacheControl = CacheControlHeaderValue.Parse("no-cache");
-                _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(userAgentString);
-                _httpClient.Timeout = configurations.HttpRequestTimeout;
-                return _httpClient;
-            }
-            ISqLitePersistence<VerificationResult> CreateAndConfigureSqLitePersistence()
-            {
-                var sqLitePersistence = new SqLitePersistence<VerificationResult>(Configurations.PathToReportFile);
-                Get<IEventBroadcaster>().Broadcast(new Event { EventType = EventType.ReportFileCreated });
-                return sqLitePersistence;
+                protected override void AttachToComponentRegistration(IComponentRegistry _, IComponentRegistration componentRegistration)
+                {
+                    componentRegistration.Preparing += (__, preparingEventArgs) =>
+                    {
+                        preparingEventArgs.Parameters = preparingEventArgs.Parameters.Union(
+                            new[]
+                            {
+                                new ResolvedParameter(
+                                    (parameterInfo, ___) => parameterInfo.ParameterType == typeof(ILog),
+                                    (parameterInfo, ___) => LogManager.GetLogger(parameterInfo.Member.DeclaringType)
+                                ),
+                            });
+                    };
+                }
             }
         }
     }

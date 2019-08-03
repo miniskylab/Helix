@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Threading;
 
 namespace Helix.Crawler
@@ -34,5 +36,7 @@ namespace Helix.Crawler
             }
             return false;
         }
+
+        public static bool IsCompilerGenerated(this Type type) => type.GetCustomAttribute(typeof(CompilerGeneratedAttribute), true) != null;
     }
 }
