@@ -87,9 +87,8 @@ namespace Helix.Crawler
                 }
                 void RegisterTransientServicesRequiringConfigurations()
                 {
-                    containerBuilder.Register(_ => CreateAndConfigureWebBrowser()).As<IWebBrowser>().SingleInstance();
-                    containerBuilder.Register(_ => CreateAndConfigureSqLitePersistence()).As<ISqLitePersistence<VerificationResult>>()
-                        .SingleInstance();
+                    containerBuilder.Register(_ => CreateAndConfigureWebBrowser()).As<IWebBrowser>();
+                    containerBuilder.Register(_ => CreateAndConfigureSqLitePersistence()).As<ISqLitePersistence<VerificationResult>>();
 
                     IWebBrowser CreateAndConfigureWebBrowser()
                     {

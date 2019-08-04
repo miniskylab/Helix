@@ -54,7 +54,7 @@ namespace Helix.Crawler
         void ReleaseUnmanagedResources()
         {
             _cancellationTokenSource?.Cancel();
-            _eventBroadcastTask?.Wait();
+            _eventBroadcastTask?.Wait(); // TODO: TaskCancelledException
             _eventBroadcastTask?.Dispose();
 
             _cancellationTokenSource?.Dispose();
