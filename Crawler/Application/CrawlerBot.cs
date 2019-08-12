@@ -44,22 +44,22 @@ namespace Helix.Crawler
             _stateMachine = new StateMachine<CrawlerState, CrawlerCommand>(
                 new Dictionary<Transition<CrawlerState, CrawlerCommand>, CrawlerState>
                 {
-                    { CreateTransition(CrawlerState.WaitingForInitialization, CrawlerCommand.Stop), CrawlerState.Completed },
-                    { CreateTransition(CrawlerState.WaitingForInitialization, CrawlerCommand.Initialize), CrawlerState.WaitingToRun },
-                    { CreateTransition(CrawlerState.WaitingToRun, CrawlerCommand.Run), CrawlerState.Running },
-                    { CreateTransition(CrawlerState.WaitingToRun, CrawlerCommand.Abort), CrawlerState.WaitingForStop },
-                    { CreateTransition(CrawlerState.WaitingForStop, CrawlerCommand.Stop), CrawlerState.Completed },
-                    { CreateTransition(CrawlerState.Running, CrawlerCommand.Stop), CrawlerState.Completed },
-                    { CreateTransition(CrawlerState.Running, CrawlerCommand.Pause), CrawlerState.Paused },
-                    { CreateTransition(CrawlerState.Completed, CrawlerCommand.MarkAsRanToCompletion), CrawlerState.RanToCompletion },
-                    { CreateTransition(CrawlerState.Completed, CrawlerCommand.MarkAsCancelled), CrawlerState.Cancelled },
-                    { CreateTransition(CrawlerState.Completed, CrawlerCommand.MarkAsFaulted), CrawlerState.Faulted },
-                    { CreateTransition(CrawlerState.Paused, CrawlerCommand.Resume), CrawlerState.Running }
+                    { Transition(CrawlerState.WaitingForInitialization, CrawlerCommand.Stop), CrawlerState.Completed },
+                    { Transition(CrawlerState.WaitingForInitialization, CrawlerCommand.Initialize), CrawlerState.WaitingToRun },
+                    { Transition(CrawlerState.WaitingToRun, CrawlerCommand.Run), CrawlerState.Running },
+                    { Transition(CrawlerState.WaitingToRun, CrawlerCommand.Abort), CrawlerState.WaitingForStop },
+                    { Transition(CrawlerState.WaitingForStop, CrawlerCommand.Stop), CrawlerState.Completed },
+                    { Transition(CrawlerState.Running, CrawlerCommand.Stop), CrawlerState.Completed },
+                    { Transition(CrawlerState.Running, CrawlerCommand.Pause), CrawlerState.Paused },
+                    { Transition(CrawlerState.Completed, CrawlerCommand.MarkAsRanToCompletion), CrawlerState.RanToCompletion },
+                    { Transition(CrawlerState.Completed, CrawlerCommand.MarkAsCancelled), CrawlerState.Cancelled },
+                    { Transition(CrawlerState.Completed, CrawlerCommand.MarkAsFaulted), CrawlerState.Faulted },
+                    { Transition(CrawlerState.Paused, CrawlerCommand.Resume), CrawlerState.Running }
                 },
                 CrawlerState.WaitingForInitialization
             );
 
-            Transition<CrawlerState, CrawlerCommand> CreateTransition(CrawlerState fromState, CrawlerCommand command)
+            Transition<CrawlerState, CrawlerCommand> Transition(CrawlerState fromState, CrawlerCommand command)
             {
                 return new Transition<CrawlerState, CrawlerCommand>(fromState, command);
             }

@@ -2,12 +2,12 @@ namespace WebBrowser.Abstractions.Enum
 {
     public enum WebBrowserState
     {
-        WaitingForWebBrowserOpening,
-        OpeningWebBrowser,
+        WaitingForOpening,
+        Opening,
         Idle,
         TryRendering,
         TryTakingScreenshot,
-        ClosingWebBrowser,
+        Closing,
         Disposing,
         Disposed
     }

@@ -2,11 +2,11 @@ namespace WebBrowser.Abstractions.Enum
 {
     public enum WebBrowserCommand
     {
-        OpenWebBrowser,
+        Open,
         TransitToIdleState,
         TryRender,
-        TryTakingScreenshot,
-        CloseWebBrowser,
+        TryTakeScreenshot,
+        Close,
         Dispose,
         TransitToDisposedState
     }
