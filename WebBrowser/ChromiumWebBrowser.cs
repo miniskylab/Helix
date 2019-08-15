@@ -213,6 +213,7 @@ namespace Helix.WebBrowser
                 _pageLoadTimeStopwatch.Reset();
                 renderingFinishedCts.Cancel();
                 renderingFinishedCts.Dispose();
+                _stateMachine.TryMoveNext(WebBrowserCommand.TransitToIdleState);
             }
 
             void EnsureCancellable()
@@ -332,6 +333,10 @@ namespace Helix.WebBrowser
                 onFailed?.Invoke(exception);
                 return false;
             }
+            finally
+            {
+                _stateMachine.TryMoveNext(WebBrowserCommand.TransitToIdleState);
+            }
         }
 
         void CloseWebBrowser(bool forcibly = false)
@@ -432,6 +437,7 @@ namespace Helix.WebBrowser
                     { Transition(WebBrowserState.TryRendering, WebBrowserCommand.TransitToIdleState), WebBrowserState.Idle },
                     { Transition(WebBrowserState.TryTakingScreenshot, WebBrowserCommand.Close), WebBrowserState.Closing },
                     { Transition(WebBrowserState.TryTakingScreenshot, WebBrowserCommand.TransitToIdleState), WebBrowserState.Idle },
+                    { Transition(WebBrowserState.Disposing, WebBrowserCommand.Close), WebBrowserState.Closing },
                     { Transition(WebBrowserState.Closing, WebBrowserCommand.TransitToDisposedState), WebBrowserState.Disposed },
                     { Transition(WebBrowserState.Closing, WebBrowserCommand.Open), WebBrowserState.Opening }
                 },
