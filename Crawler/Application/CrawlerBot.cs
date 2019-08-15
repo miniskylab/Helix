@@ -74,7 +74,7 @@ namespace Helix.Crawler
 
         public void Stop()
         {
-            if (!TryTransit(CrawlerCommand.Stop)) return;
+            if (!_stateMachine.TryMoveNext(CrawlerCommand.Stop)) return;
             var crawlerCommand = CrawlerCommand.MarkAsCancelled;
             try
             {
@@ -82,7 +82,7 @@ namespace Helix.Crawler
                 DeactivateMainWorkflow();
                 WaitForBackgroundTaskToComplete();
                 ReleaseResources();
-                TryTransit(crawlerCommand);
+                _stateMachine.TryMoveNext(crawlerCommand);
                 _eventBroadcaster.Broadcast(new Event
                 {
                     EventType = EventType.Stopped,
@@ -140,20 +140,20 @@ namespace Helix.Crawler
 
         public bool TryStart(Configurations configurations)
         {
-            if (!TryTransit(CrawlerCommand.Initialize)) return false;
+            if (!_stateMachine.TryMoveNext(CrawlerCommand.Initialize)) return false;
             try
             {
                 InitializeAndConnectServices();
                 EnsureDirectoryContainsScreenshotFilesIsRecreated();
                 MonitorHardwareResources();
                 ActivateMainWorkflow();
-                TryTransit(CrawlerCommand.Run);
+                _stateMachine.TryMoveNext(CrawlerCommand.Run);
                 return true;
             }
             catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(_scheduler.CancellationToken))
             {
                 _log.Error("One or more errors occured when trying to start crawling.", exception);
-                TryTransit(CrawlerCommand.Abort);
+                _stateMachine.TryMoveNext(CrawlerCommand.Abort);
                 _waitingForCompletionTask = Task.FromException(exception);
 
                 Stop();
@@ -302,16 +302,6 @@ namespace Helix.Crawler
                     Message = message
                 };
             }
-        }
-
-        bool TryTransit(CrawlerCommand crawlerCommand)
-        {
-            if (_stateMachine.TryMoveNext(crawlerCommand)) return true;
-
-            var commandName = Enum.GetName(typeof(CrawlerCommand), crawlerCommand);
-            _log.Info($"Transition from state [{_stateMachine.CurrentState}] via [{commandName}] command failed.\n" +
-                      $"{Environment.StackTrace}");
-            return false;
         }
     }
 }

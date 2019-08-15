@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
+using log4net;
 
 namespace Helix.Core
 {
     public sealed class StateMachine<TState, TCommand> where TState : Enum where TCommand : Enum
     {
+        readonly ILog _log;
         readonly Dictionary<Transition<TState, TCommand>, TState> _possibleTransitions;
         readonly object _stateTransitionLock;
 
@@ -15,13 +18,21 @@ namespace Helix.Core
             CurrentState = initialState;
             _stateTransitionLock = new object();
             _possibleTransitions = possibleTransitions;
+            _log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         }
 
         public bool TryMoveNext(TCommand command)
         {
             lock (_stateTransitionLock)
             {
-                if (!TryGetNext(command, out var nextState)) return false;
+                if (!TryGetNext(command, out var nextState))
+                {
+                    var commandName = Enum.GetName(typeof(TCommand), command);
+                    _log.Info($"Transition from state [{CurrentState}] via [{commandName}] command failed.\n" +
+                              $"{Environment.StackTrace}");
+                    return false;
+                }
+
                 CurrentState = nextState;
                 return true;
             }

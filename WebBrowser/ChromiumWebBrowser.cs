@@ -10,8 +10,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Helix.Core;
 using Helix.WebBrowser.Abstractions;
-using JetBrains.Annotations;
-using log4net;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using Titanium.Web.Proxy;
@@ -28,7 +26,6 @@ namespace Helix.WebBrowser
         ChromeDriverService _chromeDriverService;
         readonly TimeSpan _commandTimeout;
         ProxyServer _httpProxyServer;
-        [CanBeNull] readonly ILog _log;
         readonly Stopwatch _pageLoadTimeStopwatch;
         readonly string _pathToChromeDriverExecutable;
         readonly string _pathToChromiumExecutable;
@@ -143,10 +140,8 @@ namespace Helix.WebBrowser
         public event AsyncEventHandler<SessionEventArgs> BeforeResponse;
 
         public ChromiumWebBrowser(string pathToChromiumExecutable, string pathToChromeDriverExecutable, double commandTimeoutInSecond = 60,
-            bool useIncognitoWebBrowser = false, bool useHeadlessWebBrowser = true, (int width, int height) browserWindowSize = default,
-            ILog log = null)
+            bool useIncognitoWebBrowser = false, bool useHeadlessWebBrowser = true, (int width, int height) browserWindowSize = default)
         {
-            _log = log;
             _pageLoadTimeStopwatch = new Stopwatch();
             _pathToChromiumExecutable = pathToChromiumExecutable;
             _pathToChromeDriverExecutable = pathToChromeDriverExecutable;
@@ -163,10 +158,10 @@ namespace Helix.WebBrowser
 
         public void Dispose()
         {
-            if (!TryTransit(WebBrowserCommand.Dispose)) return;
+            if (!_stateMachine.TryMoveNext(WebBrowserCommand.Dispose)) return;
             ReleaseUnmanagedResources();
             GC.SuppressFinalize(this);
-            TryTransit(WebBrowserCommand.TransitToDisposedState);
+            _stateMachine.TryMoveNext(WebBrowserCommand.TransitToDisposedState);
         }
 
         public string GetUserAgentString()
@@ -186,7 +181,7 @@ namespace Helix.WebBrowser
         {
             html = null;
             millisecondsPageLoadTime = null;
-            if (!TryTransit(WebBrowserCommand.TryRender)) return false;
+            if (!_stateMachine.TryMoveNext(WebBrowserCommand.TryRender)) return false;
 
             var renderingFinishedCts = new CancellationTokenSource();
             try
@@ -310,7 +305,7 @@ namespace Helix.WebBrowser
 
         public bool TryTakeScreenshot(string pathToScreenshotFile, Action<Exception> onFailed)
         {
-            if (!TryTransit(WebBrowserCommand.TryTakeScreenshot)) return false;
+            if (!_stateMachine.TryMoveNext(WebBrowserCommand.TryTakeScreenshot)) return false;
             try
             {
                 if (CurrentUri == null) throw new InvalidOperationException();
@@ -341,7 +336,7 @@ namespace Helix.WebBrowser
 
         void CloseWebBrowser(bool forcibly = false)
         {
-            if (!TryTransit(WebBrowserCommand.Close)) return;
+            if (!_stateMachine.TryMoveNext(WebBrowserCommand.Close)) return;
             if (forcibly) KillAllRelatedProcesses();
             else
             {
@@ -379,7 +374,7 @@ namespace Helix.WebBrowser
 
         void OpenWebBrowser(IEnumerable<string> arguments)
         {
-            if (!TryTransit(WebBrowserCommand.Open)) return;
+            if (!_stateMachine.TryMoveNext(WebBrowserCommand.Open)) return;
             _chromeDriverService = ChromeDriverService.CreateDefaultService(_pathToChromeDriverExecutable);
             _chromeDriverService.HideCommandPromptWindow = true;
 
@@ -396,7 +391,7 @@ namespace Helix.WebBrowser
             foreach (var argument in arguments) chromeOptions.AddArguments(argument);
 
             _chromeDriver = new ChromeDriver(_chromeDriverService, chromeOptions, _commandTimeout);
-            TryTransit(WebBrowserCommand.TransitToIdleState);
+            _stateMachine.TryMoveNext(WebBrowserCommand.TransitToIdleState);
         }
 
         void ReleaseUnmanagedResources()
@@ -453,16 +448,6 @@ namespace Helix.WebBrowser
         {
             return exception is WebDriverTimeoutException ||
                    exception.InnerException is WebException webException && webException.Status == WebExceptionStatus.Timeout;
-        }
-
-        bool TryTransit(WebBrowserCommand webBrowserCommand)
-        {
-            if (_stateMachine.TryMoveNext(webBrowserCommand)) return true;
-
-            var commandName = Enum.GetName(typeof(WebBrowserCommand), webBrowserCommand);
-            _log?.Info($"Transition from state [{_stateMachine.CurrentState}] via [{commandName}] command failed.\n" +
-                       $"{Environment.StackTrace}");
-            return false;
         }
 
         static bool WebBrowserUnreachable(Exception exception)
