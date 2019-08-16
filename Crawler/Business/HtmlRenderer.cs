@@ -13,7 +13,6 @@ namespace Helix.Crawler
     public class HtmlRenderer : IHtmlRenderer
     {
         int _activeHttpTrafficCount;
-        readonly ILog _log;
         CancellationTokenSource _networkTrafficCts;
         bool _objectDisposed;
         Resource _resourceBeingRendered;
@@ -31,7 +30,6 @@ namespace Helix.Crawler
             _webBrowser.BeforeRequest += EnsureInternal;
             _webBrowser.BeforeResponse += CaptureNetworkTraffic;
 
-            _log = log;
             _objectDisposed = false;
             _takeScreenshot = false;
 
@@ -130,8 +128,7 @@ namespace Helix.Crawler
             GC.SuppressFinalize(this);
         }
 
-        public bool TryRender(Resource resource, out string html, out long? millisecondsPageLoadTime, CancellationToken cancellationToken,
-            Action<Exception> onFailed)
+        public bool TryRender(Resource resource, out string html, out long? millisecondsPageLoadTime, CancellationToken cancellationToken)
         {
             if (_objectDisposed) throw new ObjectDisposedException(nameof(HtmlRenderer));
             EnsureNetworkTrafficIsHalted();
@@ -140,14 +137,14 @@ namespace Helix.Crawler
             _resourceBeingRendered = resource;
 
             var uri = resource.Uri;
-            var renderingResult = _webBrowser.TryRender(uri, out html, out millisecondsPageLoadTime, cancellationToken, onFailed);
+            var renderingResult = _webBrowser.TryRender(uri, out html, out millisecondsPageLoadTime, cancellationToken);
 
             if (resource.IsBroken) millisecondsPageLoadTime = null;
             if (!_takeScreenshot) return renderingResult;
 
             var pathToDirectoryContainsScreenshotFiles = Configurations.PathToDirectoryContainsScreenshotFiles;
             var pathToScreenshotFile = Path.Combine(pathToDirectoryContainsScreenshotFiles, $"{_resourceBeingRendered.Id}.png");
-            _webBrowser.TryTakeScreenshot(pathToScreenshotFile, OnScreenshotTakingFailed);
+            _webBrowser.TryTakeScreenshot(pathToScreenshotFile);
             _takeScreenshot = false;
 
             return renderingResult;
@@ -157,10 +154,6 @@ namespace Helix.Crawler
                 _networkTrafficCts?.Cancel();
                 while (_activeHttpTrafficCount > 0) Thread.Sleep(100);
                 _networkTrafficCts?.Dispose();
-            }
-            void OnScreenshotTakingFailed(Exception exception)
-            {
-                _log.Info($"Failed to take screenshot of [{uri}].\r\n-----> {exception}");
             }
         }
 

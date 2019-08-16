@@ -1,4 +1,4 @@
-namespace WebBrowser.Abstractions.Enum
+namespace Helix.WebBrowser.Abstractions
 {
     public enum WebBrowserCommand
     {
