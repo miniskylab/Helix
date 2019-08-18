@@ -47,7 +47,7 @@ namespace Helix.Gui
             CommunicationSocketToGui.OnReceived += message =>
             {
                 var method = typeof(GuiController).GetMethod(message.Text, BindingFlags.NonPublic | BindingFlags.Static);
-                method.Invoke(null, string.IsNullOrWhiteSpace(message.Payload) ? null : new object[] { message.Payload });
+                method?.Invoke(null, string.IsNullOrWhiteSpace(message.Payload) ? null : new object[] { message.Payload });
             };
 
             GuiProcess.Start();

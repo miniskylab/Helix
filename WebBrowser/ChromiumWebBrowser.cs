@@ -26,6 +26,7 @@ namespace Helix.WebBrowser
         ChromeDriver _chromeDriver;
         ChromeDriverService _chromeDriverService;
         readonly TimeSpan _commandTimeout;
+        readonly object _disposalLock;
         ProxyServer _httpProxyServer;
         readonly ILog _log;
         readonly Stopwatch _pageLoadTimeStopwatch;
@@ -35,6 +36,7 @@ namespace Helix.WebBrowser
         readonly bool _useHeadlessWebBrowser;
         readonly bool _useIncognitoWebBrowser;
         static string _userAgentString;
+        bool _waitingForDisposal;
 
         public Uri CurrentUri { get; private set; }
 
@@ -144,6 +146,8 @@ namespace Helix.WebBrowser
         public ChromiumWebBrowser(string pathToChromiumExecutable, string pathToChromeDriverExecutable, double commandTimeoutInSecond = 60,
             bool useIncognitoWebBrowser = false, bool useHeadlessWebBrowser = true, (int width, int height) browserWindowSize = default)
         {
+            _waitingForDisposal = false;
+            _disposalLock = new object();
             _pageLoadTimeStopwatch = new Stopwatch();
             _pathToChromiumExecutable = pathToChromiumExecutable;
             _pathToChromeDriverExecutable = pathToChromeDriverExecutable;
@@ -161,8 +165,18 @@ namespace Helix.WebBrowser
 
         public void Dispose()
         {
-            Dispose(true);
-            GC.SuppressFinalize(this);
+            lock (_disposalLock)
+            {
+                if (_waitingForDisposal) return;
+                _waitingForDisposal = true;
+            }
+
+            _stateMachine.BlockingTransitNext(WebBrowserCommand.Dispose, CancellationToken.None, () =>
+            {
+                Dispose(true);
+                GC.SuppressFinalize(this);
+            });
+            _stateMachine.Dispose();
         }
 
         public string GetUserAgentString()
@@ -383,20 +397,14 @@ namespace Helix.WebBrowser
         void Dispose(bool disposing)
         {
             ReleaseUnmanagedResources();
-            if (disposing)
-            {
-                _stateMachine.BlockingTransitNext(WebBrowserCommand.Dispose, CancellationToken.None, () =>
-                {
-                    _pageLoadTimeStopwatch.Stop();
-                    _httpProxyServer.Stop();
-                    _httpProxyServer.Dispose();
+            if (!disposing) return;
 
-                    if (!_stateMachine.TryTransitNext(WebBrowserCommand.TransitToDisposedState))
-                        _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WebBrowserCommand.TransitToDisposedState);
+            _pageLoadTimeStopwatch.Stop();
+            _httpProxyServer.Stop();
+            _httpProxyServer.Dispose();
 
-                    _stateMachine.Dispose();
-                });
-            }
+            if (!_stateMachine.TryTransitNext(WebBrowserCommand.TransitToDisposedState))
+                _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WebBrowserCommand.TransitToDisposedState);
         }
 
         void OpenWebBrowser(IEnumerable<string> arguments)

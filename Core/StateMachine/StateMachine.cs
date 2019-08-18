@@ -29,13 +29,14 @@ namespace Helix.Core
 
         public StateMachine(Dictionary<Transition<TState, TCommand>, TState> possibleTransitions, TState initialState)
         {
-            CurrentState = initialState;
             _disposalLock = new object();
             _waitingForDisposal = false;
             _stateTransitionLock = new object();
             _possibleTransitions = possibleTransitions;
-            _activeStateTransitionCountdownEvent = new CountdownEvent(0);
+            _activeStateTransitionCountdownEvent = new CountdownEvent(1);
             _stateChangeManualResetEventSlim = new ManualResetEventSlim(false);
+
+            CurrentState = initialState;
         }
 
         public void BlockingTransitNext(TCommand command, CancellationToken cancellationToken, Action synchronizedAction = null)
@@ -83,6 +84,7 @@ namespace Helix.Core
             }
 
             _stateChangeManualResetEventSlim.Set();
+            _activeStateTransitionCountdownEvent.Signal();
             _activeStateTransitionCountdownEvent.Wait();
 
             _stateChangeManualResetEventSlim.Dispose();
