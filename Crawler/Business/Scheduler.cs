@@ -9,7 +9,7 @@ namespace Helix.Crawler
 {
     public sealed class Scheduler : IScheduler
     {
-        CancellationTokenSource _cancellationTokenSource;
+        readonly CancellationTokenSource _cancellationTokenSource;
         readonly IEventBroadcaster _eventBroadcaster;
         readonly object _extractionLock;
         readonly ILog _log;
@@ -332,19 +332,13 @@ namespace Helix.Crawler
         public void Dispose()
         {
             if (_objectDisposed) return;
-            ReleaseUnmanagedResources();
-            GC.SuppressFinalize(this);
+            _cancellationTokenSource?.Dispose();
+            _eventBroadcaster?.Dispose();
+            _memory?.Dispose();
+            _networkServicePool?.Dispose();
             _objectDisposed = true;
         }
 
-        void ReleaseUnmanagedResources()
-        {
-            _cancellationTokenSource?.Dispose();
-            _cancellationTokenSource = null;
-        }
-
         class EverythingIsDoneException : Exception { }
-
-        ~Scheduler() { ReleaseUnmanagedResources(); }
     }
 }

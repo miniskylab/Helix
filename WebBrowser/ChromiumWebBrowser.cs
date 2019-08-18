@@ -161,18 +161,8 @@ namespace Helix.WebBrowser
 
         public void Dispose()
         {
-            _stateMachine.BlockingTransitNext(WebBrowserCommand.Dispose, CancellationToken.None, () =>
-            {
-                CloseWebBrowser();
-                _pageLoadTimeStopwatch.Stop();
-                _httpProxyServer.Stop();
-                _httpProxyServer.Dispose();
-
-                if (!_stateMachine.TryTransitNext(WebBrowserCommand.TransitToDisposedState))
-                    _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WebBrowserCommand.TransitToDisposedState);
-
-                _stateMachine.Dispose();
-            });
+            Dispose(true);
+            GC.SuppressFinalize(this);
         }
 
         public string GetUserAgentString()
@@ -390,6 +380,25 @@ namespace Helix.WebBrowser
             if (!stateTransitionSucceeded) _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WebBrowserCommand.Close);
         }
 
+        void Dispose(bool disposing)
+        {
+            ReleaseUnmanagedResources();
+            if (disposing)
+            {
+                _stateMachine.BlockingTransitNext(WebBrowserCommand.Dispose, CancellationToken.None, () =>
+                {
+                    _pageLoadTimeStopwatch.Stop();
+                    _httpProxyServer.Stop();
+                    _httpProxyServer.Dispose();
+
+                    if (!_stateMachine.TryTransitNext(WebBrowserCommand.TransitToDisposedState))
+                        _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WebBrowserCommand.TransitToDisposedState);
+
+                    _stateMachine.Dispose();
+                });
+            }
+        }
+
         void OpenWebBrowser(IEnumerable<string> arguments)
         {
             var stateTransitionSucceeded = _stateMachine.TryTransitNext(WebBrowserCommand.Open, () =>
@@ -415,6 +424,8 @@ namespace Helix.WebBrowser
             });
             if (!stateTransitionSucceeded) _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WebBrowserCommand.Open);
         }
+
+        void ReleaseUnmanagedResources() { CloseWebBrowser(); }
 
         void RestartWebBrowser(bool forcibly = false)
         {
@@ -470,5 +481,7 @@ namespace Helix.WebBrowser
             return exception is WebDriverException webDriverException &&
                    webDriverException.InnerException is WebException webException && webException.InnerException is HttpRequestException;
         }
+
+        ~ChromiumWebBrowser() { Dispose(false); }
     }
 }

@@ -7,14 +7,14 @@ using log4net;
 
 namespace Helix.Crawler
 {
-    public class NetworkServicePool : INetworkServicePool
+    public sealed class NetworkServicePool : INetworkServicePool
     {
         readonly IEventBroadcaster _eventBroadcaster;
-        BlockingCollection<IHtmlRenderer> _htmlRendererPool;
+        readonly BlockingCollection<IHtmlRenderer> _htmlRendererPool;
         readonly ILog _log;
         bool _objectDisposed;
-        BlockingCollection<IResourceExtractor> _resourceExtractorPool;
-        BlockingCollection<IResourceVerifier> _resourceVerifierPool;
+        readonly BlockingCollection<IResourceExtractor> _resourceExtractorPool;
+        readonly BlockingCollection<IResourceVerifier> _resourceVerifierPool;
         Statistics _statistics;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
@@ -110,9 +110,82 @@ namespace Helix.Crawler
         public void Dispose()
         {
             if (_objectDisposed) return;
-            ReleaseUnmanagedResources();
-            GC.SuppressFinalize(this);
+            DisposeResourceExtractorPool();
+            DisposeResourceVerifierPool();
+            DisposeHtmlRendererPool();
+            CheckForOrphanedResources();
+            _eventBroadcaster?.Dispose();
             _objectDisposed = true;
+
+            void DisposeResourceExtractorPool()
+            {
+                while (_resourceExtractorPool?.Any() ?? false)
+                {
+                    _resourceExtractorPool.Take();
+                    _statistics.DisposedResourceExtractorCount++;
+                }
+                _resourceExtractorPool?.Dispose();
+            }
+            void DisposeResourceVerifierPool()
+            {
+                while (_resourceVerifierPool?.Any() ?? false)
+                {
+                    _resourceVerifierPool.Take().Dispose();
+                    _statistics.DisposedResourceVerifierCount++;
+                }
+                _resourceVerifierPool?.Dispose();
+            }
+            void DisposeHtmlRendererPool()
+            {
+                while (_htmlRendererPool?.Any() ?? false)
+                {
+                    _htmlRendererPool.Take().Dispose();
+                    _statistics.DisposedHtmlRendererCount++;
+
+                    var disposedHtmlRendererCount = _statistics.DisposedHtmlRendererCount;
+                    var createdHtmlRendererCount = _statistics.CreatedHtmlRendererCount;
+                    _eventBroadcaster.Broadcast(new Event
+                    {
+                        EventType = EventType.StopProgressUpdated,
+                        Message = $"Closing web browsers ({disposedHtmlRendererCount}/{createdHtmlRendererCount}) ..."
+                    });
+                }
+                _htmlRendererPool?.Dispose();
+            }
+            void CheckForOrphanedResources()
+            {
+                var orphanedResourceErrorMessage = string.Empty;
+                if (_statistics.DisposedResourceExtractorCount != _statistics.CreatedResourceExtractorCount)
+                    orphanedResourceErrorMessage += GetErrorMessage(
+                        _statistics.CreatedResourceExtractorCount,
+                        nameof(ResourceExtractor),
+                        _statistics.DisposedResourceExtractorCount
+                    );
+
+                if (_statistics.DisposedResourceVerifierCount != _statistics.CreatedResourceVerifierCount)
+                    orphanedResourceErrorMessage += GetErrorMessage(
+                        _statistics.CreatedResourceVerifierCount,
+                        nameof(ResourceVerifier),
+                        _statistics.DisposedResourceVerifierCount
+                    );
+
+                if (_statistics.DisposedHtmlRendererCount != _statistics.CreatedHtmlRendererCount)
+                    orphanedResourceErrorMessage += GetErrorMessage(
+                        _statistics.CreatedHtmlRendererCount,
+                        nameof(HtmlRenderer),
+                        _statistics.DisposedHtmlRendererCount
+                    );
+
+                if (string.IsNullOrEmpty(orphanedResourceErrorMessage)) return;
+                _log.Info($"Orphaned resources detected!{orphanedResourceErrorMessage}");
+
+                string GetErrorMessage(int createdCount, string resourceName, int disposedCount)
+                {
+                    resourceName = $"{resourceName}{(createdCount > 1 ? "s" : string.Empty)}";
+                    var disposedCountText = disposedCount == 0 ? "none" : $"only {disposedCount}";
+                    return $"\r\nThere were {createdCount} {resourceName} created but {disposedCountText} could be found and disposed.";
+                }
+            }
         }
 
         public IHtmlRenderer GetHtmlRenderer(CancellationToken cancellationToken)
@@ -151,87 +224,6 @@ namespace Helix.Crawler
             _htmlRendererPool.Add(htmlRenderer);
         }
 
-        void ReleaseUnmanagedResources()
-        {
-            DisposeResourceExtractorPool();
-            DisposeResourceVerifierPool();
-            DisposeHtmlRendererPool();
-            CheckForOrphanedResources();
-
-            void DisposeResourceExtractorPool()
-            {
-                while (_resourceExtractorPool?.Any() ?? false)
-                {
-                    _resourceExtractorPool.Take();
-                    _statistics.DisposedResourceExtractorCount++;
-                }
-                _resourceExtractorPool?.Dispose();
-                _resourceExtractorPool = null;
-            }
-            void DisposeResourceVerifierPool()
-            {
-                while (_resourceVerifierPool?.Any() ?? false)
-                {
-                    _resourceVerifierPool.Take().Dispose();
-                    _statistics.DisposedResourceVerifierCount++;
-                }
-                _resourceVerifierPool?.Dispose();
-                _resourceVerifierPool = null;
-            }
-            void DisposeHtmlRendererPool()
-            {
-                while (_htmlRendererPool?.Any() ?? false)
-                {
-                    _htmlRendererPool.Take().Dispose();
-                    _statistics.DisposedHtmlRendererCount++;
-
-                    var disposedHtmlRendererCount = _statistics.DisposedHtmlRendererCount;
-                    var createdHtmlRendererCount = _statistics.CreatedHtmlRendererCount;
-                    _eventBroadcaster.Broadcast(new Event
-                    {
-                        EventType = EventType.StopProgressUpdated,
-                        Message = $"Closing web browsers ({disposedHtmlRendererCount}/{createdHtmlRendererCount}) ..."
-                    });
-                }
-                _htmlRendererPool?.Dispose();
-                _htmlRendererPool = null;
-            }
-            void CheckForOrphanedResources()
-            {
-                var orphanedResourceErrorMessage = string.Empty;
-                if (_statistics.DisposedResourceExtractorCount != _statistics.CreatedResourceExtractorCount)
-                    orphanedResourceErrorMessage += GetErrorMessage(
-                        _statistics.CreatedResourceExtractorCount,
-                        nameof(ResourceExtractor),
-                        _statistics.DisposedResourceExtractorCount
-                    );
-
-                if (_statistics.DisposedResourceVerifierCount != _statistics.CreatedResourceVerifierCount)
-                    orphanedResourceErrorMessage += GetErrorMessage(
-                        _statistics.CreatedResourceVerifierCount,
-                        nameof(ResourceVerifier),
-                        _statistics.DisposedResourceVerifierCount
-                    );
-
-                if (_statistics.DisposedHtmlRendererCount != _statistics.CreatedHtmlRendererCount)
-                    orphanedResourceErrorMessage += GetErrorMessage(
-                        _statistics.CreatedHtmlRendererCount,
-                        nameof(HtmlRenderer),
-                        _statistics.DisposedHtmlRendererCount
-                    );
-
-                if (string.IsNullOrEmpty(orphanedResourceErrorMessage)) return;
-                _log.Info($"Orphaned resources detected!{orphanedResourceErrorMessage}");
-
-                string GetErrorMessage(int createdCount, string resourceName, int disposedCount)
-                {
-                    resourceName = $"{resourceName}{(createdCount > 1 ? "s" : string.Empty)}";
-                    var disposedCountText = disposedCount == 0 ? "none" : $"only {disposedCount}";
-                    return $"\r\nThere were {createdCount} {resourceName} created but {disposedCountText} could be found and disposed.";
-                }
-            }
-        }
-
         struct Statistics
         {
             public int CreatedHtmlRendererCount { get; set; }
@@ -246,7 +238,5 @@ namespace Helix.Crawler
 
             public int DisposedResourceVerifierCount { get; set; }
         }
-
-        ~NetworkServicePool() { ReleaseUnmanagedResources(); }
     }
 }

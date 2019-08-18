@@ -28,8 +28,16 @@ namespace Helix.Crawler
         public void Dispose()
         {
             if (_objectDisposed) return;
-            ReleaseUnmanagedResources();
-            GC.SuppressFinalize(this);
+
+            try { _sendingGETRequestTask?.Wait(); }
+            catch
+            {
+                /* At this point, all exceptions should be fully handled.
+                 * I just want to wait for the task to complete.
+                 * I don't care about the result of the task. */
+            }
+
+            _sendingGETRequestTask?.Dispose();
             _objectDisposed = true;
         }
 
@@ -84,21 +92,5 @@ namespace Helix.Crawler
             finally { verificationResult.StatusCode = resource.StatusCode; }
             return true;
         }
-
-        void ReleaseUnmanagedResources()
-        {
-            try { _sendingGETRequestTask?.Wait(); }
-            catch
-            {
-                /* At this point, all exceptions should be fully handled.
-                 * I just want to wait for the task to complete.
-                 * I don't care about the result of the task. */
-            }
-
-            _sendingGETRequestTask?.Dispose();
-            _sendingGETRequestTask = null;
-        }
-
-        ~ResourceVerifier() { ReleaseUnmanagedResources(); }
     }
 }

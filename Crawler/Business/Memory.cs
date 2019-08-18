@@ -58,8 +58,10 @@ namespace Helix.Crawler
             lock (_memorizationLock)
             {
                 if (_objectDisposed) return;
-                ReleaseUnmanagedResources();
-                GC.SuppressFinalize(this);
+                _toBeExtractedHtmlDocuments?.Dispose();
+                _toBeRenderedResources?.Dispose();
+                _toBeTakenScreenshotResources?.Dispose();
+                _toBeVerifiedResources?.Dispose();
                 _objectDisposed = true;
             }
         }
@@ -102,14 +104,5 @@ namespace Helix.Crawler
         {
             return _toBeVerifiedResources.TryTake(out toBeVerifiedResource);
         }
-
-        void ReleaseUnmanagedResources()
-        {
-            _toBeExtractedHtmlDocuments?.Dispose();
-            _toBeRenderedResources?.Dispose();
-            _toBeVerifiedResources?.Dispose();
-        }
-
-        ~Memory() { ReleaseUnmanagedResources(); }
     }
 }

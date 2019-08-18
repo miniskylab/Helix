@@ -128,6 +128,10 @@ namespace Helix.Crawler
                         })
                         .SingleInstance();
 
+                    /* TODO:
+                     * Create a wrapper around HttpClient that handle Dispose() to prevent auto-generated Dispose pattern from
+                     * disposing the shared HttpClient. See ResourceVerifier. */
+
                     HttpClient CreateAndConfigureHttpClient()
                     {
                         IWebBrowser webBrowser = new ChromiumWebBrowser(

@@ -6,7 +6,7 @@ using Helix.Crawler.Abstractions;
 
 namespace Helix.Crawler
 {
-    public class EventBroadcaster : IEventBroadcaster
+    public sealed class EventBroadcaster : IEventBroadcaster
     {
         CancellationTokenSource _cancellationTokenSource;
         readonly Task _eventBroadcastTask;
@@ -45,14 +45,7 @@ namespace Helix.Crawler
         public void Dispose()
         {
             if (_objectDisposed) return;
-            _objectDisposed = true;
 
-            ReleaseUnmanagedResources();
-            GC.SuppressFinalize(this);
-        }
-
-        void ReleaseUnmanagedResources()
-        {
             _cancellationTokenSource?.Cancel();
             _eventBroadcastTask?.Wait(); // TODO: TaskCancelledException
             _eventBroadcastTask?.Dispose();
@@ -63,8 +56,8 @@ namespace Helix.Crawler
             if (_events == null) return;
             _events.Dispose();
             _events = null;
-        }
 
-        ~EventBroadcaster() { ReleaseUnmanagedResources(); }
+            _objectDisposed = true;
+        }
     }
 }

@@ -10,14 +10,14 @@ using Titanium.Web.Proxy.EventArguments;
 
 namespace Helix.Crawler
 {
-    public class HtmlRenderer : IHtmlRenderer
+    public sealed class HtmlRenderer : IHtmlRenderer
     {
         int _activeHttpTrafficCount;
         CancellationTokenSource _networkTrafficCts;
         bool _objectDisposed;
         Resource _resourceBeingRendered;
         bool _takeScreenshot;
-        IWebBrowser _webBrowser;
+        readonly IWebBrowser _webBrowser;
 
         public event Action<Resource> OnResourceCaptured;
 
@@ -122,10 +122,9 @@ namespace Helix.Crawler
         public void Dispose()
         {
             if (_objectDisposed) return;
+            _networkTrafficCts?.Dispose();
+            _webBrowser?.Dispose();
             _objectDisposed = true;
-
-            ReleaseUnmanagedResources();
-            GC.SuppressFinalize(this);
         }
 
         public bool TryRender(Resource resource, out string html, out long? millisecondsPageLoadTime, CancellationToken cancellationToken)
@@ -156,13 +155,5 @@ namespace Helix.Crawler
                 _networkTrafficCts?.Dispose();
             }
         }
-
-        void ReleaseUnmanagedResources()
-        {
-            _webBrowser?.Dispose();
-            _webBrowser = null;
-        }
-
-        ~HtmlRenderer() { ReleaseUnmanagedResources(); }
     }
 }
