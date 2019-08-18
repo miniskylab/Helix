@@ -10,7 +10,7 @@ using log4net;
 
 namespace Helix.Crawler
 {
-    public partial class CrawlerBot
+    public partial class CrawlerBot : Application
     {
         IEventBroadcaster _eventBroadcaster;
         IHardwareMonitor _hardwareMonitor;
@@ -151,6 +151,7 @@ namespace Helix.Crawler
             {
                 try
                 {
+                    _log.Info("Starting ...");
                     InitializeAndConnectServices();
                     EnsureDirectoryContainsScreenshotFilesIsRecreated();
                     MonitorHardwareResources();

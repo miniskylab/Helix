@@ -12,10 +12,6 @@ using Helix.Persistence.Abstractions;
 using Helix.WebBrowser;
 using Helix.WebBrowser.Abstractions;
 using log4net;
-using log4net.Appender;
-using log4net.Core;
-using log4net.Layout;
-using log4net.Repository.Hierarchy;
 
 namespace Helix.Crawler
 {
@@ -23,7 +19,10 @@ namespace Helix.Crawler
     {
         static class ServiceLocator
         {
+            static IEventBroadcaster _eventBroadcaster;
             static IContainer _serviceContainer;
+
+            static ServiceLocator() { AppDomain.CurrentDomain.ProcessExit += (_, __) => { _eventBroadcaster?.Dispose(); }; }
 
             public static void DisposeServices()
             {
@@ -38,42 +37,12 @@ namespace Helix.Crawler
                 if (_serviceContainer?.Resolve<Configurations>() != null) throw new InvalidConstraintException();
 
                 var containerBuilder = new ContainerBuilder();
-                RegisterLoggingService();
+                containerBuilder.RegisterModule<Log4NetModule>();
                 RegisterTransientServicesByConvention();
                 RegisterTransientServicesRequiringConfigurations();
                 RegisterSingletonServices();
                 _serviceContainer = containerBuilder.Build();
 
-                void RegisterLoggingService()
-                {
-                    ConfigureLog4Net();
-                    containerBuilder.RegisterModule<Log4NetModule>();
-
-                    void ConfigureLog4Net()
-                    {
-                        var patternLayout = new PatternLayout
-                        {
-                            ConversionPattern = "[%date] [%5level] [%4thread] [%logger] - %message%newline"
-                        };
-                        patternLayout.ActivateOptions();
-
-                        var hierarchy = (Hierarchy) LogManager.GetRepository(Assembly.GetEntryAssembly());
-                        var rollingFileAppender = new RollingFileAppender
-                        {
-                            File = $"logs\\{nameof(Helix)}.{DateTime.Now:yyyyMMdd-HHmmss}.log",
-                            AppendToFile = false,
-                            PreserveLogFileNameExtension = true,
-                            RollingStyle = RollingFileAppender.RollingMode.Size,
-                            MaxSizeRollBackups = -1,
-                            MaximumFileSize = "1GB",
-                            Layout = patternLayout
-                        };
-                        rollingFileAppender.ActivateOptions();
-                        hierarchy.Root.AddAppender(rollingFileAppender);
-                        hierarchy.Root.Level = Level.Debug;
-                        hierarchy.Configured = true;
-                    }
-                }
                 void RegisterTransientServicesByConvention()
                 {
                     var filteredTypes = Assembly.GetExecutingAssembly().GetTypes()
@@ -110,8 +79,13 @@ namespace Helix.Crawler
                 }
                 void RegisterSingletonServices()
                 {
+                    _eventBroadcaster?.Dispose();
+                    _eventBroadcaster = Activator.CreateInstance<EventBroadcaster>();
+                    containerBuilder.RegisterInstance(_eventBroadcaster)
+                        .As<IEventBroadcaster>()
+                        .ExternallyOwned();
+
                     containerBuilder.RegisterInstance(configurations).AsSelf().SingleInstance();
-                    containerBuilder.RegisterType<EventBroadcaster>().As<IEventBroadcaster>().SingleInstance();
                     containerBuilder.RegisterType<IncrementalIdGenerator>().As<IIncrementalIdGenerator>().SingleInstance();
                     containerBuilder.RegisterType<Statistics>().As<IStatistics>().SingleInstance();
                     containerBuilder.RegisterType<ReportWriter>().As<IReportWriter>().SingleInstance();
@@ -127,10 +101,6 @@ namespace Helix.Crawler
                             Parameter<IHtmlRenderer>()
                         })
                         .SingleInstance();
-
-                    /* TODO:
-                     * Create a wrapper around HttpClient that handle Dispose() to prevent auto-generated Dispose pattern from
-                     * disposing the shared HttpClient. See ResourceVerifier. */
 
                     HttpClient CreateAndConfigureHttpClient()
                     {

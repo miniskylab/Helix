@@ -333,7 +333,6 @@ namespace Helix.Crawler
         {
             if (_objectDisposed) return;
             _cancellationTokenSource?.Dispose();
-            _eventBroadcaster?.Dispose();
             _memory?.Dispose();
             _networkServicePool?.Dispose();
             _objectDisposed = true;

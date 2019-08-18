@@ -114,7 +114,6 @@ namespace Helix.Crawler
             DisposeResourceVerifierPool();
             DisposeHtmlRendererPool();
             CheckForOrphanedResources();
-            _eventBroadcaster?.Dispose();
             _objectDisposed = true;
 
             void DisposeResourceExtractorPool()
