@@ -178,7 +178,7 @@ namespace Helix.Crawler
                                 new ResolvedParameter(
                                     (parameterInfo, ___) => parameterInfo.ParameterType == typeof(ILog),
                                     (parameterInfo, ___) => LogManager.GetLogger(parameterInfo.Member.DeclaringType)
-                                ),
+                                )
                             });
                     };
                 }

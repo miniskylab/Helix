@@ -26,10 +26,17 @@ namespace Helix.Crawler
             {
                 while (!CancellationRequestedAndNoEventInQueue())
                 {
-                    var @event = _events.Take(_cancellationTokenSource.Token);
-                    if (@event == null) continue;
+                    try
+                    {
+                        var @event = _events.Take(_cancellationTokenSource.Token);
+                        if (@event == null) continue;
 
-                    OnEventBroadcast?.Invoke(@event);
+                        OnEventBroadcast?.Invoke(@event);
+                    }
+                    catch (Exception exception) when (exception.IsAcknowledgingOperationCancelledException(_cancellationTokenSource.Token))
+                    {
+                        /* Do nothing */
+                    }
                 }
 
                 bool CancellationRequestedAndNoEventInQueue() => _cancellationTokenSource.IsCancellationRequested && _events.Count == 0;
@@ -47,7 +54,7 @@ namespace Helix.Crawler
             if (_objectDisposed) return;
 
             _cancellationTokenSource?.Cancel();
-            _eventBroadcastTask?.Wait(); // TODO: TaskCancelledException
+            _eventBroadcastTask?.Wait();
             _eventBroadcastTask?.Dispose();
 
             _cancellationTokenSource?.Dispose();

@@ -14,7 +14,7 @@ namespace Helix.Crawler.Abstractions
         EarlyHints = 103,
 
         /* 2xx Success */
-        OK = 200,
+        Ok = 200,
         Created = 201,
         Accepted = 202,
         NonAuthoritativeInformation = 203,
@@ -23,7 +23,7 @@ namespace Helix.Crawler.Abstractions
         PartialContent = 206,
         MultiStatus = 207,
         AlreadyReported = 208,
-        IMUsed = 226,
+        ImUsed = 226,
 
         /* 3xx Redirection */
         Ambiguous = 300,

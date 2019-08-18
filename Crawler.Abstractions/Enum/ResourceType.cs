@@ -7,7 +7,7 @@ namespace Helix.Crawler.Abstractions
     {
         Unknown = 0,
 
-        Html = 1 << 0,
+        Html = 1,
         Css = 1 << 1,
         Script = 1 << 2,
         Json = 1 << 3,
