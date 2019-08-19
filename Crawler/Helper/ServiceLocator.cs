@@ -19,10 +19,7 @@ namespace Helix.Crawler
     {
         static class ServiceLocator
         {
-            static IEventBroadcaster _eventBroadcaster;
             static IContainer _serviceContainer;
-
-            static ServiceLocator() { AppDomain.CurrentDomain.ProcessExit += (_, __) => { _eventBroadcaster?.Dispose(); }; }
 
             public static void DisposeServices()
             {
@@ -79,13 +76,8 @@ namespace Helix.Crawler
                 }
                 void RegisterSingletonServices()
                 {
-                    _eventBroadcaster?.Dispose();
-                    _eventBroadcaster = Activator.CreateInstance<EventBroadcaster>();
-                    containerBuilder.RegisterInstance(_eventBroadcaster)
-                        .As<IEventBroadcaster>()
-                        .ExternallyOwned();
-
                     containerBuilder.RegisterInstance(configurations).AsSelf().SingleInstance();
+                    containerBuilder.RegisterInstance(Activator.CreateInstance<EventBroadcaster>()).As<IEventBroadcaster>();
                     containerBuilder.RegisterType<IncrementalIdGenerator>().As<IIncrementalIdGenerator>().SingleInstance();
                     containerBuilder.RegisterType<Statistics>().As<IStatistics>().SingleInstance();
                     containerBuilder.RegisterType<ReportWriter>().As<IReportWriter>().SingleInstance();

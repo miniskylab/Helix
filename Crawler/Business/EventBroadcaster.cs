@@ -29,8 +29,6 @@ namespace Helix.Crawler
                     try
                     {
                         var @event = _events.Take(_cancellationTokenSource.Token);
-                        if (@event == null) continue;
-
                         OnEventBroadcast?.Invoke(@event);
                     }
                     catch (Exception exception) when (exception.IsAcknowledgingOperationCancelledException(_cancellationTokenSource.Token))

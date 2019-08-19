@@ -4,6 +4,7 @@ using System.IO;
 using System.Net;
 using System.Reflection;
 using System.Threading.Tasks;
+using Autofac.Features.OwnedInstances;
 using Helix.Core;
 using Helix.Crawler.Abstractions;
 using log4net;
@@ -12,7 +13,7 @@ namespace Helix.Crawler
 {
     public partial class CrawlerBot : Application
     {
-        IEventBroadcaster _eventBroadcaster;
+        Owned<IEventBroadcaster> _eventBroadcaster;
         IHardwareMonitor _hardwareMonitor;
         readonly ILog _log;
         IMemory _memory;
@@ -87,11 +88,12 @@ namespace Helix.Crawler
                     if (!_stateMachine.TryTransitNext(crawlerCommand))
                         _log.StateTransitionFailureEvent(_stateMachine.CurrentState, crawlerCommand);
 
-                    _eventBroadcaster.Broadcast(new Event
+                    _eventBroadcaster.Value.Broadcast(new Event
                     {
                         EventType = EventType.Stopped,
                         Message = Enum.GetName(typeof(CrawlerState), CrawlerState)
                     });
+                    _eventBroadcaster.Dispose();
                 }
                 catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(_scheduler.CancellationToken))
                 {
@@ -101,13 +103,13 @@ namespace Helix.Crawler
                 void StopMonitoringHardwareResources()
                 {
                     if (_hardwareMonitor == null || !_hardwareMonitor.IsRunning) return;
-                    _eventBroadcaster.Broadcast(StopProgressUpdatedEvent("Stopping hardware monitor service ..."));
+                    _eventBroadcaster.Value.Broadcast(StopProgressUpdatedEvent("Stopping hardware monitor service ..."));
                     _hardwareMonitor.StopMonitoring();
                 }
                 void DeactivateMainWorkflow()
                 {
                     if (_scheduler == null) return;
-                    _eventBroadcaster.Broadcast(StopProgressUpdatedEvent("De-activating main workflow ..."));
+                    _eventBroadcaster.Value.Broadcast(StopProgressUpdatedEvent("De-activating main workflow ..."));
 
                     if (_scheduler.RemainingWorkload == 0 && _memory.AlreadyVerifiedUrlCount > 0)
                         crawlerCommand = CrawlerCommand.MarkAsRanToCompletion;
@@ -116,7 +118,7 @@ namespace Helix.Crawler
                 void WaitForBackgroundTaskToComplete()
                 {
                     if (_waitingForCompletionTask == null) return;
-                    _eventBroadcaster.Broadcast(StopProgressUpdatedEvent("Waiting for background tasks to complete ..."));
+                    _eventBroadcaster.Value.Broadcast(StopProgressUpdatedEvent("Waiting for background tasks to complete ..."));
 
                     try { _waitingForCompletionTask.Wait(); }
                     catch (Exception exception)
@@ -129,7 +131,7 @@ namespace Helix.Crawler
                 }
                 void ReleaseResources()
                 {
-                    _eventBroadcaster.Broadcast(StopProgressUpdatedEvent("Disposing services ..."));
+                    _eventBroadcaster.Value.Broadcast(StopProgressUpdatedEvent("Disposing services ..."));
                     ServiceLocator.DisposeServices();
                 }
                 Event StopProgressUpdatedEvent(string message = "")
@@ -178,14 +180,14 @@ namespace Helix.Crawler
                     _log.Info("Setting up and configuring services ...");
                     ServiceLocator.SetupAndConfigureServices(configurations);
 
-                    _eventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
-                    _eventBroadcaster.OnEventBroadcast += @event =>
+                    _eventBroadcaster = ServiceLocator.Get<Owned<IEventBroadcaster>>();
+                    _eventBroadcaster.Value.OnEventBroadcast += @event =>
                     {
                         OnEventBroadcast?.Invoke(@event);
                         if (@event.EventType != EventType.ResourceVerified && !string.IsNullOrWhiteSpace(@event.Message))
                             _log.Info(@event.Message);
                     };
-                    _eventBroadcaster.Broadcast(StartProgressUpdatedEvent("Connecting services ..."));
+                    _eventBroadcaster.Value.Broadcast(StartProgressUpdatedEvent("Connecting services ..."));
 
                     Statistics = ServiceLocator.Get<IStatistics>();
                     _memory = ServiceLocator.Get<IMemory>();
@@ -197,14 +199,14 @@ namespace Helix.Crawler
                 }
                 void EnsureDirectoryContainsScreenshotFilesIsRecreated()
                 {
-                    _eventBroadcaster.Broadcast(StartProgressUpdatedEvent("Re-creating directory containing screenshot files ..."));
+                    _eventBroadcaster.Value.Broadcast(StartProgressUpdatedEvent("Re-creating directory containing screenshot files ..."));
                     if (Directory.Exists(Configurations.PathToDirectoryContainsScreenshotFiles))
                         Directory.Delete(Configurations.PathToDirectoryContainsScreenshotFiles, true);
                     Directory.CreateDirectory(Configurations.PathToDirectoryContainsScreenshotFiles);
                 }
                 void ActivateMainWorkflow()
                 {
-                    _eventBroadcaster.Broadcast(StartProgressUpdatedEvent("Activating main workflow ..."));
+                    _eventBroadcaster.Value.Broadcast(StartProgressUpdatedEvent("Activating main workflow ..."));
                     _memory.MemorizeToBeVerifiedResource(
                         _resourceEnricher.Enrich(new Resource
                         {
@@ -284,7 +286,7 @@ namespace Helix.Crawler
                                 else Statistics.IncrementValidUrlCount();
 
                                 _reportWriter.WriteReport(verificationResult);
-                                _eventBroadcaster.Broadcast(new Event
+                                _eventBroadcaster.Value.Broadcast(new Event
                                 {
                                     EventType = EventType.ResourceVerified,
                                     Message = $"{verificationResult.StatusCode:D} - {verificationResult.VerifiedUrl}"
