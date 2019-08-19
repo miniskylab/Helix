@@ -76,8 +76,11 @@ namespace Helix.Crawler
                 }
                 void RegisterSingletonServices()
                 {
-                    containerBuilder.RegisterInstance(configurations).AsSelf().SingleInstance();
-                    containerBuilder.RegisterInstance(Activator.CreateInstance<EventBroadcaster>()).As<IEventBroadcaster>();
+                    containerBuilder.RegisterInstance(Activator.CreateInstance<EventBroadcaster>())
+                        .As<IEventBroadcaster>()
+                        .ExternallyOwned();
+
+                    containerBuilder.RegisterInstance(configurations).AsSelf();
                     containerBuilder.RegisterType<IncrementalIdGenerator>().As<IIncrementalIdGenerator>().SingleInstance();
                     containerBuilder.RegisterType<Statistics>().As<IStatistics>().SingleInstance();
                     containerBuilder.RegisterType<ReportWriter>().As<IReportWriter>().SingleInstance();
