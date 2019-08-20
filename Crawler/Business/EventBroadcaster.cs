@@ -33,7 +33,8 @@ namespace Helix.Crawler
                     }
                     catch (Exception exception) when (exception.IsAcknowledgingOperationCancelledException(_cancellationTokenSource.Token))
                     {
-                        /* Do nothing */
+                        while (_events.TryTake(out var @event))
+                            OnEventBroadcast?.Invoke(@event);
                     }
                 }
 
