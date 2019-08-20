@@ -87,7 +87,7 @@ namespace Helix.Crawler
                     if (response.StatusCode < 300 || 400 <= response.StatusCode) return false;
                     if (!response.Headers.Headers.TryGetValue("Location", out var locationHeader)) return false;
                     if (!Uri.TryCreate(locationHeader.Value, UriKind.RelativeOrAbsolute, out var redirectUri)) return false;
-                    uriBeingRendered = redirectUri.IsAbsoluteUri ? redirectUri : new Uri(_resourceBeingRendered.ParentUri, redirectUri);
+                    uriBeingRendered = redirectUri.IsAbsoluteUri ? redirectUri : new Uri(_resourceBeingRendered.Uri, redirectUri);
                     return true;
                 }
                 bool ParentUriWasFound()
