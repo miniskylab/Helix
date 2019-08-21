@@ -217,7 +217,9 @@ namespace Helix.WebBrowser
                     renderingFinishedCts.Cancel();
                     renderingFinishedCts.Dispose();
 
-                    if (!_stateMachine.TryTransitNext(WebBrowserCommand.TransitToIdleState))
+                    var webBrowserIsNotIdle = _stateMachine.CurrentState != WebBrowserState.Idle;
+                    var cannotTransitToIdleState = !_stateMachine.TryTransitNext(WebBrowserCommand.TransitToIdleState);
+                    if (webBrowserIsNotIdle && cannotTransitToIdleState)
                         _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WebBrowserCommand.TransitToIdleState);
                 }
 
