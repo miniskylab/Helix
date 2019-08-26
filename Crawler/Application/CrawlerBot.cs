@@ -96,7 +96,7 @@ namespace Helix.Crawler
                 }
                 catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(_scheduler.CancellationToken))
                 {
-                    _log.Error("One or more errors occured when stopping crawling.", exception);
+                    _log.Error("One or more errors occurred when stopping crawling.", exception);
                 }
 
                 void StopMonitoringHardwareResources()
@@ -165,7 +165,7 @@ namespace Helix.Crawler
                 }
                 catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(_scheduler.CancellationToken))
                 {
-                    _log.Error("One or more errors occured when trying to start crawling.", exception);
+                    _log.Error("One or more errors occurred when trying to start crawling.", exception);
 
                     if (!_stateMachine.TryTransitNext(CrawlerCommand.Abort))
                         _log.StateTransitionFailureEvent(_stateMachine.CurrentState, CrawlerCommand.Abort);
@@ -226,7 +226,7 @@ namespace Helix.Crawler
                         catch (Exception exception)
                         {
                             if (exception.IsAcknowledgingOperationCancelledException(_scheduler.CancellationToken)) return;
-                            _log.Error("One or more errors occured when activating main workflow", exception);
+                            _log.Error("One or more errors occurred when activating main workflow", exception);
                         }
                         finally
                         {

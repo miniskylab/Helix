@@ -15,6 +15,7 @@ using log4net;
 
 namespace Helix.Crawler
 {
+    // TODO: Move to Application
     public partial class CrawlerBot
     {
         static class ServiceLocator

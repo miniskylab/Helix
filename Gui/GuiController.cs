@@ -304,7 +304,7 @@ namespace Helix.Gui
             }
             catch (Exception exception)
             {
-                Log.Error("One or more errors occured when stopping working.", exception);
+                Log.Error("One or more errors occurred when stopping working.", exception);
             }
 
             void OnStopProgressUpdated(Event @event)

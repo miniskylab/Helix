@@ -107,7 +107,7 @@ namespace Helix.Crawler
                         try { taskDescription(resourceExtractor, toBeExtractedHtmlDocument); }
                         catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(CancellationToken))
                         {
-                            _log.Error("One or more errors occured.", exception);
+                            _log.Error("One or more errors occurred.", exception);
                         }
                         finally { ReleaseResourceExtractor(); }
                     },
@@ -124,7 +124,7 @@ namespace Helix.Crawler
             catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(CancellationToken))
             {
                 if (exception is EverythingIsDoneException) return;
-                _log.Error("One or more errors occured.", exception);
+                _log.Error("One or more errors occurred.", exception);
             }
 
             void GetResourceExtractorAndToBeExtractedHtmlDocument()
@@ -200,7 +200,7 @@ namespace Helix.Crawler
             catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(CancellationToken))
             {
                 if (exception is EverythingIsDoneException) return;
-                _log.Error("One or more errors occured.", exception);
+                _log.Error("One or more errors occurred.", exception);
             }
 
             void ExecuteTaskDescription()
@@ -208,7 +208,7 @@ namespace Helix.Crawler
                 try { taskDescription(htmlRenderer, toBeRenderedResource); }
                 catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(CancellationToken))
                 {
-                    _log.Error("One or more errors occured.", exception);
+                    _log.Error("One or more errors occurred.", exception);
                 }
                 finally { ReleaseHtmlRenderer(); }
             }
@@ -267,7 +267,7 @@ namespace Helix.Crawler
                         try { taskDescription(resourceVerifier, toBeVerifiedResource); }
                         catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(CancellationToken))
                         {
-                            _log.Error("One or more errors occured.", exception);
+                            _log.Error("One or more errors occurred.", exception);
                         }
                         finally { ReleaseResourceVerifier(); }
                     },
@@ -284,7 +284,7 @@ namespace Helix.Crawler
             catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(CancellationToken))
             {
                 if (exception is EverythingIsDoneException) return;
-                _log.Error("One or more errors occured.", exception);
+                _log.Error("One or more errors occurred.", exception);
             }
 
             void GetResourceVerifierAndToBeVerifiedResource()
