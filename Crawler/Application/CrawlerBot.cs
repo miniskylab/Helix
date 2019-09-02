@@ -10,7 +10,7 @@ using log4net;
 
 namespace Helix.Crawler
 {
-    public partial class CrawlerBot : Application
+    public class CrawlerBot : Application
     {
         IEventBroadcaster _eventBroadcaster;
         IHardwareMonitor _hardwareMonitor;
@@ -252,7 +252,7 @@ namespace Helix.Crawler
                                     Statistics.IncrementTotalPageLoadTimeBy(millisecondsPageLoadTime.Value);
                                 }
 
-                                if (toBeRenderedResource.IsBroken) return;
+                                if (toBeRenderedResource.StatusCode.IsWithinBrokenRange()) return;
                                 _memory.MemorizeToBeExtractedHtmlDocument(new HtmlDocument
                                 {
                                     Uri = toBeRenderedResource.Uri, Text = htmlText
@@ -281,7 +281,7 @@ namespace Helix.Crawler
                                 if (isOrphanedUri || uriSchemeNotSupported) return;
                                 // TODO: We should log these orphaned uri-s somewhere
 
-                                if (resource.IsBroken) Statistics.IncrementBrokenUrlCount();
+                                if (resource.StatusCode.IsWithinBrokenRange()) Statistics.IncrementBrokenUrlCount();
                                 else Statistics.IncrementValidUrlCount();
 
                                 _reportWriter.WriteReport(verificationResult);

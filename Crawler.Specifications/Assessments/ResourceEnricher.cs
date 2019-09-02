@@ -22,8 +22,6 @@ namespace Helix.Crawler.Specifications
                 Assert.Equal(expectedOutputResource?.OriginalUrl, inputResource.OriginalUrl);
                 Assert.StrictEqual(expectedOutputResource?.Uri, inputResource.Uri);
                 Assert.Equal(expectedOutputResource?.StatusCode, inputResource.StatusCode);
-                Assert.Equal(expectedOutputResource?.AbsoluteUrl, inputResource.AbsoluteUrl);
-                Assert.Equal(expectedOutputResource?.IsBroken, inputResource.IsBroken);
                 Assert.Equal(expectedOutputResource?.Uri?.Fragment, inputResource.Uri?.Fragment);
             }
         }

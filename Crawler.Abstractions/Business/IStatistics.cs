@@ -3,6 +3,7 @@ namespace Helix.Crawler.Abstractions
     public interface IStatistics
     {
         int BrokenUrlCount { get; }
+
         double MillisecondsAveragePageLoadTime { get; }
 
         int ValidUrlCount { get; }

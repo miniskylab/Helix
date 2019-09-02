@@ -41,21 +41,14 @@ namespace Helix.Crawler
             _objectDisposed = true;
         }
 
+        // TODO: Refactor this method so that, it returns Task<bool>. We can then have a singleton ResourceVerifier
         public bool TryVerify(Resource resource, CancellationToken cancellationToken, out VerificationResult verificationResult)
         {
             if (_objectDisposed) throw new ObjectDisposedException(nameof(ResourceVerifier));
             verificationResult = null;
 
             if (!resource.IsInternal && !_configurations.VerifyExternalUrls) return false;
-            verificationResult = new VerificationResult
-            {
-                Id = resource.Id,
-                IsInternalResource = resource.IsInternal,
-                ParentUrl = resource.ParentUri?.AbsoluteUri,
-                StatusCode = resource.StatusCode,
-                VerifiedUrl = resource.AbsoluteUrl,
-                ResourceType = Enum.GetName(typeof(ResourceType), resource.ResourceType)
-            };
+            verificationResult = resource.ToVerificationResult();
             if (resource.StatusCode != default) return true;
 
             try

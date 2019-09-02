@@ -15,139 +15,135 @@ using log4net;
 
 namespace Helix.Crawler
 {
-    // TODO: Move to Application
-    public partial class CrawlerBot
+    internal static class ServiceLocator
     {
-        static class ServiceLocator
+        static IContainer _serviceContainer;
+
+        public static void DisposeServices()
         {
-            static IContainer _serviceContainer;
+            _serviceContainer?.Dispose();
+            _serviceContainer = null;
+        }
 
-            public static void DisposeServices()
+        public static TService Get<TService>() where TService : class { return _serviceContainer?.Resolve<TService>(); }
+
+        public static void SetupAndConfigureServices(Configurations configurations)
+        {
+            if (_serviceContainer?.Resolve<Configurations>() != null) throw new InvalidConstraintException();
+
+            var containerBuilder = new ContainerBuilder();
+            containerBuilder.RegisterModule<Log4NetModule>();
+            RegisterTransientServicesByConvention();
+            RegisterTransientServicesRequiringConfigurations();
+            RegisterSingletonServices();
+            _serviceContainer = containerBuilder.Build();
+
+            void RegisterTransientServicesByConvention()
             {
-                _serviceContainer?.Dispose();
-                _serviceContainer = null;
+                var filteredTypes = Assembly.GetExecutingAssembly().GetTypes()
+                    .Where(type => type.IsClass && !type.IsAbstract && !type.IsNested && !type.IsCompilerGenerated());
+                foreach (var filteredType in filteredTypes)
+                {
+                    var matchingInterfaceType = filteredType.GetInterface($"I{filteredType.Name}");
+                    if (matchingInterfaceType == null) continue;
+                    containerBuilder.RegisterType(filteredType).As(matchingInterfaceType);
+                }
             }
-
-            public static TService Get<TService>() where TService : class { return _serviceContainer?.Resolve<TService>(); }
-
-            public static void SetupAndConfigureServices(Configurations configurations)
+            void RegisterTransientServicesRequiringConfigurations()
             {
-                if (_serviceContainer?.Resolve<Configurations>() != null) throw new InvalidConstraintException();
+                containerBuilder.Register(_ => CreateAndConfigureWebBrowser()).As<IWebBrowser>();
+                containerBuilder.Register(_ => CreateAndConfigureSqLitePersistence()).As<ISqLitePersistence<VerificationResult>>();
 
-                var containerBuilder = new ContainerBuilder();
-                containerBuilder.RegisterModule<Log4NetModule>();
-                RegisterTransientServicesByConvention();
-                RegisterTransientServicesRequiringConfigurations();
-                RegisterSingletonServices();
-                _serviceContainer = containerBuilder.Build();
-
-                void RegisterTransientServicesByConvention()
+                IWebBrowser CreateAndConfigureWebBrowser()
                 {
-                    var filteredTypes = Assembly.GetExecutingAssembly().GetTypes()
-                        .Where(type => type.IsClass && !type.IsAbstract && !type.IsNested && !type.IsCompilerGenerated());
-                    foreach (var filteredType in filteredTypes)
-                    {
-                        var matchingInterfaceType = filteredType.GetInterface($"I{filteredType.Name}");
-                        if (matchingInterfaceType == null) continue;
-                        containerBuilder.RegisterType(filteredType).As(matchingInterfaceType);
-                    }
+                    return new ChromiumWebBrowser(
+                        Configurations.PathToChromiumExecutable,
+                        Configurations.WorkingDirectory,
+                        configurations.HttpRequestTimeout.TotalSeconds,
+                        configurations.UseIncognitoWebBrowser,
+                        configurations.UseHeadlessWebBrowsers,
+                        (1920, 1080)
+                    );
                 }
-                void RegisterTransientServicesRequiringConfigurations()
+                ISqLitePersistence<VerificationResult> CreateAndConfigureSqLitePersistence()
                 {
-                    containerBuilder.Register(_ => CreateAndConfigureWebBrowser()).As<IWebBrowser>();
-                    containerBuilder.Register(_ => CreateAndConfigureSqLitePersistence()).As<ISqLitePersistence<VerificationResult>>();
-
-                    IWebBrowser CreateAndConfigureWebBrowser()
-                    {
-                        return new ChromiumWebBrowser(
-                            Configurations.PathToChromiumExecutable,
-                            Configurations.WorkingDirectory,
-                            configurations.HttpRequestTimeout.TotalSeconds,
-                            configurations.UseIncognitoWebBrowser,
-                            configurations.UseHeadlessWebBrowsers,
-                            (1920, 1080)
-                        );
-                    }
-                    ISqLitePersistence<VerificationResult> CreateAndConfigureSqLitePersistence()
-                    {
-                        var sqLitePersistence = new SqLitePersistence<VerificationResult>(Configurations.PathToReportFile);
-                        Get<IEventBroadcaster>().Broadcast(new Event { EventType = EventType.ReportFileCreated });
-                        return sqLitePersistence;
-                    }
+                    var sqLitePersistence = new SqLitePersistence<VerificationResult>(Configurations.PathToReportFile);
+                    Get<IEventBroadcaster>().Broadcast(new Event { EventType = EventType.ReportFileCreated });
+                    return sqLitePersistence;
                 }
-                void RegisterSingletonServices()
-                {
-                    containerBuilder.RegisterInstance(Activator.CreateInstance<EventBroadcaster>())
-                        .As<IEventBroadcaster>()
-                        .ExternallyOwned();
+            }
+            void RegisterSingletonServices()
+            {
+                containerBuilder.RegisterInstance(Activator.CreateInstance<EventBroadcaster>())
+                    .As<IEventBroadcaster>()
+                    .ExternallyOwned();
 
-                    containerBuilder.RegisterInstance(configurations).AsSelf();
-                    containerBuilder.RegisterType<IncrementalIdGenerator>().As<IIncrementalIdGenerator>().SingleInstance();
-                    containerBuilder.RegisterType<Statistics>().As<IStatistics>().SingleInstance();
-                    containerBuilder.RegisterType<ReportWriter>().As<IReportWriter>().SingleInstance();
-                    containerBuilder.RegisterType<Memory>().As<IMemory>().SingleInstance();
-                    containerBuilder.RegisterType<Scheduler>().As<IScheduler>().SingleInstance();
-                    containerBuilder.RegisterType<HardwareMonitor>().As<IHardwareMonitor>().SingleInstance();
-                    containerBuilder.Register(_ => CreateAndConfigureHttpClient()).SingleInstance();
-                    containerBuilder.RegisterType<NetworkServicePool>().As<INetworkServicePool>()
-                        .WithParameters(new[]
+                containerBuilder.RegisterInstance(configurations).AsSelf();
+                containerBuilder.RegisterType<IncrementalIdGenerator>().As<IIncrementalIdGenerator>().SingleInstance();
+                containerBuilder.RegisterType<Statistics>().As<IStatistics>().SingleInstance();
+                containerBuilder.RegisterType<ReportWriter>().As<IReportWriter>().SingleInstance();
+                containerBuilder.RegisterType<Memory>().As<IMemory>().SingleInstance();
+                containerBuilder.RegisterType<Scheduler>().As<IScheduler>().SingleInstance();
+                containerBuilder.RegisterType<HardwareMonitor>().As<IHardwareMonitor>().SingleInstance();
+                containerBuilder.Register(_ => CreateAndConfigureHttpClient()).SingleInstance();
+                containerBuilder.RegisterType<NetworkServicePool>().As<INetworkServicePool>()
+                    .WithParameters(new[]
+                    {
+                        Parameter<IResourceExtractor>(),
+                        Parameter<IResourceVerifier>(),
+                        Parameter<IHtmlRenderer>()
+                    })
+                    .SingleInstance();
+
+                HttpClient CreateAndConfigureHttpClient()
+                {
+                    IWebBrowser webBrowser = new ChromiumWebBrowser(
+                        Configurations.PathToChromiumExecutable,
+                        Configurations.WorkingDirectory
+                    );
+                    var userAgentString = webBrowser.GetUserAgentString();
+                    webBrowser.Dispose();
+
+                    var httpClient = new HttpClient();
+                    httpClient.DefaultRequestHeaders.Accept.ParseAdd(
+                        "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+                    httpClient.DefaultRequestHeaders.AcceptEncoding.ParseAdd("gzip, deflate, br");
+                    httpClient.DefaultRequestHeaders.AcceptLanguage.ParseAdd("en-US,en;q=0.9");
+                    httpClient.DefaultRequestHeaders.Upgrade.ParseAdd("1");
+                    httpClient.DefaultRequestHeaders.Pragma.ParseAdd("no-cache");
+                    httpClient.DefaultRequestHeaders.CacheControl = CacheControlHeaderValue.Parse("no-cache");
+                    httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(userAgentString);
+                    httpClient.Timeout = configurations.HttpRequestTimeout;
+                    return httpClient;
+                }
+                ResolvedParameter Parameter<T>()
+                {
+                    return new ResolvedParameter(
+                        (parameterInfo, _) => parameterInfo.ParameterType == typeof(Func<T>),
+                        (_, componentContext) =>
                         {
-                            Parameter<IResourceExtractor>(),
-                            Parameter<IResourceVerifier>(),
-                            Parameter<IHtmlRenderer>()
-                        })
-                        .SingleInstance();
-
-                    HttpClient CreateAndConfigureHttpClient()
-                    {
-                        IWebBrowser webBrowser = new ChromiumWebBrowser(
-                            Configurations.PathToChromiumExecutable,
-                            Configurations.WorkingDirectory
-                        );
-                        var userAgentString = webBrowser.GetUserAgentString();
-                        webBrowser.Dispose();
-
-                        var httpClient = new HttpClient();
-                        httpClient.DefaultRequestHeaders.Accept.ParseAdd(
-                            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
-                        httpClient.DefaultRequestHeaders.AcceptEncoding.ParseAdd("gzip, deflate, br");
-                        httpClient.DefaultRequestHeaders.AcceptLanguage.ParseAdd("en-US,en;q=0.9");
-                        httpClient.DefaultRequestHeaders.Upgrade.ParseAdd("1");
-                        httpClient.DefaultRequestHeaders.Pragma.ParseAdd("no-cache");
-                        httpClient.DefaultRequestHeaders.CacheControl = CacheControlHeaderValue.Parse("no-cache");
-                        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(userAgentString);
-                        httpClient.Timeout = configurations.HttpRequestTimeout;
-                        return httpClient;
-                    }
-                    ResolvedParameter Parameter<T>()
-                    {
-                        return new ResolvedParameter(
-                            (parameterInfo, _) => parameterInfo.ParameterType == typeof(Func<T>),
-                            (_, componentContext) =>
-                            {
-                                var copiedComponentContext = componentContext.Resolve<IComponentContext>();
-                                return new Func<T>(copiedComponentContext.Resolve<T>);
-                            });
-                    }
+                            var copiedComponentContext = componentContext.Resolve<IComponentContext>();
+                            return new Func<T>(copiedComponentContext.Resolve<T>);
+                        });
                 }
             }
+        }
 
-            class Log4NetModule : Autofac.Module
+        class Log4NetModule : Autofac.Module
+        {
+            protected override void AttachToComponentRegistration(IComponentRegistry _, IComponentRegistration componentRegistration)
             {
-                protected override void AttachToComponentRegistration(IComponentRegistry _, IComponentRegistration componentRegistration)
+                componentRegistration.Preparing += (__, preparingEventArgs) =>
                 {
-                    componentRegistration.Preparing += (__, preparingEventArgs) =>
-                    {
-                        preparingEventArgs.Parameters = preparingEventArgs.Parameters.Union(
-                            new[]
-                            {
-                                new ResolvedParameter(
-                                    (parameterInfo, ___) => parameterInfo.ParameterType == typeof(ILog),
-                                    (parameterInfo, ___) => LogManager.GetLogger(parameterInfo.Member.DeclaringType)
-                                )
-                            });
-                    };
-                }
+                    preparingEventArgs.Parameters = preparingEventArgs.Parameters.Union(
+                        new[]
+                        {
+                            new ResolvedParameter(
+                                (parameterInfo, ___) => parameterInfo.ParameterType == typeof(ILog),
+                                (parameterInfo, ___) => LogManager.GetLogger(parameterInfo.Member.DeclaringType)
+                            )
+                        });
+                };
             }
         }
     }

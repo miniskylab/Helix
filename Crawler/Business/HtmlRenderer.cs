@@ -22,9 +22,8 @@ namespace Helix.Crawler
         public event Action<Resource> OnResourceCaptured;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public HtmlRenderer(Configurations configurations, IWebBrowser webBrowser, IResourceScope resourceScope, IReportWriter reportWriter,
-            IResourceEnricher resourceEnricher, IHttpContentTypeToResourceTypeDictionary httpContentTypeToResourceTypeDictionary,
-            ILog log)
+        public HtmlRenderer(Configurations configurations, IResourceScope resourceScope, ILog log, IWebBrowser webBrowser,
+            IHttpContentTypeToResourceTypeDictionary httpContentTypeToResourceTypeDictionary)
         {
             _webBrowser = webBrowser;
             _webBrowser.BeforeRequest += EnsureInternal;
@@ -66,8 +65,8 @@ namespace Helix.Crawler
                             return;
                         }
 
-                        if (_resourceBeingRendered.IsBroken) return;
-                        var resource = new Resource
+                        if (_resourceBeingRendered.StatusCode.IsWithinBrokenRange()) return;
+                        OnResourceCaptured?.Invoke(new Resource
                         {
                             ParentUri = parentUri,
                             OriginalUrl = request.Url,
@@ -75,9 +74,7 @@ namespace Helix.Crawler
                             StatusCode = (StatusCode) response.StatusCode,
                             Size = response.ContentLength,
                             ResourceType = httpContentTypeToResourceTypeDictionary[response.ContentType]
-                        };
-                        resourceEnricher.Enrich(resource);
-                        OnResourceCaptured?.Invoke(resource);
+                        });
                     }
                     finally { Interlocked.Decrement(ref _activeHttpTrafficCount); }
                 }, _networkTrafficCts.Token, TaskCreationOptions.None, PriorityTaskScheduler.Highest);
@@ -107,13 +104,11 @@ namespace Helix.Crawler
                     var newStatusCode = response.StatusCode;
                     var oldStatusCode = (int) _resourceBeingRendered.StatusCode;
                     log.Info($"StatusCode changed from [{oldStatusCode}] to [{newStatusCode}] at [{_resourceBeingRendered.Uri}]");
-
                     _resourceBeingRendered.StatusCode = (StatusCode) response.StatusCode;
-                    reportWriter.UpdateStatusCode(_resourceBeingRendered.Id, (StatusCode) response.StatusCode);
                 }
                 void TakeScreenshotIfNecessary()
                 {
-                    if (_resourceBeingRendered.IsBroken && configurations.TakeScreenshotEvidence)
+                    if (_resourceBeingRendered.StatusCode.IsWithinBrokenRange() && configurations.TakeScreenshotEvidence)
                         _takeScreenshot = true;
                 }
             }
@@ -138,7 +133,7 @@ namespace Helix.Crawler
             var uri = resource.Uri;
             var renderingResult = _webBrowser.TryRender(uri, out html, out millisecondsPageLoadTime, cancellationToken);
 
-            if (resource.IsBroken) millisecondsPageLoadTime = null;
+            if (resource.StatusCode.IsWithinBrokenRange()) millisecondsPageLoadTime = null;
             if (!_takeScreenshot) return renderingResult;
 
             var pathToDirectoryContainsScreenshotFiles = Configurations.PathToDirectoryContainsScreenshotFiles;

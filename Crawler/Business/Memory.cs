@@ -83,8 +83,8 @@ namespace Helix.Crawler
         {
             lock (_memorizationLock)
             {
-                if (_alreadyVerifiedUrls.Contains(toBeVerifiedResource.AbsoluteUrl)) return;
-                _alreadyVerifiedUrls.Add(toBeVerifiedResource.AbsoluteUrl);
+                if (_alreadyVerifiedUrls.Contains(toBeVerifiedResource.GetAbsoluteUrl())) return;
+                _alreadyVerifiedUrls.Add(toBeVerifiedResource.GetAbsoluteUrl());
             }
             _toBeVerifiedResources.Add(toBeVerifiedResource);
         }

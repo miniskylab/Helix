@@ -33,31 +33,28 @@ namespace Helix.Crawler
             }
         }
 
-        public void UpdateStatusCode(int resourceId, StatusCode newStatusCode)
-        {
-            lock (_writeLock)
-            {
-                if (_objectDisposed) throw new ObjectDisposedException(nameof(ReportWriter));
-                var verificationResult = _verificationResults.FirstOrDefault(v => v.Id == resourceId);
-                if (verificationResult != null)
-                {
-                    verificationResult.StatusCode = newStatusCode;
-                    return;
-                }
-
-                verificationResult = _sqLitePersistence.GetByPrimaryKey(resourceId);
-                if (verificationResult == null) throw new KeyNotFoundException();
-                verificationResult.StatusCode = newStatusCode;
-                _sqLitePersistence.Update(verificationResult);
-            }
-        }
-
         public void WriteReport(VerificationResult verificationResult)
         {
             lock (_writeLock)
             {
                 if (_objectDisposed) throw new ObjectDisposedException(nameof(ReportWriter));
                 if (_verificationResults.Count >= 300) FlushMemoryBufferToDisk();
+
+                var oldVerificationResult = _verificationResults.FirstOrDefault(v => v.Id == verificationResult.Id);
+                if (oldVerificationResult != null)
+                {
+                    _verificationResults.Remove(oldVerificationResult);
+                    _verificationResults.Add(verificationResult);
+                    return;
+                }
+
+                oldVerificationResult = _sqLitePersistence.GetByPrimaryKey(verificationResult.Id);
+                if (oldVerificationResult != null)
+                {
+                    _sqLitePersistence.Update(verificationResult);
+                    return;
+                }
+
                 _verificationResults.Add(verificationResult);
             }
         }

@@ -10,6 +10,7 @@ namespace Helix.Crawler.Abstractions
 
         public bool IsInternal { get; set; }
 
+        // TODO:
         // public bool Localized { get; set; }
 
         public string OriginalUrl { get; set; }
@@ -23,11 +24,5 @@ namespace Helix.Crawler.Abstractions
         public StatusCode StatusCode { get; set; }
 
         public Uri Uri { get; set; }
-
-        public string AbsoluteUrl => Uri != null
-            ? OriginalUrl.EndsWith("/") ? Uri?.AbsoluteUri : Uri?.AbsoluteUri.TrimEnd('/')
-            : OriginalUrl;
-
-        public bool IsBroken => StatusCode < 0 || 400 <= (int) StatusCode;
     }
 }
