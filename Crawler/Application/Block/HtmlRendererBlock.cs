@@ -49,21 +49,7 @@ namespace Helix.Crawler
             {
                 CapturedResources.Complete();
                 VerificationResults.Complete();
-
-                while (_htmlRenderers.Any())
-                {
-                    _htmlRenderers.Take().Dispose();
-                    counter.disposedHtmlRendererCount++;
-
-                    var webBrowserClosedEvent = new Event
-                    {
-                        EventType = EventType.StopProgressUpdated,
-                        Message = $"Closing web browsers ({counter.disposedHtmlRendererCount}/{counter.createdHtmlRenderCount}) ..."
-                    };
-                    if (!Events.Post(webBrowserClosedEvent))
-                        _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
-                }
-                _htmlRenderers?.Dispose();
+                DisposeHtmlRenderers();
                 Events.Complete();
                 CheckMemoryLeak();
             });
@@ -92,6 +78,23 @@ namespace Helix.Crawler
 
                 _htmlRenderers.Add(htmlRenderer, CancellationToken.None);
                 counter.createdHtmlRenderCount++;
+            }
+            void DisposeHtmlRenderers()
+            {
+                while (_htmlRenderers.Any())
+                {
+                    _htmlRenderers.Take().Dispose();
+                    counter.disposedHtmlRendererCount++;
+
+                    var webBrowserClosedEvent = new Event
+                    {
+                        EventType = EventType.StopProgressUpdated,
+                        Message = $"Closing web browsers ({counter.disposedHtmlRendererCount}/{counter.createdHtmlRenderCount}) ..."
+                    };
+                    if (!Events.Post(webBrowserClosedEvent))
+                        _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
+                }
+                _htmlRenderers?.Dispose();
             }
             void CreateAndDestroyHtmlRenderersAdaptively()
             {
