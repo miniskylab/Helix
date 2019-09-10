@@ -38,11 +38,7 @@ namespace Helix.Crawler
             _htmlRenderers = new BlockingCollection<IHtmlRenderer>();
             (int createdHtmlRenderCount, int disposedHtmlRendererCount) counter = (0, 0);
 
-            Events = new BufferBlock<Event>(new DataflowBlockOptions
-            {
-                EnsureOrdered = true,
-                CancellationToken = cancellationToken
-            });
+            Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true, CancellationToken = cancellationToken });
             CapturedResources = new BufferBlock<Resource>(new DataflowBlockOptions { CancellationToken = cancellationToken });
             VerificationResults = new BufferBlock<VerificationResult>(new DataflowBlockOptions { CancellationToken = cancellationToken });
             base.Completion.ContinueWith(_ =>

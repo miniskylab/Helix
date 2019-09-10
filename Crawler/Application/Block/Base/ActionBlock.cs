@@ -9,7 +9,7 @@ namespace Helix.Crawler
     {
         readonly System.Threading.Tasks.Dataflow.ActionBlock<TInput> _actionBlock;
 
-        public Task Completion => _actionBlock.Completion;
+        public virtual Task Completion => _actionBlock.Completion;
 
         protected ActionBlock(CancellationToken cancellationToken)
         {
