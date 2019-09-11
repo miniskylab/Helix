@@ -1,9 +1,9 @@
-﻿using System;
+﻿using System.Collections.ObjectModel;
 
 namespace Helix.Crawler.Abstractions
 {
     public interface IResourceExtractor
     {
-        void ExtractResourcesFrom(HtmlDocument htmlDocument, Action<Resource> onResourceExtracted);
+        ReadOnlyCollection<Resource> ExtractResourcesFrom(HtmlDocument htmlDocument);
     }
 }

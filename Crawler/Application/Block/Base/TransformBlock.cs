@@ -17,9 +17,9 @@ namespace Helix.Crawler
                 input => Transform(input),
                 new ExecutionDataflowBlockOptions
                 {
+                    MaxDegreeOfParallelism = -1,
                     EnsureOrdered = ensureOrdered,
-                    CancellationToken = cancellationToken,
-                    MaxDegreeOfParallelism = Environment.ProcessorCount
+                    CancellationToken = cancellationToken
                 }
             );
         }

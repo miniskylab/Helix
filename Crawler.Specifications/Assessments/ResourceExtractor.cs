@@ -13,30 +13,24 @@ namespace Helix.Crawler.Specifications
         void ExtractResourcesFromHtmlDocument(HtmlDocument inputHtmlDocument, IList<Resource> expectedOutputResources,
             Type expectedExceptionType)
         {
-            var resourceExtractedEventRaiseCount = 0;
             var resourceExtractor = ServiceLocator.Get<IResourceExtractor>();
             if (expectedExceptionType != null)
             {
-                Assert.True(resourceExtractedEventRaiseCount == 0);
                 Assert.Throws(
                     expectedExceptionType,
-                    () => resourceExtractor.ExtractResourcesFrom(inputHtmlDocument, OnResourceExtracted)
+                    () => resourceExtractor.ExtractResourcesFrom(inputHtmlDocument)
                 );
             }
             else
             {
-                resourceExtractor.ExtractResourcesFrom(inputHtmlDocument, OnResourceExtracted);
-                Assert.Equal(expectedOutputResources.Count, resourceExtractedEventRaiseCount);
-            }
-
-            void OnResourceExtracted(Resource extractedResource)
-            {
-                Assert.Single(
-                    expectedOutputResources ?? new List<Resource>(),
-                    expectedOutputResource => expectedOutputResource?.ParentUri == extractedResource?.ParentUri &&
-                                              expectedOutputResource?.OriginalUrl == extractedResource?.OriginalUrl
-                );
-                resourceExtractedEventRaiseCount++;
+                var extractedResources = resourceExtractor.ExtractResourcesFrom(inputHtmlDocument);
+                Assert.Equal(expectedOutputResources.Count, extractedResources.Count);
+                for (var index = 0; index < expectedOutputResources.Count; index++)
+                {
+                    Assert.Equal(expectedOutputResources[index].OriginalUrl, extractedResources[index].OriginalUrl);
+                    Assert.StrictEqual(expectedOutputResources[index].ParentUri, extractedResources[index].ParentUri);
+                    Assert.Equal(expectedOutputResources[index].IsExtracted, extractedResources[index].IsExtracted);
+                }
             }
         }
 
@@ -44,18 +38,7 @@ namespace Helix.Crawler.Specifications
         void RaiseArgumentNullExceptionIfCallbackIsNull()
         {
             var resourceExtractor = ServiceLocator.Get<IResourceExtractor>();
-            var htmlDocument = new HtmlDocument
-            {
-                Uri = new Uri("http://www.helix.com"),
-                Text = @"<html>
-                            <body>
-                                <a href=""/anything""></a>
-                                <a href=""//www.sanity.com""></a>
-                            </body>
-                        </html>"
-            };
-            Assert.Throws<ArgumentNullException>(() => resourceExtractor.ExtractResourcesFrom(htmlDocument, null));
-            Assert.Throws<ArgumentNullException>(() => resourceExtractor.ExtractResourcesFrom(null, null));
+            Assert.Throws<ArgumentNullException>(() => resourceExtractor.ExtractResourcesFrom(null));
         }
     }
 }

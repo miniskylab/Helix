@@ -16,6 +16,7 @@ namespace Helix.Crawler.Specifications
             IgnoreAnchorTagsWithHrefAttributeContainingJavaScriptCode();
 
             ThrowExceptionIfArgumentNull();
+            NeverReturnNull();
         }
 
         void ExtractResourcesFromHtmlDocument()
@@ -38,14 +39,19 @@ namespace Helix.Crawler.Specifications
                 },
                 new List<Resource>
                 {
-                    new Resource { ParentUri = new Uri("http://www.helix.com"), OriginalUrl = "//www.sanity.com" },
-                    new Resource { ParentUri = new Uri("http://www.helix.com"), OriginalUrl = "http://www.sanity.com/" },
-                    new Resource { ParentUri = new Uri("http://www.helix.com"), OriginalUrl = "ftp://www.sanity.com" },
-                    new Resource { ParentUri = new Uri("http://www.helix.com"), OriginalUrl = "/with-leading-slash" },
-                    new Resource { ParentUri = new Uri("http://www.helix.com"), OriginalUrl = "without-leading-slash" },
-                    new Resource { ParentUri = new Uri("http://www.helix.com"), OriginalUrl = "http://192.168.1.2" }
+                    Resource("//www.sanity.com"),
+                    Resource("http://www.sanity.com/"),
+                    Resource("ftp://www.sanity.com"),
+                    Resource("/with-leading-slash"),
+                    Resource("without-leading-slash"),
+                    Resource("http://192.168.1.2")
                 }
             );
+
+            Resource Resource(string originalUrl)
+            {
+                return new Resource { ParentUri = new Uri("http://www.helix.com"), OriginalUrl = originalUrl, IsExtracted = true };
+            }
         }
 
         void IgnoreAnchorTagsWithHrefAttributeContainingEmptyOrWhiteSpaceCharactersOnly()
@@ -91,6 +97,21 @@ namespace Helix.Crawler.Specifications
                         <html>
                             <body>
                                 <a></a>
+                            </body>
+                        </html>"
+                },
+                new List<Resource>()
+            );
+        }
+
+        void NeverReturnNull()
+        {
+            AddTheoryDescription(new HtmlDocument
+                {
+                    Uri = new Uri("http://www.helix.com"),
+                    Text = @"
+                        <html>
+                            <body>
                             </body>
                         </html>"
                 },

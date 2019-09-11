@@ -264,10 +264,8 @@ namespace Helix.Crawler
                         while (_scheduler.RemainingWorkload != 0 && !_scheduler.CancellationToken.IsCancellationRequested)
                             _scheduler.CreateTask((resourceExtractor, toBeExtractedHtmlDocument) =>
                             {
-                                resourceExtractor.ExtractResourcesFrom(
-                                    toBeExtractedHtmlDocument,
-                                    resource => _memory.MemorizeToBeVerifiedResource(resource)
-                                );
+                                foreach (var extractedResource in resourceExtractor.ExtractResourcesFrom(toBeExtractedHtmlDocument))
+                                    _memory.MemorizeToBeVerifiedResource(extractedResource);
                             });
                     }
                     void Verify()

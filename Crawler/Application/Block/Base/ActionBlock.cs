@@ -17,7 +17,7 @@ namespace Helix.Crawler
                 Act,
                 new ExecutionDataflowBlockOptions
                 {
-                    MaxDegreeOfParallelism = Environment.ProcessorCount,
+                    MaxDegreeOfParallelism = -1,
                     CancellationToken = cancellationToken
                 }
             );
