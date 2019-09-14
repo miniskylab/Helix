@@ -28,12 +28,9 @@ namespace Helix.Crawler
             _resourceVerifier = resourceVerifier;
             _cancellationToken = cancellationToken;
 
-            Events = new BufferBlock<Event>(new DataflowBlockOptions
-            {
-                EnsureOrdered = true,
-                CancellationToken = cancellationToken
-            });
+            Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true, CancellationToken = cancellationToken });
             VerificationResults = new BufferBlock<VerificationResult>(new DataflowBlockOptions { CancellationToken = cancellationToken });
+
             base.Completion.ContinueWith(_ =>
             {
                 Events.Complete();
@@ -57,21 +54,32 @@ namespace Helix.Crawler
                 var uriSchemeNotSupported = verificationResult.StatusCode == StatusCode.UriSchemeNotSupported;
                 if (uriSchemeNotSupported) return null;
 
-                if (!VerificationResults.Post(verificationResult))
-                    _log.Error($"Failed to post data to buffer block named [{nameof(VerificationResults)}].");
-
-                if (resource.StatusCode.IsWithinBrokenRange()) _statistics.IncrementBrokenUrlCount();
-                else _statistics.IncrementValidUrlCount();
-
-                var resourceVerifiedEvent = new Event
-                {
-                    EventType = EventType.ResourceVerified,
-                    Message = $"{verificationResult.StatusCode:D} - {verificationResult.VerifiedUrl}"
-                };
-                if (!Events.Post(resourceVerifiedEvent))
-                    _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
+                DoStatistics();
+                SendOutVerificationResult();
+                SendOutResourceVerifiedEvent();
 
                 return resource;
+
+                void DoStatistics()
+                {
+                    if (resource.StatusCode.IsWithinBrokenRange()) _statistics.IncrementBrokenUrlCount();
+                    else _statistics.IncrementValidUrlCount();
+                }
+                void SendOutVerificationResult()
+                {
+                    if (!VerificationResults.Post(verificationResult))
+                        _log.Error($"Failed to post data to buffer block named [{nameof(VerificationResults)}].");
+                }
+                void SendOutResourceVerifiedEvent()
+                {
+                    var resourceVerifiedEvent = new Event
+                    {
+                        EventType = EventType.ResourceVerified,
+                        Message = $"{verificationResult.StatusCode:D} - {verificationResult.VerifiedUrl}"
+                    };
+                    if (!Events.Post(resourceVerifiedEvent))
+                        _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
+                }
             }
             catch (Exception exception)
             {

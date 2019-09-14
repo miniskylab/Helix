@@ -45,11 +45,15 @@ namespace Helix.Crawler
         public bool TryVerify(Resource resource, CancellationToken cancellationToken, out VerificationResult verificationResult)
         {
             if (_objectDisposed) throw new ObjectDisposedException(nameof(ResourceVerifier));
-            verificationResult = null;
 
+            verificationResult = null;
             if (!resource.IsInternal && !_configurations.VerifyExternalUrls) return false;
-            verificationResult = resource.ToVerificationResult();
-            if (resource.StatusCode != default) return true;
+
+            if (resource.StatusCode != default)
+            {
+                verificationResult = resource.ToVerificationResult();
+                return true;
+            }
 
             try
             {
@@ -63,7 +67,6 @@ namespace Helix.Crawler
                 resource.StatusCode = (StatusCode) httpResponseMessage.StatusCode;
                 resource.Size = httpResponseMessage.Content.Headers.ContentLength;
                 resource.ResourceType = _httpContentTypeToResourceTypeDictionary[httpContentType];
-                verificationResult.ResourceType = Enum.GetName(typeof(ResourceType), resource.ResourceType);
             }
             catch (AggregateException aggregateException)
             {
@@ -82,7 +85,11 @@ namespace Helix.Crawler
                         throw;
                 }
             }
-            finally { verificationResult.StatusCode = resource.StatusCode; }
+            finally
+            {
+                verificationResult = resource.ToVerificationResult();
+            }
+
             return true;
         }
     }

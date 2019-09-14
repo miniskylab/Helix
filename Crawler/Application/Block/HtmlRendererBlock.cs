@@ -41,6 +41,7 @@ namespace Helix.Crawler
             Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true, CancellationToken = cancellationToken });
             CapturedResources = new BufferBlock<Resource>(new DataflowBlockOptions { CancellationToken = cancellationToken });
             VerificationResults = new BufferBlock<VerificationResult>(new DataflowBlockOptions { CancellationToken = cancellationToken });
+
             base.Completion.ContinueWith(_ =>
             {
                 CapturedResources.Complete();
@@ -48,21 +49,39 @@ namespace Helix.Crawler
                 DisposeHtmlRenderers();
                 Events.Complete();
                 CheckMemoryLeak();
+
+                void CheckMemoryLeak()
+                {
+                    if (counter.disposedHtmlRendererCount == counter.createdHtmlRenderCount) return;
+                    var resourceName = $"{nameof(HtmlRenderer)}{(counter.createdHtmlRenderCount > 1 ? "s" : string.Empty)}";
+                    var disposedCountText = counter.disposedHtmlRendererCount == 0 ? "none" : $"only {counter.disposedHtmlRendererCount}";
+                    _log.Warn(
+                        "Orphaned resources detected! " +
+                        $"{counter.createdHtmlRenderCount} {resourceName} were created but {disposedCountText} could be found and disposed."
+                    );
+                }
+                void DisposeHtmlRenderers()
+                {
+                    while (_htmlRenderers.Any())
+                    {
+                        _htmlRenderers.Take().Dispose();
+                        counter.disposedHtmlRendererCount++;
+
+                        var webBrowserClosedEvent = new Event
+                        {
+                            EventType = EventType.StopProgressUpdated,
+                            Message = $"Closing web browsers ({counter.disposedHtmlRendererCount}/{counter.createdHtmlRenderCount}) ..."
+                        };
+                        if (!Events.Post(webBrowserClosedEvent))
+                            _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
+                    }
+                    _htmlRenderers?.Dispose();
+                }
             });
 
             CreateHtmlRenderer();
             CreateAndDestroyHtmlRenderersAdaptively();
 
-            void CheckMemoryLeak()
-            {
-                if (counter.disposedHtmlRendererCount == counter.createdHtmlRenderCount) return;
-                var resourceName = $"{nameof(HtmlRenderer)}{(counter.createdHtmlRenderCount > 1 ? "s" : string.Empty)}";
-                var disposedCountText = counter.disposedHtmlRendererCount == 0 ? "none" : $"only {counter.disposedHtmlRendererCount}";
-                _log.Warn(
-                    "Orphaned resources detected! " +
-                    $"{counter.createdHtmlRenderCount} {resourceName} were created but {disposedCountText} could be found and disposed."
-                );
-            }
             void CreateHtmlRenderer()
             {
                 var htmlRenderer = getHtmlRenderer();
@@ -74,23 +93,6 @@ namespace Helix.Crawler
 
                 _htmlRenderers.Add(htmlRenderer, CancellationToken.None);
                 counter.createdHtmlRenderCount++;
-            }
-            void DisposeHtmlRenderers()
-            {
-                while (_htmlRenderers.Any())
-                {
-                    _htmlRenderers.Take().Dispose();
-                    counter.disposedHtmlRendererCount++;
-
-                    var webBrowserClosedEvent = new Event
-                    {
-                        EventType = EventType.StopProgressUpdated,
-                        Message = $"Closing web browsers ({counter.disposedHtmlRendererCount}/{counter.createdHtmlRenderCount}) ..."
-                    };
-                    if (!Events.Post(webBrowserClosedEvent))
-                        _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
-                }
-                _htmlRenderers?.Dispose();
             }
             void CreateAndDestroyHtmlRenderersAdaptively()
             {
@@ -146,19 +148,27 @@ namespace Helix.Crawler
                     _cancellationToken
                 );
                 if (renderingFailed) return null;
-                var newStatusCode = resource.StatusCode;
-                if (oldStatusCode != newStatusCode && !VerificationResults.Post(resource.ToVerificationResult()))
-                    _log.Error($"Failed to post data to buffer block named [{nameof(VerificationResults)}].");
 
-                if (millisecondsPageLoadTime.HasValue)
-                {
-                    _statistics.IncrementSuccessfullyRenderedPageCount();
-                    _statistics.IncrementTotalPageLoadTimeBy(millisecondsPageLoadTime.Value);
-                }
+                UpdateStatusCodeIfChanged();
+                DoStatisticsIfHasPageLoadTime();
 
                 return !resource.StatusCode.IsWithinBrokenRange()
                     ? new HtmlDocument { Uri = resource.Uri, Text = htmlText }
                     : null;
+
+                void UpdateStatusCodeIfChanged()
+                {
+                    var newStatusCode = resource.StatusCode;
+                    if (oldStatusCode == newStatusCode) return;
+                    if (!VerificationResults.Post(resource.ToVerificationResult()))
+                        _log.Error($"Failed to post data to buffer block named [{nameof(VerificationResults)}].");
+                }
+                void DoStatisticsIfHasPageLoadTime()
+                {
+                    if (!millisecondsPageLoadTime.HasValue) return;
+                    _statistics.IncrementSuccessfullyRenderedPageCount();
+                    _statistics.IncrementTotalPageLoadTimeBy(millisecondsPageLoadTime.Value);
+                }
             }
             catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(_cancellationToken))
             {
