@@ -11,7 +11,8 @@ namespace Helix.Crawler
         readonly ILog _log;
         readonly IReportWriter _reportWriter;
 
-        public ReportWriterBlock(CancellationToken cancellationToken, IReportWriter reportWriter, ILog log) : base(cancellationToken)
+        public ReportWriterBlock(CancellationToken cancellationToken, IReportWriter reportWriter, ILog log)
+            : base(cancellationToken, maxDegreeOfParallelism: 300)
         {
             _log = log;
             _reportWriter = reportWriter;

@@ -11,15 +11,15 @@ namespace Helix.Crawler
 
         public virtual Task Completion => _transformBlock.Completion;
 
-        protected TransformBlock(CancellationToken cancellationToken, bool ensureOrdered = false)
+        protected TransformBlock(CancellationToken cancellationToken, bool ensureOrdered = false, int maxDegreeOfParallelism = -1)
         {
             _transformBlock = new System.Threading.Tasks.Dataflow.TransformBlock<TInput, TOutput>(
                 input => Transform(input),
                 new ExecutionDataflowBlockOptions
                 {
-                    MaxDegreeOfParallelism = -1,
                     EnsureOrdered = ensureOrdered,
-                    CancellationToken = cancellationToken
+                    CancellationToken = cancellationToken,
+                    MaxDegreeOfParallelism = maxDegreeOfParallelism
                 }
             );
         }

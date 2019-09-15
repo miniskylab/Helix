@@ -13,7 +13,7 @@ namespace Helix.Crawler
         readonly IResourceExtractor _resourceExtractor;
 
         public ResourceExtractorBlock(CancellationToken cancellationToken, IResourceExtractor resourceExtractor, ILog log)
-            : base(cancellationToken)
+            : base(cancellationToken, maxDegreeOfParallelism: 300)
         {
             _log = log;
             _resourceExtractor = resourceExtractor;

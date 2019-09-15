@@ -22,7 +22,7 @@ namespace Helix.Crawler
         public override Task Completion => Task.WhenAll(base.Completion, VerificationResults.Completion, Events.Completion);
 
         public ResourceVerifierBlock(CancellationToken cancellationToken, IStatistics statistics, IResourceVerifier resourceVerifier,
-            ILog log) : base(cancellationToken)
+            ILog log) : base(cancellationToken, maxDegreeOfParallelism: 300)
         {
             _log = log;
             _statistics = statistics;

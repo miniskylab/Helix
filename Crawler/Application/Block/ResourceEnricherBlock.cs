@@ -12,7 +12,7 @@ namespace Helix.Crawler
         readonly IResourceEnricher _resourceEnricher;
 
         public ResourceEnricherBlock(CancellationToken cancellationToken, IResourceEnricher resourceEnricher, ILog log)
-            : base(cancellationToken)
+            : base(cancellationToken, maxDegreeOfParallelism: 300)
         {
             _log = log;
             _resourceEnricher = resourceEnricher;

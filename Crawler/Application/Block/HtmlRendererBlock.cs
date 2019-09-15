@@ -31,7 +31,7 @@ namespace Helix.Crawler
         );
 
         public HtmlRendererBlock(CancellationToken cancellationToken, IStatistics statistics, ILog log, Configurations configurations,
-            IHardwareMonitor hardwareMonitor, Func<IHtmlRenderer> getHtmlRenderer) : base(cancellationToken)
+            IHardwareMonitor hardwareMonitor, Func<IHtmlRenderer> getHtmlRenderer) : base(cancellationToken, maxDegreeOfParallelism: 300)
         {
             _log = log;
             _statistics = statistics;
