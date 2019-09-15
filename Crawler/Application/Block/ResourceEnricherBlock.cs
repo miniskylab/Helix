@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using Helix.Crawler.Abstractions;
 using log4net;
+using Newtonsoft.Json;
 
 namespace Helix.Crawler
 {
@@ -22,7 +23,7 @@ namespace Helix.Crawler
             try { return _resourceEnricher.Enrich(resource); }
             catch (Exception exception)
             {
-                _log.Error($"One or more errors occurred while enriching URL: {resource.Uri}.", exception);
+                _log.Error($"One or more errors occurred while enriching: {JsonConvert.SerializeObject(resource)}.", exception);
                 return null;
             }
         }

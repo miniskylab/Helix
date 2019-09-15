@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using Helix.Crawler.Abstractions;
 using log4net;
+using Newtonsoft.Json;
 
 namespace Helix.Crawler
 {
@@ -22,7 +23,7 @@ namespace Helix.Crawler
             catch (Exception exception)
             {
                 _log.Error(
-                    $"One or more errors occurred while saving this URL to database: {verificationResult.VerifiedUrl}.",
+                    $"One or more errors occurred while saving to database: {JsonConvert.SerializeObject(verificationResult)}.",
                     exception
                 );
             }

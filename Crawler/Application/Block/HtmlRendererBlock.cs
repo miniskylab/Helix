@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using Helix.Crawler.Abstractions;
 using log4net;
+using Newtonsoft.Json;
 
 namespace Helix.Crawler
 {
@@ -147,14 +148,21 @@ namespace Helix.Crawler
                     out var millisecondsPageLoadTime,
                     _cancellationToken
                 );
-                if (renderingFailed) return null;
+
+                if (renderingFailed)
+                {
+                    _log.Info($"Failed to render {nameof(Resource)} was discarded: {JsonConvert.SerializeObject(resource)}");
+                    return null;
+                }
 
                 UpdateStatusCodeIfChanged();
                 DoStatisticsIfHasPageLoadTime();
 
-                return !resource.StatusCode.IsWithinBrokenRange()
-                    ? new HtmlDocument { Uri = resource.Uri, Text = htmlText }
-                    : null;
+                if (!resource.StatusCode.IsWithinBrokenRange())
+                    return new HtmlDocument { Uri = resource.Uri, Text = htmlText };
+
+                _log.Info($"Broken {nameof(Resource)} was discarded: {JsonConvert.SerializeObject(resource)}");
+                return null;
 
                 void UpdateStatusCodeIfChanged()
                 {
@@ -172,7 +180,7 @@ namespace Helix.Crawler
             }
             catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(_cancellationToken))
             {
-                _log.Error($"One or more errors occurred while rendering URL: {resource.Uri}.", exception);
+                _log.Error($"One or more errors occurred while rendering: {JsonConvert.SerializeObject(resource)}.", exception);
                 return null;
             }
             finally

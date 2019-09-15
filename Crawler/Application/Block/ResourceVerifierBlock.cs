@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using Helix.Crawler.Abstractions;
 using log4net;
+using Newtonsoft.Json;
 
 namespace Helix.Crawler
 {
@@ -42,17 +43,25 @@ namespace Helix.Crawler
         {
             try
             {
-                if (!_resourceVerifier.TryVerify(resource, _cancellationToken, out var verificationResult)) return null;
+                if (!_resourceVerifier.TryVerify(resource, _cancellationToken, out var verificationResult))
+                {
+                    _log.Info($"Failed to be verified {nameof(Resource)} was discarded: {JsonConvert.SerializeObject(resource)}.");
+                    return null;
+                }
 
                 var isOrphanedUri = verificationResult.StatusCode == StatusCode.OrphanedUri;
                 if (isOrphanedUri)
                 {
-                    _log.Info($"Orphaned URL detected: {resource.Uri}.");
+                    _log.Info($"{nameof(Resource)} with orphaned URL was discarded: {JsonConvert.SerializeObject(resource)}.");
                     return null;
                 }
 
                 var uriSchemeNotSupported = verificationResult.StatusCode == StatusCode.UriSchemeNotSupported;
-                if (uriSchemeNotSupported) return null;
+                if (uriSchemeNotSupported)
+                {
+                    _log.Info($"{nameof(Resource)} with unsupported scheme was discarded: {JsonConvert.SerializeObject(resource)}.");
+                    return null;
+                }
 
                 DoStatistics();
                 SendOutVerificationResult();
@@ -83,7 +92,7 @@ namespace Helix.Crawler
             }
             catch (Exception exception)
             {
-                _log.Error($"One or more errors occurred while verifying URL: {resource.Uri}.", exception);
+                _log.Error($"One or more errors occurred while verifying: {JsonConvert.SerializeObject(resource)}.", exception);
                 return null;
             }
         }

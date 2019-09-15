@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using Helix.Crawler.Abstractions;
 using log4net;
+using Newtonsoft.Json;
 
 namespace Helix.Crawler
 {
@@ -23,7 +24,10 @@ namespace Helix.Crawler
             try { return _resourceExtractor.ExtractResourcesFrom(htmlDocument); }
             catch (Exception exception)
             {
-                _log.Error($"One or more errors occurred while extracting resource from URL: {htmlDocument.Uri}.", exception);
+                _log.Error(
+                    $"One or more errors occurred while extracting resources from: {JsonConvert.SerializeObject(htmlDocument)}.",
+                    exception
+                );
                 return null;
             }
         }
