@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,14 +11,12 @@ using Newtonsoft.Json;
 
 namespace Helix.Crawler
 {
-    internal class HtmlRendererBlock : TransformBlock<Resource, HtmlDocument>
+    internal class HtmlRendererBlock : TransformBlock<Resource, RenderingResult>
     {
         readonly CancellationToken _cancellationToken;
         readonly BlockingCollection<IHtmlRenderer> _htmlRenderers;
         readonly ILog _log;
         readonly IStatistics _statistics;
-
-        public BufferBlock<Resource> CapturedResources { get; }
 
         public BufferBlock<Event> Events { get; }
 
@@ -26,7 +25,6 @@ namespace Helix.Crawler
         public override Task Completion => Task.WhenAll(
             base.Completion,
             Events.Completion,
-            CapturedResources.Completion,
             VerificationResults.Completion
         );
 
@@ -40,12 +38,10 @@ namespace Helix.Crawler
             (int createdHtmlRenderCount, int disposedHtmlRendererCount) counter = (0, 0);
 
             Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true, CancellationToken = cancellationToken });
-            CapturedResources = new BufferBlock<Resource>(new DataflowBlockOptions { CancellationToken = cancellationToken });
             VerificationResults = new BufferBlock<VerificationResult>(new DataflowBlockOptions { CancellationToken = cancellationToken });
 
             base.Completion.ContinueWith(_ =>
             {
-                CapturedResources.Complete();
                 VerificationResults.Complete();
                 DisposeHtmlRenderers();
                 Events.Complete();
@@ -85,14 +81,7 @@ namespace Helix.Crawler
 
             void CreateHtmlRenderer()
             {
-                var htmlRenderer = getHtmlRenderer();
-                htmlRenderer.OnResourceCaptured += resource =>
-                {
-                    if (!CapturedResources.Post(resource))
-                        _log.Error($"Failed to post data to buffer block named [{nameof(CapturedResources)}].");
-                };
-
-                _htmlRenderers.Add(htmlRenderer, CancellationToken.None);
+                _htmlRenderers.Add(getHtmlRenderer(), CancellationToken.None);
                 counter.createdHtmlRenderCount++;
             }
             void CreateAndDestroyHtmlRenderersAdaptively()
@@ -135,12 +124,16 @@ namespace Helix.Crawler
             }
         }
 
-        protected override HtmlDocument Transform(Resource resource)
+        protected override RenderingResult Transform(Resource resource)
         {
             IHtmlRenderer htmlRenderer = null;
+            var capturedResources = new List<Resource>();
+
             try
             {
                 htmlRenderer = _htmlRenderers.Take(_cancellationToken);
+                htmlRenderer.OnResourceCaptured += CaptureResource;
+
                 var oldStatusCode = resource.StatusCode;
                 var renderingFailed = !htmlRenderer.TryRender(
                     resource,
@@ -159,7 +152,12 @@ namespace Helix.Crawler
                 DoStatisticsIfHasPageLoadTime();
 
                 if (!resource.StatusCode.IsWithinBrokenRange())
-                    return new HtmlDocument { Uri = resource.Uri, Text = htmlText };
+                    return new RenderingResult
+                    {
+                        RenderedResource = resource,
+                        NewResources = capturedResources,
+                        HtmlDocument = new HtmlDocument { Uri = resource.Uri, Text = htmlText }
+                    };
 
                 _log.Info($"Broken {nameof(Resource)} was discarded: {JsonConvert.SerializeObject(resource)}");
                 return null;
@@ -185,8 +183,14 @@ namespace Helix.Crawler
             }
             finally
             {
-                if (htmlRenderer != null) _htmlRenderers.Add(htmlRenderer, CancellationToken.None);
+                if (htmlRenderer != null)
+                {
+                    htmlRenderer.OnResourceCaptured -= CaptureResource;
+                    _htmlRenderers.Add(htmlRenderer, CancellationToken.None);
+                }
             }
+
+            void CaptureResource(Resource capturedResource) { capturedResources.Add(capturedResource); }
         }
     }
 }
