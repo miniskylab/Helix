@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading;
+using System.Threading.Tasks.Dataflow;
 using Helix.Crawler.Abstractions;
 
 namespace Helix.Crawler
@@ -16,6 +17,25 @@ namespace Helix.Crawler
             _remainingWorkload = 0;
             _memorizationLock = new object();
             _alreadyProcessedUrls = new HashSet<string>();
+        }
+
+        public void StopWorkflow()
+        {
+            // TODO: Add implementation
+        }
+
+        public bool TryActivateWorkflow(string startUrl)
+        {
+            // TODO: Move Crawler state machine here
+            // TODO: Add a check so that, this method can only be called once
+
+            var startResource = new Resource { ParentUri = null, OriginalUrl = startUrl };
+            var startRenderingResult = new RenderingResult
+            {
+                HtmlDocument = null,
+                NewResources = new List<Resource> { startResource }
+            };
+            return this.Post(startRenderingResult);
         }
 
         protected override IEnumerable<Resource> Transform(RenderingResult renderingResult)
