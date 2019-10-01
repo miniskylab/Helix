@@ -28,15 +28,11 @@ namespace Helix.Crawler
             _stateMachine = new StateMachine<WorkflowState, WorkflowCommand>(
                 new Dictionary<Transition<WorkflowState, WorkflowCommand>, WorkflowState>
                 {
-                    { Transition(WorkflowState.WaitingForInitialization, WorkflowCommand.Initialize), WorkflowState.WaitingToRun },
-                    { Transition(WorkflowState.WaitingToRun, WorkflowCommand.Abort), WorkflowState.WaitingForInitialization },
-                    { Transition(WorkflowState.WaitingToRun, WorkflowCommand.Run), WorkflowState.Running },
-                    { Transition(WorkflowState.Running, WorkflowCommand.Stop), WorkflowState.Completed },
-                    { Transition(WorkflowState.Completed, WorkflowCommand.MarkAsRanToCompletion), WorkflowState.RanToCompletion },
-                    { Transition(WorkflowState.Completed, WorkflowCommand.MarkAsCancelled), WorkflowState.Cancelled },
-                    { Transition(WorkflowState.Completed, WorkflowCommand.MarkAsFaulted), WorkflowState.Faulted }
+                    { Transition(WorkflowState.WaitingForActivation, WorkflowCommand.Activate), WorkflowState.Activated },
+                    { Transition(WorkflowState.Activated, WorkflowCommand.Deactivate), WorkflowState.WaitingForActivation },
+                    { Transition(WorkflowState.Activated, WorkflowCommand.SignalCancellation), WorkflowState.SignaledForCancellation }
                 },
-                WorkflowState.WaitingToRun
+                WorkflowState.WaitingForActivation
             );
 
             Transition<WorkflowState, WorkflowCommand> Transition(WorkflowState fromState, WorkflowCommand command)
@@ -45,65 +41,42 @@ namespace Helix.Crawler
             }
         }
 
-        public void StopWorkflow()
+        public void SignalCancellation()
         {
-            var stateTransitionSucceeded = _stateMachine.TryTransitNext(WorkflowCommand.Stop, () =>
+            var stateTransitionSucceeded = _stateMachine.TryTransitNext(WorkflowCommand.SignalCancellation, () =>
             {
-                try
-                {
-                    Complete();
-
-                    var workflowCommand = _remainingWorkload == 0 ? WorkflowCommand.MarkAsRanToCompletion : WorkflowCommand.MarkAsCancelled;
-                    if (!_stateMachine.TryTransitNext(workflowCommand))
-                        _log.StateTransitionFailureEvent(_stateMachine.CurrentState, workflowCommand);
-                }
+                try { Complete(); }
                 catch (Exception exception)
                 {
-                    _log.Error("One or more errors occurred when trying to stop workflow.", exception);
-
-                    if (!_stateMachine.TryTransitNext(WorkflowCommand.MarkAsFaulted))
-                        _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WorkflowCommand.MarkAsFaulted);
+                    _log.Error("One or more errors occurred when signaling cancellation for workflow.", exception);
                 }
             });
-            if (!stateTransitionSucceeded) _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WorkflowCommand.Stop);
+            if (!stateTransitionSucceeded) _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WorkflowCommand.SignalCancellation);
         }
 
         public bool TryActivateWorkflow(string startUrl)
         {
             var activationSuccessful = false;
-            var stateTransitionSucceeded = _stateMachine.TryTransitNext(WorkflowCommand.Initialize, () =>
+            var stateTransitionSucceeded = _stateMachine.TryTransitNext(WorkflowCommand.Activate, () =>
             {
                 try
                 {
-                    activationSuccessful = this.Post(
-                        new RenderingResult
-                        {
-                            HtmlDocument = null,
-                            NewResources = new List<Resource>
-                            {
-                                new Resource
-                                {
-                                    ParentUri = null,
-                                    OriginalUrl = startUrl
-                                }
-                            }
-                        }
-                    );
+                    activationSuccessful = this.Post(new RenderingResult
+                    {
+                        HtmlDocument = null,
+                        NewResources = new List<Resource> { new Resource { ParentUri = null, OriginalUrl = startUrl } }
+                    });
 
                     if (!activationSuccessful) throw new ArgumentException("Could not activate workflow using given start URL", startUrl);
-
-                    if (!_stateMachine.TryTransitNext(WorkflowCommand.Run))
-                        _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WorkflowCommand.Run);
                 }
                 catch (Exception exception)
                 {
                     _log.Error("One or more errors occurred when trying to activate workflow.", exception);
-
-                    if (!_stateMachine.TryTransitNext(WorkflowCommand.Abort))
-                        _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WorkflowCommand.Abort);
+                    if (!_stateMachine.TryTransitNext(WorkflowCommand.Deactivate))
+                        _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WorkflowCommand.Deactivate);
                 }
             });
-            if (!stateTransitionSucceeded) _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WorkflowCommand.Initialize);
+            if (!stateTransitionSucceeded) _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WorkflowCommand.Activate);
 
             return activationSuccessful;
         }
@@ -125,14 +98,9 @@ namespace Helix.Crawler
                 }
 
                 Interlocked.Decrement(ref _remainingWorkload);
-                if (_remainingWorkload > 0) return new ReadOnlyCollection<Resource>(newResources);
+                if (_remainingWorkload == 0) Complete();
 
-                Complete();
-
-                if (!_stateMachine.TryTransitNext(WorkflowCommand.MarkAsRanToCompletion))
-                    _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WorkflowCommand.MarkAsRanToCompletion);
-
-                return new ReadOnlyCollection<Resource>(new List<Resource>());
+                return new ReadOnlyCollection<Resource>(newResources);
             }
             catch (Exception exception)
             {
