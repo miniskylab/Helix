@@ -6,6 +6,7 @@ using System.Threading.Tasks.Dataflow;
 using Helix.Core;
 using Helix.Crawler.Abstractions;
 using log4net;
+using Newtonsoft.Json;
 
 namespace Helix.Crawler
 {
@@ -46,7 +47,25 @@ namespace Helix.Crawler
 
         public void StopWorkflow()
         {
-            // TODO: Add implementation
+            var stateTransitionSucceeded = _stateMachine.TryTransitNext(WorkflowCommand.Stop, () =>
+            {
+                try
+                {
+                    Complete();
+
+                    var workflowCommand = _remainingWorkload == 0 ? WorkflowCommand.MarkAsRanToCompletion : WorkflowCommand.MarkAsCancelled;
+                    if (!_stateMachine.TryTransitNext(workflowCommand))
+                        _log.StateTransitionFailureEvent(_stateMachine.CurrentState, workflowCommand);
+                }
+                catch (Exception exception)
+                {
+                    _log.Error("One or more errors occurred when trying to stop workflow.", exception);
+
+                    if (!_stateMachine.TryTransitNext(WorkflowCommand.MarkAsFaulted))
+                        _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WorkflowCommand.MarkAsFaulted);
+                }
+            });
+            if (!stateTransitionSucceeded) _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WorkflowCommand.Stop);
         }
 
         public bool TryActivateWorkflow(string startUrl)
@@ -91,20 +110,35 @@ namespace Helix.Crawler
 
         protected override IEnumerable<Resource> Transform(RenderingResult renderingResult)
         {
-            var newResources = new List<Resource>();
-            foreach (var newResource in renderingResult.NewResources)
+            try
             {
-                lock (_memorizationLock)
+                var newResources = new List<Resource>();
+                foreach (var newResource in renderingResult.NewResources)
                 {
-                    if (_alreadyProcessedUrls.Contains(newResource.GetAbsoluteUrl())) continue;
-                    _alreadyProcessedUrls.Add(newResource.GetAbsoluteUrl());
+                    lock (_memorizationLock)
+                    {
+                        if (_alreadyProcessedUrls.Contains(newResource.GetAbsoluteUrl())) continue;
+                        _alreadyProcessedUrls.Add(newResource.GetAbsoluteUrl());
+                    }
+                    newResources.Add(newResource);
+                    Interlocked.Increment(ref _remainingWorkload);
                 }
-                newResources.Add(newResource);
-                Interlocked.Increment(ref _remainingWorkload);
-            }
-            Interlocked.Decrement(ref _remainingWorkload);
 
-            return new ReadOnlyCollection<Resource>(newResources);
+                Interlocked.Decrement(ref _remainingWorkload);
+                if (_remainingWorkload > 0) return new ReadOnlyCollection<Resource>(newResources);
+
+                Complete();
+
+                if (!_stateMachine.TryTransitNext(WorkflowCommand.MarkAsRanToCompletion))
+                    _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WorkflowCommand.MarkAsRanToCompletion);
+
+                return new ReadOnlyCollection<Resource>(new List<Resource>());
+            }
+            catch (Exception exception)
+            {
+                _log.Error($"One or more errors occurred while coordinating: {JsonConvert.SerializeObject(renderingResult)}.", exception);
+                return null;
+            }
         }
     }
 }
