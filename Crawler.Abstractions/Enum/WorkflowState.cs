@@ -8,6 +8,6 @@ namespace Helix.Crawler.Abstractions
         None = 0,
         WaitingForActivation = 1 << 1,
         Activated = 1 << 2,
-        SignaledForCancellation = 1 << 3
+        SignaledForShutdown = 1 << 3
     }
 }

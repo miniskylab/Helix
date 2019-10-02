@@ -30,7 +30,7 @@ namespace Helix.Crawler
                 {
                     { Transition(WorkflowState.WaitingForActivation, WorkflowCommand.Activate), WorkflowState.Activated },
                     { Transition(WorkflowState.Activated, WorkflowCommand.Deactivate), WorkflowState.WaitingForActivation },
-                    { Transition(WorkflowState.Activated, WorkflowCommand.SignalCancellation), WorkflowState.SignaledForCancellation }
+                    { Transition(WorkflowState.Activated, WorkflowCommand.SignalShutdown), WorkflowState.SignaledForShutdown }
                 },
                 WorkflowState.WaitingForActivation
             );
@@ -41,9 +41,9 @@ namespace Helix.Crawler
             }
         }
 
-        public void SignalCancellation()
+        public void SignalShutdown()
         {
-            var stateTransitionSucceeded = _stateMachine.TryTransitNext(WorkflowCommand.SignalCancellation, () =>
+            var stateTransitionSucceeded = _stateMachine.TryTransitNext(WorkflowCommand.SignalShutdown, () =>
             {
                 try { Complete(); }
                 catch (Exception exception)
@@ -51,7 +51,7 @@ namespace Helix.Crawler
                     _log.Error("One or more errors occurred when signaling cancellation for workflow.", exception);
                 }
             });
-            if (!stateTransitionSucceeded) _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WorkflowCommand.SignalCancellation);
+            if (!stateTransitionSucceeded) _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WorkflowCommand.SignalShutdown);
         }
 
         public bool TryActivateWorkflow(string startUrl)
@@ -98,7 +98,7 @@ namespace Helix.Crawler
                 }
 
                 Interlocked.Decrement(ref _remainingWorkload);
-                if (_remainingWorkload == 0) Complete();
+                if (_remainingWorkload == 0) SignalShutdown();
 
                 return new ReadOnlyCollection<Resource>(newResources);
             }

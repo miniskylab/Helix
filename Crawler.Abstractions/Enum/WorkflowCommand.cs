@@ -4,6 +4,6 @@ namespace Helix.Crawler.Abstractions
     {
         Activate,
         Deactivate,
-        SignalCancellation
+        SignalShutdown
     }
 }
