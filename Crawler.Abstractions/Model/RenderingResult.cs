@@ -6,6 +6,6 @@ namespace Helix.Crawler.Abstractions
     {
         public HtmlDocument HtmlDocument { get; set; }
 
-        public List<Resource> NewResources { get; set; }
+        public List<Resource> CapturedResources { get; set; }
     }
 }

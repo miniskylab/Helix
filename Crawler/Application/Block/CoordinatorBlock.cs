@@ -64,7 +64,7 @@ namespace Helix.Crawler
                     activationSuccessful = this.Post(new RenderingResult
                     {
                         HtmlDocument = null,
-                        NewResources = new List<Resource> { new Resource { ParentUri = null, OriginalUrl = startUrl } }
+                        CapturedResources = new List<Resource> { new Resource { ParentUri = null, OriginalUrl = startUrl } }
                     });
 
                     if (!activationSuccessful) throw new ArgumentException("Could not activate workflow using given start URL", startUrl);
@@ -86,7 +86,7 @@ namespace Helix.Crawler
             try
             {
                 var newResources = new List<Resource>();
-                foreach (var newResource in renderingResult.NewResources)
+                foreach (var newResource in renderingResult.CapturedResources)
                 {
                     lock (_memorizationLock)
                     {

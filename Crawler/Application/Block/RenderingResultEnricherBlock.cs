@@ -23,7 +23,7 @@ namespace Helix.Crawler
             try
             {
                 var extractedResources = _resourceExtractor.ExtractResourcesFrom(renderingResult.HtmlDocument);
-                renderingResult.NewResources.AddRange(extractedResources);
+                renderingResult.CapturedResources.AddRange(extractedResources);
                 return renderingResult;
             }
             catch (Exception exception)
