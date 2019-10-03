@@ -25,7 +25,7 @@ namespace Helix.Crawler.Specifications
                 new HtmlDocument
                 {
                     Uri = new Uri("http://www.helix.com"),
-                    Text = @"
+                    HtmlText = @"
                         <html>
                             <body>
                                 <a href=""//www.sanity.com""></a>
@@ -59,7 +59,7 @@ namespace Helix.Crawler.Specifications
             AddTheoryDescription(new HtmlDocument
                 {
                     Uri = new Uri("http://www.helix.com"),
-                    Text = @"
+                    HtmlText = @"
                         <html>
                             <body>
                                 <a href=""""></a>
@@ -76,7 +76,7 @@ namespace Helix.Crawler.Specifications
             AddTheoryDescription(new HtmlDocument
                 {
                     Uri = new Uri("http://www.helix.com"),
-                    Text = @"
+                    HtmlText = @"
                         <html>
                             <body>
                                 <a href=""javascript:test()""></a>
@@ -93,7 +93,7 @@ namespace Helix.Crawler.Specifications
             AddTheoryDescription(new HtmlDocument
                 {
                     Uri = new Uri("http://www.helix.com"),
-                    Text = @"
+                    HtmlText = @"
                         <html>
                             <body>
                                 <a></a>
@@ -109,7 +109,7 @@ namespace Helix.Crawler.Specifications
             AddTheoryDescription(new HtmlDocument
                 {
                     Uri = new Uri("http://www.helix.com"),
-                    Text = @"
+                    HtmlText = @"
                         <html>
                             <body>
                             </body>

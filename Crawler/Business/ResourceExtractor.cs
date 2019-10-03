@@ -16,7 +16,7 @@ namespace Helix.Crawler
             if (htmlDocument == null) throw new ArgumentNullException(nameof(htmlDocument));
 
             var htmlAgilityPackDocument = new HtmlAgilityPackDocument();
-            htmlAgilityPackDocument.LoadHtml(htmlDocument.Text);
+            htmlAgilityPackDocument.LoadHtml(htmlDocument.HtmlText);
 
             var extractedResources = new List<Resource>();
             var anchorTags = htmlAgilityPackDocument.DocumentNode.SelectNodes("//a[@href]");

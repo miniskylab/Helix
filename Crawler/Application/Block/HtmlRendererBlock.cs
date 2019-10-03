@@ -155,7 +155,7 @@ namespace Helix.Crawler
                     return new RenderingResult
                     {
                         NewResources = capturedResources,
-                        HtmlDocument = new HtmlDocument { Uri = resource.Uri, Text = htmlText }
+                        HtmlDocument = new HtmlDocument { Uri = resource.Uri, HtmlText = htmlText }
                     };
 
                 _log.Info($"Broken {nameof(Resource)} was discarded: {JsonConvert.SerializeObject(resource)}");

@@ -255,7 +255,7 @@ namespace Helix.Crawler
                                 if (toBeRenderedResource.StatusCode.IsWithinBrokenRange()) return;
                                 _memory.MemorizeToBeExtractedHtmlDocument(new HtmlDocument
                                 {
-                                    Uri = toBeRenderedResource.Uri, Text = htmlText
+                                    Uri = toBeRenderedResource.Uri, HtmlText = htmlText
                                 });
                             });
                     }
