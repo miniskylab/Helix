@@ -48,7 +48,7 @@ namespace Helix.Crawler
                 try { Complete(); }
                 catch (Exception exception)
                 {
-                    _log.Error("One or more errors occurred when signaling cancellation for workflow.", exception);
+                    _log.Error("One or more errors occurred while signaling shutdown for workflow.", exception);
                 }
             });
             if (!stateTransitionSucceeded) _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WorkflowCommand.SignalShutdown);
