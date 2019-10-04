@@ -4,8 +4,10 @@ namespace Helix.Crawler.Abstractions
 {
     public class RenderingResult
     {
+        public List<Resource> CapturedResources { get; set; }
+
         public HtmlDocument HtmlDocument { get; set; }
 
-        public List<Resource> CapturedResources { get; set; }
+        public Resource RenderedResource { get; set; }
     }
 }

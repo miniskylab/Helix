@@ -154,6 +154,7 @@ namespace Helix.Crawler
                 if (!resource.StatusCode.IsWithinBrokenRange())
                     return new RenderingResult
                     {
+                        RenderedResource = resource,
                         CapturedResources = capturedResources,
                         HtmlDocument = new HtmlDocument { Uri = resource.Uri, HtmlText = htmlText }
                     };

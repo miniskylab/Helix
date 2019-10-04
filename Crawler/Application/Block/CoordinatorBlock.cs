@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Data;
 using System.Threading;
 using System.Threading.Tasks.Dataflow;
 using Helix.Core;
@@ -10,7 +11,7 @@ using Newtonsoft.Json;
 
 namespace Helix.Crawler
 {
-    public class CoordinatorBlock : TransformManyBlock<RenderingResult, Resource>
+    public class CoordinatorBlock : TransformManyBlock<ProcessingResult, Resource>
     {
         readonly HashSet<string> _alreadyProcessedUrls;
         readonly ILog _log;
@@ -61,10 +62,9 @@ namespace Helix.Crawler
             {
                 try
                 {
-                    activationSuccessful = this.Post(new RenderingResult
+                    activationSuccessful = this.Post(new SuccessfulProcessingResult
                     {
-                        HtmlDocument = null,
-                        CapturedResources = new List<Resource> { new Resource { ParentUri = null, OriginalUrl = startUrl } }
+                        NewResources = new List<Resource> { new Resource { ParentUri = null, OriginalUrl = startUrl } }
                     });
 
                     if (!activationSuccessful) throw new ArgumentException("Could not activate workflow using given start URL", startUrl);
@@ -81,20 +81,29 @@ namespace Helix.Crawler
             return activationSuccessful;
         }
 
-        protected override IEnumerable<Resource> Transform(RenderingResult renderingResult)
+        protected override IEnumerable<Resource> Transform(ProcessingResult processingResult)
         {
             try
             {
-                var newResources = new List<Resource>();
-                foreach (var newResource in renderingResult.CapturedResources)
+                lock (_memorizationLock)
                 {
-                    lock (_memorizationLock)
+                    if (!_alreadyProcessedUrls.Contains(processingResult.ProcessedResource.GetAbsoluteUrl()))
+                        throw new InvalidConstraintException($"Processed resource was not registered by {nameof(CoordinatorBlock)}.");
+                }
+
+                var newResources = new List<Resource>();
+                if (processingResult is SuccessfulProcessingResult successfulProcessingResult)
+                {
+                    foreach (var newResource in successfulProcessingResult.NewResources)
                     {
-                        if (_alreadyProcessedUrls.Contains(newResource.GetAbsoluteUrl())) continue;
-                        _alreadyProcessedUrls.Add(newResource.GetAbsoluteUrl());
+                        lock (_memorizationLock)
+                        {
+                            if (_alreadyProcessedUrls.Contains(newResource.GetAbsoluteUrl())) continue;
+                            _alreadyProcessedUrls.Add(newResource.GetAbsoluteUrl());
+                        }
+                        newResources.Add(newResource);
+                        Interlocked.Increment(ref _remainingWorkload);
                     }
-                    newResources.Add(newResource);
-                    Interlocked.Increment(ref _remainingWorkload);
                 }
 
                 Interlocked.Decrement(ref _remainingWorkload);
@@ -104,7 +113,7 @@ namespace Helix.Crawler
             }
             catch (Exception exception)
             {
-                _log.Error($"One or more errors occurred while coordinating: {JsonConvert.SerializeObject(renderingResult)}.", exception);
+                _log.Error($"One or more errors occurred while coordinating: {JsonConvert.SerializeObject(processingResult)}.", exception);
                 return null;
             }
         }
