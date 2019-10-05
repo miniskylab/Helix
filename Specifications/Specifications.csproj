@@ -1,15 +1,15 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>netcoreapp2.1</TargetFramework>
+        <TargetFramework>netcoreapp3.0</TargetFramework>
         <IsPackable>false</IsPackable>
         <LangVersion>latest</LangVersion>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="HtmlAgilityPack" Version="1.11.12" />
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.2.0" />
-        <PackageReference Include="Titanium.Web.Proxy" Version="3.1.1021" />
+        <PackageReference Include="HtmlAgilityPack" Version="1.11.15" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.3.0" />
+        <PackageReference Include="Titanium.Web.Proxy" Version="3.1.1037" />
         <PackageReference Include="xunit" Version="2.4.1" />
     </ItemGroup>
 

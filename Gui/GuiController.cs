@@ -40,10 +40,6 @@ namespace Helix.Gui
 
         static void Main()
         {
-            /* Hide the console windows.
-             * TODO: Will be removed and replaced with built-in .NET Core 3.0 feature. */
-            ShowWindow(GetConsoleWindow(), 0);
-
             CommunicationSocketToGui.OnReceived += message =>
             {
                 var method = typeof(GuiController).GetMethod(message.Text, BindingFlags.NonPublic | BindingFlags.Static);
@@ -262,9 +258,6 @@ namespace Helix.Gui
 
         [DllImport("user32.dll")]
         static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
-        [DllImport("kernel32.dll")]
-        static extern IntPtr GetConsoleWindow();
 
         [DllImport("user32.dll")]
         static extern bool IsIconic(IntPtr handle);
