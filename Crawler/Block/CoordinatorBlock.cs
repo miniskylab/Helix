@@ -85,6 +85,9 @@ namespace Helix.Crawler
         {
             try
             {
+                if (processingResult == null)
+                    throw new ArgumentNullException(nameof(processingResult));
+
                 lock (_memorizationLock)
                 {
                     if (!_alreadyProcessedUrls.Contains(processingResult.ProcessedResource.GetAbsoluteUrl()))

@@ -23,6 +23,9 @@ namespace Helix.Crawler
         {
             try
             {
+                if (renderingResult == null)
+                    throw new ArgumentNullException(nameof(renderingResult));
+
                 var newResources = new List<Resource>();
                 newResources.AddRange(renderingResult.CapturedResources);
                 newResources.AddRange(_resourceExtractor.ExtractResourcesFrom(renderingResult.HtmlDocument));
@@ -35,8 +38,8 @@ namespace Helix.Crawler
             }
             catch (Exception exception)
             {
-                _log.Error($"One or more errors occurred while enriching: {JsonConvert.SerializeObject(renderingResult)}.", exception);
-                return null;
+                _log.Error($"One or more errors occurred while processing: {JsonConvert.SerializeObject(renderingResult)}.", exception);
+                return new FailedProcessingResult { ProcessedResource = renderingResult?.RenderedResource };
             }
         }
     }

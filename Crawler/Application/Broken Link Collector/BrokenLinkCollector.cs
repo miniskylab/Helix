@@ -8,7 +8,7 @@ using log4net;
 
 namespace Helix.Crawler
 {
-    public class CrawlerBotV2
+    public class BrokenLinkCollector
     {
         readonly ILog _log;
         readonly StateMachine<CrawlerState, CrawlerCommand> _stateMachine;
@@ -17,11 +17,14 @@ namespace Helix.Crawler
 
         public CrawlerState CrawlerState => _stateMachine.CurrentState;
 
-        public CrawlerBotV2()
+        public BrokenLinkCollector()
         {
             _log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-            _stateMachine = new StateMachine<CrawlerState, CrawlerCommand>(
-                new Dictionary<Transition<CrawlerState, CrawlerCommand>, CrawlerState>
+            _stateMachine = new StateMachine<CrawlerState, CrawlerCommand>(PossibleTransitions(), CrawlerState.WaitingForInitialization);
+
+            Dictionary<Transition<CrawlerState, CrawlerCommand>, CrawlerState> PossibleTransitions()
+            {
+                return new Dictionary<Transition<CrawlerState, CrawlerCommand>, CrawlerState>
                 {
                     { Transition(CrawlerState.WaitingForInitialization, CrawlerCommand.Stop), CrawlerState.Completed },
                     { Transition(CrawlerState.WaitingForInitialization, CrawlerCommand.Initialize), CrawlerState.WaitingToRun },
@@ -34,17 +37,15 @@ namespace Helix.Crawler
                     { Transition(CrawlerState.Completed, CrawlerCommand.MarkAsCancelled), CrawlerState.Cancelled },
                     { Transition(CrawlerState.Completed, CrawlerCommand.MarkAsFaulted), CrawlerState.Faulted },
                     { Transition(CrawlerState.Paused, CrawlerCommand.Resume), CrawlerState.Running }
-                },
-                CrawlerState.WaitingForInitialization
-            );
-
-            Transition<CrawlerState, CrawlerCommand> Transition(CrawlerState fromState, CrawlerCommand command)
-            {
-                return new Transition<CrawlerState, CrawlerCommand>(fromState, command);
+                };
+                Transition<CrawlerState, CrawlerCommand> Transition(CrawlerState fromState, CrawlerCommand command)
+                {
+                    return new Transition<CrawlerState, CrawlerCommand>(fromState, command);
+                }
             }
         }
 
-        static CrawlerBotV2()
+        static BrokenLinkCollector()
         {
             // TODO: A workaround for .Net Core 2.x bug. Should be removed in the future.
             AppContext.SetSwitch("System.Net.Http.UseSocketsHttpHandler", false);

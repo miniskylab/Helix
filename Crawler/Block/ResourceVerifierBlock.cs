@@ -17,9 +17,16 @@ namespace Helix.Crawler
 
         public BufferBlock<Event> Events { get; }
 
+        public BufferBlock<FailedProcessingResult> FailedProcessingResults { get; }
+
         public BufferBlock<VerificationResult> VerificationResults { get; }
 
-        public override Task Completion => Task.WhenAll(base.Completion, VerificationResults.Completion, Events.Completion);
+        public override Task Completion => Task.WhenAll(
+            base.Completion,
+            VerificationResults.Completion,
+            FailedProcessingResults.Completion,
+            Events.Completion
+        );
 
         public ResourceVerifierBlock(CancellationToken cancellationToken, IStatistics statistics, IResourceVerifier resourceVerifier,
             ILog log) : base(cancellationToken, maxDegreeOfParallelism: 300)
@@ -29,13 +36,16 @@ namespace Helix.Crawler
             _resourceVerifier = resourceVerifier;
             _cancellationToken = cancellationToken;
 
+            var generalDataflowBlockOptions = new DataflowBlockOptions { CancellationToken = cancellationToken };
+            VerificationResults = new BufferBlock<VerificationResult>(generalDataflowBlockOptions);
+            FailedProcessingResults = new BufferBlock<FailedProcessingResult>(generalDataflowBlockOptions);
             Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true, CancellationToken = cancellationToken });
-            VerificationResults = new BufferBlock<VerificationResult>(new DataflowBlockOptions { CancellationToken = cancellationToken });
 
             base.Completion.ContinueWith(_ =>
             {
                 Events.Complete();
                 VerificationResults.Complete();
+                FailedProcessingResults.Complete();
             });
         }
 
@@ -43,8 +53,12 @@ namespace Helix.Crawler
         {
             try
             {
+                if (resource == null)
+                    throw new ArgumentNullException(nameof(resource));
+
                 if (!_resourceVerifier.TryVerify(resource, _cancellationToken, out var verificationResult))
                 {
+                    SendOutFailedProcessingResult();
                     _log.Info($"Failed to be verified {nameof(Resource)} was discarded: {JsonConvert.SerializeObject(resource)}.");
                     return null;
                 }
@@ -52,6 +66,7 @@ namespace Helix.Crawler
                 var isOrphanedUri = verificationResult.StatusCode == StatusCode.OrphanedUri;
                 if (isOrphanedUri)
                 {
+                    SendOutFailedProcessingResult();
                     _log.Info($"{nameof(Resource)} with orphaned URL was discarded: {JsonConvert.SerializeObject(resource)}.");
                     return null;
                 }
@@ -59,6 +74,7 @@ namespace Helix.Crawler
                 var uriSchemeNotSupported = verificationResult.StatusCode == StatusCode.UriSchemeNotSupported;
                 if (uriSchemeNotSupported)
                 {
+                    SendOutFailedProcessingResult();
                     _log.Info($"{nameof(Resource)} with unsupported scheme was discarded: {JsonConvert.SerializeObject(resource)}.");
                     return null;
                 }
@@ -92,8 +108,15 @@ namespace Helix.Crawler
             }
             catch (Exception exception)
             {
+                SendOutFailedProcessingResult();
                 _log.Error($"One or more errors occurred while verifying: {JsonConvert.SerializeObject(resource)}.", exception);
                 return null;
+            }
+
+            void SendOutFailedProcessingResult()
+            {
+                if (!FailedProcessingResults.Post(new FailedProcessingResult { ProcessedResource = resource }))
+                    _log.Error($"Failed to post data to buffer block named [{nameof(FailedProcessingResults)}].");
             }
         }
     }

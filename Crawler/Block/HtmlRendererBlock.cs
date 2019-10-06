@@ -20,12 +20,15 @@ namespace Helix.Crawler
 
         public BufferBlock<Event> Events { get; }
 
+        public BufferBlock<FailedProcessingResult> FailedProcessingResults { get; }
+
         public BufferBlock<VerificationResult> VerificationResults { get; }
 
         public override Task Completion => Task.WhenAll(
             base.Completion,
             Events.Completion,
-            VerificationResults.Completion
+            VerificationResults.Completion,
+            FailedProcessingResults.Completion
         );
 
         public HtmlRendererBlock(CancellationToken cancellationToken, IStatistics statistics, ILog log, Configurations configurations,
@@ -37,11 +40,14 @@ namespace Helix.Crawler
             _htmlRenderers = new BlockingCollection<IHtmlRenderer>();
             (int createdHtmlRenderCount, int disposedHtmlRendererCount) counter = (0, 0);
 
+            var generalDataflowBlockOptions = new DataflowBlockOptions { CancellationToken = cancellationToken };
+            VerificationResults = new BufferBlock<VerificationResult>(generalDataflowBlockOptions);
+            FailedProcessingResults = new BufferBlock<FailedProcessingResult>(generalDataflowBlockOptions);
             Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true, CancellationToken = cancellationToken });
-            VerificationResults = new BufferBlock<VerificationResult>(new DataflowBlockOptions { CancellationToken = cancellationToken });
 
             base.Completion.ContinueWith(_ =>
             {
+                FailedProcessingResults.Complete();
                 VerificationResults.Complete();
                 DisposeHtmlRenderers();
                 Events.Complete();
@@ -131,6 +137,9 @@ namespace Helix.Crawler
 
             try
             {
+                if (resource == null)
+                    throw new ArgumentNullException(nameof(resource));
+
                 htmlRenderer = _htmlRenderers.Take(_cancellationToken);
                 htmlRenderer.OnResourceCaptured += CaptureResource;
 
@@ -144,6 +153,7 @@ namespace Helix.Crawler
 
                 if (renderingFailed)
                 {
+                    SendOutFailedProcessingResult();
                     _log.Info($"Failed to render {nameof(Resource)} was discarded: {JsonConvert.SerializeObject(resource)}");
                     return null;
                 }
@@ -159,6 +169,7 @@ namespace Helix.Crawler
                         HtmlDocument = new HtmlDocument { Uri = resource.Uri, HtmlText = htmlText }
                     };
 
+                SendOutFailedProcessingResult();
                 _log.Info($"Broken {nameof(Resource)} was discarded: {JsonConvert.SerializeObject(resource)}");
                 return null;
 
@@ -178,6 +189,7 @@ namespace Helix.Crawler
             }
             catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(_cancellationToken))
             {
+                SendOutFailedProcessingResult();
                 _log.Error($"One or more errors occurred while rendering: {JsonConvert.SerializeObject(resource)}.", exception);
                 return null;
             }
@@ -191,6 +203,11 @@ namespace Helix.Crawler
             }
 
             void CaptureResource(Resource capturedResource) { capturedResources.Add(capturedResource); }
+            void SendOutFailedProcessingResult()
+            {
+                if (!FailedProcessingResults.Post(new FailedProcessingResult { ProcessedResource = resource }))
+                    _log.Error($"Failed to post data to buffer block named [{nameof(FailedProcessingResults)}].");
+            }
         }
     }
 }

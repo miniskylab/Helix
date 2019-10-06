@@ -20,7 +20,11 @@ namespace Helix.Crawler
 
         protected override void Act(VerificationResult verificationResult)
         {
-            try { _reportWriter.WriteReport(verificationResult); }
+            try
+            {
+                if (verificationResult == null) throw new ArgumentNullException(nameof(verificationResult));
+                _reportWriter.WriteReport(verificationResult);
+            }
             catch (Exception exception)
             {
                 _log.Error(
