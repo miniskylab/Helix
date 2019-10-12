@@ -3,7 +3,7 @@ using Helix.Crawler.Abstractions;
 
 namespace Helix.Crawler
 {
-    internal class EventBroadcasterBlock : TransformBlock<Event, Event>
+    internal class EventBroadcasterBlock : TransformBlock<Event, Event>, IEventBroadcasterBlock
     {
         public EventBroadcasterBlock(CancellationToken cancellationToken) : base(cancellationToken, maxDegreeOfParallelism: 300) { }
 

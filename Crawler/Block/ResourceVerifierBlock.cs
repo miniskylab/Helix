@@ -8,7 +8,7 @@ using Newtonsoft.Json;
 
 namespace Helix.Crawler
 {
-    internal class ResourceVerifierBlock : TransformBlock<Resource, Resource>
+    internal class ResourceVerifierBlock : TransformBlock<Resource, Resource>, IResourceVerifierBlock
     {
         readonly CancellationToken _cancellationToken;
         readonly ILog _log;

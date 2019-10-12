@@ -7,7 +7,7 @@ using Newtonsoft.Json;
 
 namespace Helix.Crawler
 {
-    public class ProcessingResultGeneratorBlock : TransformBlock<RenderingResult, ProcessingResult>
+    public class ProcessingResultGeneratorBlock : TransformBlock<RenderingResult, ProcessingResult>, IProcessingResultGeneratorBlock
     {
         readonly ILog _log;
         readonly IResourceExtractor _resourceExtractor;

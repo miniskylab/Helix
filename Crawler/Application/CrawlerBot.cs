@@ -89,7 +89,7 @@ namespace Helix.Crawler
 
                     _eventBroadcaster.Broadcast(new Event
                     {
-                        EventType = EventType.Stopped,
+                        EventType = EventType.Completed,
                         Message = Enum.GetName(typeof(CrawlerState), CrawlerState)
                     });
                     _eventBroadcaster.Dispose();

@@ -6,7 +6,7 @@ using Newtonsoft.Json;
 
 namespace Helix.Crawler
 {
-    public class ReportWriterBlock : ActionBlock<VerificationResult>
+    public class ReportWriterBlock : ActionBlock<VerificationResult>, IReportWriterBlock
     {
         readonly ILog _log;
         readonly IReportWriter _reportWriter;

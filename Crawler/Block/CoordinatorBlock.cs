@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using Helix.Core;
 using Helix.Crawler.Abstractions;
@@ -11,13 +12,20 @@ using Newtonsoft.Json;
 
 namespace Helix.Crawler
 {
-    public class CoordinatorBlock : TransformManyBlock<ProcessingResult, Resource>
+    public class CoordinatorBlock : TransformManyBlock<ProcessingResult, Resource>, ICoordinatorBlock
     {
         readonly HashSet<string> _alreadyProcessedUrls;
         readonly ILog _log;
         readonly object _memorizationLock;
         int _remainingWorkload;
         readonly StateMachine<WorkflowState, WorkflowCommand> _stateMachine;
+
+        public BufferBlock<Event> Events { get; }
+
+        public override Task Completion => Task.WhenAll(
+            base.Completion,
+            Events.Completion
+        );
 
         public CoordinatorBlock(CancellationToken cancellationToken, ILog log) : base(cancellationToken)
         {
@@ -35,6 +43,9 @@ namespace Helix.Crawler
                 },
                 WorkflowState.WaitingForActivation
             );
+
+            Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true, CancellationToken = cancellationToken });
+            base.Completion.ContinueWith(_ => Events.Complete());
 
             Transition<WorkflowState, WorkflowCommand> Transition(WorkflowState fromState, WorkflowCommand command)
             {
@@ -110,7 +121,11 @@ namespace Helix.Crawler
                 }
 
                 Interlocked.Decrement(ref _remainingWorkload);
-                if (_remainingWorkload == 0) SignalShutdown();
+                if (_remainingWorkload != 0) return new ReadOnlyCollection<Resource>(newResources);
+
+                SignalShutdown();
+                if (!Events.Post(new Event { EventType = EventType.NoMoreWorkToDo }))
+                    _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
 
                 return new ReadOnlyCollection<Resource>(newResources);
             }

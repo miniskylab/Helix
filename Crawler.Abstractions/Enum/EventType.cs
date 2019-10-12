@@ -7,6 +7,7 @@
         StartProgressUpdated,
         StopProgressUpdated,
         ReportFileCreated,
-        Stopped
+        Completed,
+        NoMoreWorkToDo
     }
 }

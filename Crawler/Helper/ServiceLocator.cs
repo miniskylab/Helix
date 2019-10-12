@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Reflection;
+using System.Threading;
 using Autofac;
 using Autofac.Core;
 using Helix.Crawler.Abstractions;
@@ -74,17 +75,19 @@ namespace Helix.Crawler
             }
             void RegisterSingletonServices()
             {
-                containerBuilder.RegisterInstance(Activator.CreateInstance<EventBroadcaster>())
-                    .As<IEventBroadcaster>()
-                    .ExternallyOwned();
-
                 containerBuilder.RegisterInstance(configurations).AsSelf();
+                containerBuilder.RegisterInstance(Activator.CreateInstance<EventBroadcaster>()).As<IEventBroadcaster>();
+
+                containerBuilder.RegisterType<CancellationTokenSource>().AsSelf().SingleInstance();
                 containerBuilder.RegisterType<IncrementalIdGenerator>().As<IIncrementalIdGenerator>().SingleInstance();
                 containerBuilder.RegisterType<Statistics>().As<IStatistics>().SingleInstance();
                 containerBuilder.RegisterType<ReportWriter>().As<IReportWriter>().SingleInstance();
                 containerBuilder.RegisterType<Memory>().As<IMemory>().SingleInstance();
                 containerBuilder.RegisterType<Scheduler>().As<IScheduler>().SingleInstance();
                 containerBuilder.RegisterType<HardwareMonitor>().As<IHardwareMonitor>().SingleInstance();
+                containerBuilder.RegisterType<BrokenLinkCollectionWorkflow>().As<IBrokenLinkCollectionWorkflow>().SingleInstance();
+
+                containerBuilder.Register(_ => Get<CancellationTokenSource>().Token).SingleInstance();
                 containerBuilder.Register(_ => CreateAndConfigureHttpClient()).SingleInstance();
                 containerBuilder.RegisterType<NetworkServicePool>().As<INetworkServicePool>()
                     .WithParameters(new[]

@@ -17,8 +17,8 @@ namespace Helix.Gui
 {
     public static class GuiController
     {
+        static BrokenLinkCollector _brokenLinkCollector;
         static Task _constantRedrawTask;
-        static CrawlerBot _crawlerBot;
         static bool _isClosing;
         static Process _sqLiteProcess;
         static readonly ISynchronousServerSocket CommunicationSocketToGui;
@@ -69,7 +69,7 @@ namespace Helix.Gui
                 DisableCloseButton = true
             });
 
-            var working = _crawlerBot != null && !CrawlerState.Completed.HasFlag(_crawlerBot.CrawlerState);
+            var working = _brokenLinkCollector != null && !CrawlerState.Completed.HasFlag(_brokenLinkCollector.CrawlerState);
             if (working) StopWorking();
 
             ManualResetEvent.Set();
@@ -132,11 +132,11 @@ namespace Helix.Gui
             _sqLiteProcess?.CloseMainWindow();
             _sqLiteProcess?.Close();
 
-            _crawlerBot = new CrawlerBot();
-            _crawlerBot.OnEventBroadcast += OnStartProgressUpdated;
-            _crawlerBot.OnEventBroadcast += OnReportFileCreated;
-            _crawlerBot.OnEventBroadcast += OnResourceVerified;
-            _crawlerBot.OnEventBroadcast += OnStopped;
+            _brokenLinkCollector = new BrokenLinkCollector();
+            _brokenLinkCollector.OnEventBroadcast += OnStartProgressUpdated;
+            _brokenLinkCollector.OnEventBroadcast += OnReportFileCreated;
+            _brokenLinkCollector.OnEventBroadcast += OnResourceVerified;
+            _brokenLinkCollector.OnEventBroadcast += OnCompleted;
 
             Redraw(new Frame
             {
@@ -148,7 +148,7 @@ namespace Helix.Gui
                 BorderColor = BorderColor.Normal,
                 MainButtonFunctionality = MainButtonFunctionality.Start
             });
-            if (_crawlerBot.TryStart(new Configurations(configurationJsonString)))
+            if (_brokenLinkCollector.TryStart(new Configurations(configurationJsonString)))
             {
                 Redraw(new Frame
                 {
@@ -172,7 +172,7 @@ namespace Helix.Gui
             {
                 if (@event.EventType != EventType.StartProgressUpdated)
                 {
-                    _crawlerBot.OnEventBroadcast -= OnStartProgressUpdated;
+                    _brokenLinkCollector.OnEventBroadcast -= OnStartProgressUpdated;
                     return;
                 }
                 Redraw(new Frame { StatusText = @event.Message });
@@ -180,12 +180,12 @@ namespace Helix.Gui
             void OnReportFileCreated(Event @event)
             {
                 if (@event.EventType != EventType.ReportFileCreated) return;
-                _crawlerBot.OnEventBroadcast -= OnReportFileCreated;
+                _brokenLinkCollector.OnEventBroadcast -= OnReportFileCreated;
                 Redraw(new Frame { DisablePreviewButton = false });
             }
-            void OnStopped(Event @event)
+            void OnCompleted(Event @event)
             {
-                if (@event.EventType != EventType.Stopped) return;
+                if (@event.EventType != EventType.Completed) return;
                 Redraw(new Frame
                 {
                     DisableStopButton = true,
@@ -194,23 +194,23 @@ namespace Helix.Gui
                     MainButtonFunctionality = MainButtonFunctionality.Start,
                     DisableCloseButton = _isClosing,
                     ShowWaitingOverlay = _isClosing,
-                    BorderColor = _crawlerBot.CrawlerState == CrawlerState.Faulted ? BorderColor.Error : BorderColor.Normal,
-                    StatusText = _crawlerBot.CrawlerState == CrawlerState.Faulted
+                    BorderColor = _brokenLinkCollector.CrawlerState == CrawlerState.Faulted ? BorderColor.Error : BorderColor.Normal,
+                    StatusText = _brokenLinkCollector.CrawlerState == CrawlerState.Faulted
                         ? "One or more errors occurred. Check the logs for more details."
-                        : _crawlerBot.CrawlerState == CrawlerState.RanToCompletion
+                        : _brokenLinkCollector.CrawlerState == CrawlerState.RanToCompletion
                             ? "The crawling task has completed."
                             : $"{@event.Message}."
                 });
 
                 _constantRedrawTask?.Wait();
-                if (_crawlerBot.CrawlerState == CrawlerState.Faulted) return;
+                if (_brokenLinkCollector.CrawlerState == CrawlerState.Faulted) return;
                 Redraw(new Frame
                 {
-                    VerifiedUrlCount = _crawlerBot.Statistics?.VerifiedUrlCount,
-                    ValidUrlCount = _crawlerBot.Statistics?.ValidUrlCount,
-                    BrokenUrlCount = _crawlerBot.Statistics?.BrokenUrlCount,
-                    MillisecondsAveragePageLoadTime = _crawlerBot.Statistics?.MillisecondsAveragePageLoadTime,
-                    RemainingWorkload = _crawlerBot.RemainingWorkload,
+                    VerifiedUrlCount = BrokenLinkCollector.Statistics?.VerifiedUrlCount,
+                    ValidUrlCount = BrokenLinkCollector.Statistics?.ValidUrlCount,
+                    BrokenUrlCount = BrokenLinkCollector.Statistics?.BrokenUrlCount,
+                    MillisecondsAveragePageLoadTime = BrokenLinkCollector.Statistics?.MillisecondsAveragePageLoadTime,
+                    RemainingWorkload = _brokenLinkCollector.RemainingWorkload,
                     ElapsedTime = ElapsedTimeStopwatch.Elapsed.ToString("hh' : 'mm' : 'ss")
                 });
             }
@@ -219,15 +219,15 @@ namespace Helix.Gui
                 _constantRedrawTask = Task.Run(() =>
                 {
                     ElapsedTimeStopwatch.Restart();
-                    while (!CrawlerState.Completed.HasFlag(_crawlerBot.CrawlerState))
+                    while (!CrawlerState.Completed.HasFlag(_brokenLinkCollector.CrawlerState))
                     {
                         Redraw(new Frame
                         {
-                            VerifiedUrlCount = _crawlerBot.Statistics?.VerifiedUrlCount,
-                            ValidUrlCount = _crawlerBot.Statistics?.ValidUrlCount,
-                            BrokenUrlCount = _crawlerBot.Statistics?.BrokenUrlCount,
-                            MillisecondsAveragePageLoadTime = _crawlerBot.Statistics?.MillisecondsAveragePageLoadTime,
-                            RemainingWorkload = _crawlerBot.RemainingWorkload,
+                            VerifiedUrlCount = BrokenLinkCollector.Statistics?.VerifiedUrlCount,
+                            ValidUrlCount = BrokenLinkCollector.Statistics?.ValidUrlCount,
+                            BrokenUrlCount = BrokenLinkCollector.Statistics?.BrokenUrlCount,
+                            MillisecondsAveragePageLoadTime = BrokenLinkCollector.Statistics?.MillisecondsAveragePageLoadTime,
+                            RemainingWorkload = _brokenLinkCollector.RemainingWorkload,
                             ElapsedTime = ElapsedTimeStopwatch.Elapsed.ToString("hh' : 'mm' : 'ss")
                         });
                         Thread.Sleep(timeSpan);
@@ -274,10 +274,10 @@ namespace Helix.Gui
             if (@event.EventType != EventType.ResourceVerified) return;
             Redraw(new Frame
             {
-                VerifiedUrlCount = _crawlerBot.Statistics?.VerifiedUrlCount,
-                ValidUrlCount = _crawlerBot.Statistics?.ValidUrlCount,
-                BrokenUrlCount = _crawlerBot.Statistics?.BrokenUrlCount,
-                RemainingWorkload = _crawlerBot.RemainingWorkload,
+                VerifiedUrlCount = BrokenLinkCollector.Statistics?.VerifiedUrlCount,
+                ValidUrlCount = BrokenLinkCollector.Statistics?.ValidUrlCount,
+                BrokenUrlCount = BrokenLinkCollector.Statistics?.BrokenUrlCount,
+                RemainingWorkload = _brokenLinkCollector.RemainingWorkload,
                 StatusText = @event.Message
             });
         }
@@ -288,8 +288,8 @@ namespace Helix.Gui
         {
             try
             {
-                _crawlerBot.OnEventBroadcast += OnStopProgressUpdated;
-                _crawlerBot.Stop();
+                _brokenLinkCollector.OnEventBroadcast += OnStopProgressUpdated;
+                _brokenLinkCollector.Stop();
 
                 var waitingTime = TimeSpan.FromMinutes(1);
                 if (_constantRedrawTask == null || _constantRedrawTask.Wait(waitingTime)) return;

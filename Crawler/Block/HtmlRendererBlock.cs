@@ -11,7 +11,7 @@ using Newtonsoft.Json;
 
 namespace Helix.Crawler
 {
-    internal class HtmlRendererBlock : TransformBlock<Resource, RenderingResult>
+    internal class HtmlRendererBlock : TransformBlock<Resource, RenderingResult>, IHtmlRendererBlock
     {
         readonly CancellationToken _cancellationToken;
         readonly BlockingCollection<IHtmlRenderer> _htmlRenderers;

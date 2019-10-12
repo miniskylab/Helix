@@ -8,7 +8,7 @@ using Newtonsoft.Json;
 
 namespace Helix.Crawler
 {
-    internal class ResourceEnricherBlock : TransformBlock<Resource, Resource>
+    internal class ResourceEnricherBlock : TransformBlock<Resource, Resource>, IResourceEnricherBlock
     {
         readonly ILog _log;
         readonly IResourceEnricher _resourceEnricher;
