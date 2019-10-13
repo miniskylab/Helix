@@ -61,6 +61,7 @@ namespace Helix.Crawler
 
                 _coordinatorBlock.LinkTo(NullTarget<Resource>(), PropagateNullObjectsOnly<Resource>());
                 _coordinatorBlock.LinkTo(_resourceEnricherBlock, generalDataflowLinkOptions);
+                _coordinatorBlock.Events.LinkTo(_eventBroadcasterBlock);
 
                 _resourceEnricherBlock.LinkTo(NullTarget<Resource>(), PropagateNullObjectsOnly<Resource>());
                 _resourceEnricherBlock.LinkTo(_resourceVerifierBlock, generalDataflowLinkOptions);

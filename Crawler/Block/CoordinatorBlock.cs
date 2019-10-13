@@ -123,7 +123,6 @@ namespace Helix.Crawler
                 Interlocked.Decrement(ref _remainingWorkload);
                 if (_remainingWorkload != 0) return new ReadOnlyCollection<Resource>(newResources);
 
-                SignalShutdown();
                 if (!Events.Post(new Event { EventType = EventType.NoMoreWorkToDo }))
                     _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
 
