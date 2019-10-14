@@ -8,6 +8,7 @@ using log4net.Repository.Hierarchy;
 
 namespace Helix.Crawler
 {
+    // TODO: Move ServiceLocator here
     public abstract class Application
     {
         static Application() { ConfigureLog4Net(); }

@@ -10,7 +10,7 @@ using log4net;
 
 namespace Helix.Crawler
 {
-    public class BrokenLinkCollector
+    public class BrokenLinkCollector : Application
     {
         IBrokenLinkCollectionWorkflow _brokenLinkCollectionWorkflow;
         readonly ILog _log;

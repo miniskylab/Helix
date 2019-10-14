@@ -100,7 +100,10 @@ namespace Helix.Crawler
 
                 lock (_memorizationLock)
                 {
-                    if (!_alreadyProcessedUrls.Contains(processingResult.ProcessedResource.GetAbsoluteUrl()))
+                    var processedResource = processingResult.ProcessedResource;
+                    var isStartResource = processedResource == null;
+
+                    if (!isStartResource && !_alreadyProcessedUrls.Contains(processedResource.GetAbsoluteUrl()))
                         throw new InvalidConstraintException($"Processed resource was not registered by {nameof(CoordinatorBlock)}.");
                 }
 
