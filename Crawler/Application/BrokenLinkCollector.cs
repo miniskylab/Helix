@@ -12,12 +12,13 @@ namespace Helix.Crawler
 {
     public class BrokenLinkCollector
     {
+        IBrokenLinkCollectionWorkflow _brokenLinkCollectionWorkflow;
         readonly ILog _log;
         readonly StateMachine<CrawlerState, CrawlerCommand> _stateMachine;
 
         public CrawlerState CrawlerState => _stateMachine.CurrentState;
 
-        public int RemainingWorkload => 0; // TODO: Add implementation
+        public int RemainingWorkload => _brokenLinkCollectionWorkflow?.RemainingWorkload ?? 0;
 
         public static IStatistics Statistics => ServiceLocator.Get<IStatistics>();
 
@@ -96,6 +97,8 @@ namespace Helix.Crawler
                 {
                     _log.Info("Setting up and configuring services ...");
                     ServiceLocator.SetupAndConfigureServices(configurations);
+
+                    _brokenLinkCollectionWorkflow = ServiceLocator.Get<IBrokenLinkCollectionWorkflow>();
 
                     ServiceLocator.Get<IEventBroadcaster>().OnEventBroadcast += @event =>
                     {

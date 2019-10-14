@@ -6,6 +6,8 @@ namespace Helix.Crawler.Abstractions
     {
         BufferBlock<Event> Events { get; }
 
+        int RemainingWorkload { get; }
+
         void SignalShutdown();
 
         bool TryActivateWorkflow(string startUrl);

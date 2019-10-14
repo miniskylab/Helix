@@ -22,10 +22,9 @@ namespace Helix.Crawler
 
         public BufferBlock<Event> Events { get; }
 
-        public override Task Completion => Task.WhenAll(
-            base.Completion,
-            Events.Completion
-        );
+        public override Task Completion => Task.WhenAll(base.Completion, Events.Completion);
+
+        public int RemainingWorkload => _remainingWorkload;
 
         public CoordinatorBlock(CancellationToken cancellationToken, ILog log) : base(cancellationToken)
         {

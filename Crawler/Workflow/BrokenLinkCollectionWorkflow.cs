@@ -20,6 +20,8 @@ namespace Helix.Crawler
         readonly IResourceEnricherBlock _resourceEnricherBlock;
         readonly IResourceVerifierBlock _resourceVerifierBlock;
 
+        public int RemainingWorkload => _coordinatorBlock.RemainingWorkload;
+
         public event Action<Event> OnEventBroadcast;
 
         public BrokenLinkCollectionWorkflow(IResourceVerifierBlock resourceVerifierBlock, IEventBroadcasterBlock eventBroadcasterBlock,
