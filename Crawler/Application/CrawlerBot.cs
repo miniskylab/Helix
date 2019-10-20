@@ -296,7 +296,7 @@ namespace Helix.Crawler
                                               $"{resource.Uri}");
 
                                 var isInternalResource = resource.IsInternal;
-                                var isExtractedResource = resource.IsExtracted;
+                                var isExtractedResource = resource.IsExtractedFromHtmlDocument;
                                 var isInitialResource = resource.Uri != null && _resourceScope.IsStartUri(resource.Uri);
                                 var isHtml = resource.ResourceType == ResourceType.Html;
                                 if (isInternalResource && isHtml && !resourceIsTooBig && (isExtractedResource || isInitialResource))

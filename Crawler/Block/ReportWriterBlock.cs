@@ -6,17 +6,18 @@ using Newtonsoft.Json;
 
 namespace Helix.Crawler
 {
-    public class ReportWriterBlock : ActionBlock<VerificationResult>, IReportWriterBlock
+    public class ReportWriterBlock : ActionBlock<VerificationResult>, IReportWriterBlock, IDisposable
     {
         readonly ILog _log;
         readonly IReportWriter _reportWriter;
 
-        public ReportWriterBlock(CancellationToken cancellationToken, IReportWriter reportWriter, ILog log)
-            : base(cancellationToken, maxDegreeOfParallelism: 300)
+        public ReportWriterBlock(CancellationToken cancellationToken, IReportWriter reportWriter, ILog log) : base(cancellationToken)
         {
             _log = log;
             _reportWriter = reportWriter;
         }
+
+        public void Dispose() { _reportWriter?.Dispose(); }
 
         protected override void Act(VerificationResult verificationResult)
         {

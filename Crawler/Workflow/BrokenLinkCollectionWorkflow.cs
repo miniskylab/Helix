@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
@@ -7,67 +8,61 @@ using log4net;
 
 namespace Helix.Crawler
 {
-    internal class BrokenLinkCollectionWorkflow : IBrokenLinkCollectionWorkflow
+    public class BrokenLinkCollectionWorkflow : IBrokenLinkCollectionWorkflow, IDisposable
     {
         readonly ICoordinatorBlock _coordinatorBlock;
-        readonly CancellationTokenSource _eventBroadcastCancellationTokenSource;
+        readonly CancellationTokenSource _eventBroadcastCts;
         readonly IEventBroadcasterBlock _eventBroadcasterBlock;
         readonly Task _eventBroadcastTask;
         readonly IHtmlRendererBlock _htmlRendererBlock;
         readonly ILog _log;
         readonly IProcessingResultGeneratorBlock _processingResultGeneratorBlock;
         readonly IReportWriterBlock _reportWriterBlock;
-        readonly IResourceEnricherBlock _resourceEnricherBlock;
         readonly IResourceVerifierBlock _resourceVerifierBlock;
+
+        public BlockingCollection<Event> Events { get; }
 
         public int RemainingWorkload => _coordinatorBlock.RemainingWorkload;
 
-        public event Action<Event> OnEventBroadcast;
-
-        public BrokenLinkCollectionWorkflow(IResourceVerifierBlock resourceVerifierBlock, IEventBroadcasterBlock eventBroadcasterBlock,
-            ICoordinatorBlock coordinatorBlock, IReportWriterBlock reportWriterBlock, IResourceEnricherBlock resourceEnricherBlock,
-            IProcessingResultGeneratorBlock processingResultGeneratorBlock, IHtmlRendererBlock htmlRendererBlock, ILog log)
+        public BrokenLinkCollectionWorkflow(IEventBroadcasterBlock eventBroadcasterBlock, IResourceVerifierBlock resourceVerifierBlock,
+            ICoordinatorBlock coordinatorBlock, IReportWriterBlock reportWriterBlock, IHtmlRendererBlock htmlRendererBlock, ILog log,
+            IProcessingResultGeneratorBlock processingResultGeneratorBlock)
         {
             _log = log;
             _coordinatorBlock = coordinatorBlock;
             _eventBroadcasterBlock = eventBroadcasterBlock;
             _processingResultGeneratorBlock = processingResultGeneratorBlock;
             _reportWriterBlock = reportWriterBlock;
-            _resourceEnricherBlock = resourceEnricherBlock;
             _resourceVerifierBlock = resourceVerifierBlock;
             _htmlRendererBlock = htmlRendererBlock;
 
-            _eventBroadcastCancellationTokenSource = new CancellationTokenSource();
-            _eventBroadcastTask = new Task(
-                () =>
+            Events = new BlockingCollection<Event>();
+
+            _eventBroadcastCts = new CancellationTokenSource();
+            _eventBroadcastTask = new Task(() =>
+            {
+                try
                 {
-                    var cancellationToken = _eventBroadcastCancellationTokenSource.Token;
-                    try
-                    {
-                        while (!cancellationToken.IsCancellationRequested)
-                            OnEventBroadcast?.Invoke(_eventBroadcasterBlock.Receive(cancellationToken));
-                    }
-                    catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(cancellationToken))
-                    {
-                        log.Error("One or more errors occured while broadcast event.", exception);
-                    }
-                },
-                _eventBroadcastCancellationTokenSource.Token
-            );
+                    while (!_eventBroadcastCts.Token.IsCancellationRequested)
+                        Events.Add(_eventBroadcasterBlock.Receive(_eventBroadcastCts.Token));
+                }
+                catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(_eventBroadcastCts.Token))
+                {
+                    log.Error("One or more errors occured while broadcast event.", exception);
+                }
+            }, _eventBroadcastCts.Token);
 
             WireUpBlocks();
+
+            #region Local Functions
 
             void WireUpBlocks()
             {
                 var generalDataflowLinkOptions = new DataflowLinkOptions { PropagateCompletion = true };
 
                 _coordinatorBlock.LinkTo(NullTarget<Resource>(), PropagateNullObjectsOnly<Resource>());
-                _coordinatorBlock.LinkTo(_resourceEnricherBlock, generalDataflowLinkOptions);
+                _coordinatorBlock.LinkTo(_resourceVerifierBlock, generalDataflowLinkOptions);
                 _coordinatorBlock.Events.LinkTo(_eventBroadcasterBlock);
-
-                _resourceEnricherBlock.LinkTo(NullTarget<Resource>(), PropagateNullObjectsOnly<Resource>());
-                _resourceEnricherBlock.LinkTo(_resourceVerifierBlock, generalDataflowLinkOptions);
-                _resourceEnricherBlock.FailedProcessingResults.LinkTo(_coordinatorBlock);
 
                 _resourceVerifierBlock.LinkTo(NullTarget<Resource>(), PropagateNullObjectsOnly<Resource>());
                 _resourceVerifierBlock.LinkTo(_htmlRendererBlock, generalDataflowLinkOptions);
@@ -89,13 +84,29 @@ namespace Helix.Crawler
                 Predicate<T> PropagateNullObjectsOnly<T>() { return @object => @object == null; }
                 ITargetBlock<T> NullTarget<T>() { return DataflowBlock.NullTarget<T>(); }
             }
+
+            #endregion Local Functions
+        }
+
+        public void Dispose()
+        {
+            _eventBroadcastCts?.Dispose();
+            _eventBroadcastTask?.Dispose();
+            Events?.Dispose();
         }
 
         public void SignalShutdown()
         {
-            try { _coordinatorBlock.SignalShutdown(); }
+            try
+            {
+                _eventBroadcastCts.Cancel();
+                _eventBroadcastTask.Wait();
+
+                _coordinatorBlock.SignalShutdown();
+            }
             catch (Exception exception)
             {
+                if (exception.IsAcknowledgingOperationCancelledException(_eventBroadcastCts.Token)) return;
                 _log.Error($"One or more errors occurred while signaling shutdown for {nameof(BrokenLinkCollectionWorkflow)}.", exception);
             }
         }
@@ -118,28 +129,13 @@ namespace Helix.Crawler
                     _htmlRendererBlock.Completion,
                     _processingResultGeneratorBlock.Completion,
                     _reportWriterBlock.Completion,
-                    _resourceEnricherBlock.Completion,
                     _resourceVerifierBlock.Completion
                 ).Wait();
             }
             catch (Exception exception)
             {
-                if (exception.IsAcknowledgingOperationCancelledException(_eventBroadcastCancellationTokenSource.Token)) return;
+                if (exception.IsAcknowledgingOperationCancelledException(CancellationToken.None)) return;
                 _log.Error("One or more errors occurred while waiting for all blocks to complete.", exception);
-            }
-
-            try
-            {
-                _eventBroadcastCancellationTokenSource.Cancel();
-                _eventBroadcastTask.Wait();
-
-                _eventBroadcastCancellationTokenSource.Dispose();
-                _eventBroadcastTask.Dispose();
-            }
-            catch (Exception exception)
-            {
-                if (exception.IsAcknowledgingOperationCancelledException(_eventBroadcastCancellationTokenSource.Token)) return;
-                _log.Error("One or more errors occurred while stopping event broadcast task.", exception);
             }
         }
     }

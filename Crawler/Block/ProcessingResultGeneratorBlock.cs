@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using Helix.Crawler.Abstractions;
 using log4net;
@@ -10,12 +11,14 @@ namespace Helix.Crawler
     public class ProcessingResultGeneratorBlock : TransformBlock<RenderingResult, ProcessingResult>, IProcessingResultGeneratorBlock
     {
         readonly ILog _log;
+        readonly IResourceEnricher _resourceEnricher;
         readonly IResourceExtractor _resourceExtractor;
 
-        public ProcessingResultGeneratorBlock(CancellationToken cancellationToken, IResourceExtractor resourceExtractor, ILog log)
-            : base(cancellationToken, maxDegreeOfParallelism: 300)
+        public ProcessingResultGeneratorBlock(CancellationToken cancellationToken, IResourceExtractor resourceExtractor, ILog log,
+            IResourceEnricher resourceEnricher) : base(cancellationToken)
         {
             _log = log;
+            _resourceEnricher = resourceEnricher;
             _resourceExtractor = resourceExtractor;
         }
 
@@ -32,7 +35,7 @@ namespace Helix.Crawler
 
                 return new SuccessfulProcessingResult
                 {
-                    NewResources = newResources,
+                    NewResources = newResources.Select(_resourceEnricher.Enrich).ToList(),
                     ProcessedResource = renderingResult.RenderedResource
                 };
             }

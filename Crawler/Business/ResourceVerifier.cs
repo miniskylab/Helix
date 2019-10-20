@@ -49,7 +49,8 @@ namespace Helix.Crawler
             verificationResult = null;
             if (!resource.IsInternal && !_configurations.VerifyExternalUrls) return false;
 
-            if (resource.StatusCode != default)
+            var resourceIsAlreadyVerified = resource.StatusCode != default;
+            if (resourceIsAlreadyVerified)
             {
                 verificationResult = resource.ToVerificationResult();
                 return true;
@@ -62,6 +63,7 @@ namespace Helix.Crawler
                     HttpCompletionOption.ResponseHeadersRead,
                     cancellationToken
                 );
+
                 var httpResponseMessage = _sendingGETRequestTask.Result;
                 var httpContentType = httpResponseMessage.Content.Headers.ContentType?.ToString();
                 resource.StatusCode = (StatusCode) httpResponseMessage.StatusCode;

@@ -35,23 +35,21 @@ namespace Helix.Crawler
             _cancellationTokenSource = new CancellationTokenSource();
             _samplingTask = Task.Run(() =>
             {
-                using (var performanceCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total"))
+                using var performanceCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total");
+                performanceCounter.NextValue();
+                while (!_cancellationTokenSource.IsCancellationRequested)
                 {
-                    performanceCounter.NextValue();
-                    while (!_cancellationTokenSource.IsCancellationRequested)
-                    {
-                        const int millisecondSampleInterval = 1000;
-                        Thread.Sleep(millisecondSampleInterval);
+                    const int millisecondSampleInterval = 1000;
+                    Thread.Sleep(millisecondSampleInterval);
 
-                        const float bufferRate = 1.5f;
-                        cpuUsageSamples.Add((int) MathF.Ceiling(performanceCounter.NextValue() * bufferRate));
+                    const float bufferRate = 1.5f;
+                    cpuUsageSamples.Add((int) MathF.Ceiling(performanceCounter.NextValue() * bufferRate));
 
-                        var millisecondTotalElapsedTime = cpuUsageSamples.Count * millisecondSampleInterval;
-                        if (millisecondTotalElapsedTime < millisecondSampleDuration) continue;
+                    var millisecondTotalElapsedTime = cpuUsageSamples.Count * millisecondSampleInterval;
+                    if (millisecondTotalElapsedTime < millisecondSampleDuration) continue;
 
-                        CheckCpuAndMemoryUsage();
-                        cpuUsageSamples.Clear();
-                    }
+                    CheckCpuAndMemoryUsage();
+                    cpuUsageSamples.Clear();
                 }
             }, _cancellationTokenSource.Token);
 

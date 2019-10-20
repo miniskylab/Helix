@@ -7,11 +7,11 @@ using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using Helix.Crawler.Abstractions;
 using log4net;
-using Newtonsoft.Json;
+using Microsoft.Extensions.Logging;
 
 namespace Helix.Crawler
 {
-    internal class HtmlRendererBlock : TransformBlock<Resource, RenderingResult>, IHtmlRendererBlock
+    public class HtmlRendererBlock : TransformBlock<Resource, RenderingResult>, IHtmlRendererBlock, IDisposable
     {
         readonly CancellationToken _cancellationToken;
         readonly BlockingCollection<IHtmlRenderer> _htmlRenderers;
@@ -32,7 +32,8 @@ namespace Helix.Crawler
         );
 
         public HtmlRendererBlock(CancellationToken cancellationToken, IStatistics statistics, ILog log, Configurations configurations,
-            IHardwareMonitor hardwareMonitor, Func<IHtmlRenderer> getHtmlRenderer) : base(cancellationToken, maxDegreeOfParallelism: 300)
+            IHardwareMonitor hardwareMonitor, Func<IHtmlRenderer> getHtmlRenderer) : base(cancellationToken,
+            maxDegreeOfParallelism: Environment.ProcessorCount)
         {
             _log = log;
             _statistics = statistics;
@@ -40,9 +41,9 @@ namespace Helix.Crawler
             _htmlRenderers = new BlockingCollection<IHtmlRenderer>();
             (int createdHtmlRenderCount, int disposedHtmlRendererCount) counter = (0, 0);
 
-            var generalDataflowBlockOptions = new DataflowBlockOptions { CancellationToken = cancellationToken };
-            VerificationResults = new BufferBlock<VerificationResult>(generalDataflowBlockOptions);
-            FailedProcessingResults = new BufferBlock<FailedProcessingResult>(generalDataflowBlockOptions);
+            var dataflowBlockOptions = new DataflowBlockOptions { CancellationToken = cancellationToken };
+            VerificationResults = new BufferBlock<VerificationResult>(dataflowBlockOptions);
+            FailedProcessingResults = new BufferBlock<FailedProcessingResult>(dataflowBlockOptions);
             Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true, CancellationToken = cancellationToken });
 
             base.Completion.ContinueWith(_ =>
@@ -52,6 +53,8 @@ namespace Helix.Crawler
                 DisposeHtmlRenderers();
                 Events.Complete();
                 CheckMemoryLeak();
+
+                #region Local Functions
 
                 void CheckMemoryLeak()
                 {
@@ -75,15 +78,19 @@ namespace Helix.Crawler
                             EventType = EventType.StopProgressUpdated,
                             Message = $"Closing web browsers ({counter.disposedHtmlRendererCount}/{counter.createdHtmlRenderCount}) ..."
                         };
-                        if (!Events.Post(webBrowserClosedEvent))
+                        if (!Events.Post(webBrowserClosedEvent) && !Events.Completion.IsCompleted)
                             _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
                     }
                     _htmlRenderers?.Dispose();
                 }
+
+                #endregion Local Functions
             });
 
             CreateHtmlRenderer();
             CreateAndDestroyHtmlRenderersAdaptively();
+
+            #region Local Functions
 
             void CreateHtmlRenderer()
             {
@@ -128,7 +135,11 @@ namespace Helix.Crawler
                         );
                 };
             }
+
+            #endregion Local Functions
         }
+
+        public void Dispose() { _htmlRenderers?.Dispose(); }
 
         protected override RenderingResult Transform(Resource resource)
         {
@@ -139,6 +150,12 @@ namespace Helix.Crawler
             {
                 if (resource == null)
                     throw new ArgumentNullException(nameof(resource));
+
+                if (!resource.IsExtractedFromHtmlDocument)
+                    return ProcessUnsuccessfulRendering(
+                        $"{nameof(Resource)} which was not extracted from HTML document was skipped: {resource.ToJson()}",
+                        LogLevel.Debug
+                    );
 
                 htmlRenderer = _htmlRenderers.Take(_cancellationToken);
                 htmlRenderer.OnResourceCaptured += CaptureResource;
@@ -152,32 +169,31 @@ namespace Helix.Crawler
                 );
 
                 if (renderingFailed)
-                {
-                    SendOutFailedProcessingResult();
-                    _log.Info($"Failed to render {nameof(Resource)} was discarded: {JsonConvert.SerializeObject(resource)}");
-                    return null;
-                }
+                    return ProcessUnsuccessfulRendering(
+                        $"Failed to render {nameof(Resource)} was discarded: {resource.ToJson()}",
+                        LogLevel.Information
+                    );
 
                 UpdateStatusCodeIfChanged();
+                if (resource.StatusCode.IsWithinBrokenRange())
+                    return ProcessUnsuccessfulRendering(
+                        $"Broken {nameof(Resource)} was discarded: {resource.ToJson()}",
+                        LogLevel.Information
+                    );
+
                 DoStatisticsIfHasPageLoadTime();
-
-                if (!resource.StatusCode.IsWithinBrokenRange())
-                    return new RenderingResult
-                    {
-                        RenderedResource = resource,
-                        CapturedResources = capturedResources,
-                        HtmlDocument = new HtmlDocument { Uri = resource.Uri, HtmlText = htmlText }
-                    };
-
-                SendOutFailedProcessingResult();
-                _log.Info($"Broken {nameof(Resource)} was discarded: {JsonConvert.SerializeObject(resource)}");
-                return null;
+                return new RenderingResult
+                {
+                    RenderedResource = resource,
+                    CapturedResources = capturedResources,
+                    HtmlDocument = new HtmlDocument { Uri = resource.Uri, HtmlText = htmlText }
+                };
 
                 void UpdateStatusCodeIfChanged()
                 {
                     var newStatusCode = resource.StatusCode;
                     if (oldStatusCode == newStatusCode) return;
-                    if (!VerificationResults.Post(resource.ToVerificationResult()))
+                    if (!VerificationResults.Post(resource.ToVerificationResult()) && !VerificationResults.Completion.IsCompleted)
                         _log.Error($"Failed to post data to buffer block named [{nameof(VerificationResults)}].");
                 }
                 void DoStatisticsIfHasPageLoadTime()
@@ -189,9 +205,11 @@ namespace Helix.Crawler
             }
             catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(_cancellationToken))
             {
-                SendOutFailedProcessingResult();
-                _log.Error($"One or more errors occurred while rendering: {JsonConvert.SerializeObject(resource)}.", exception);
-                return null;
+                return ProcessUnsuccessfulRendering(
+                    $"One or more errors occurred while rendering: {resource.ToJson()}.",
+                    LogLevel.Error,
+                    exception
+                );
             }
             finally
             {
@@ -203,10 +221,36 @@ namespace Helix.Crawler
             }
 
             void CaptureResource(Resource capturedResource) { capturedResources.Add(capturedResource); }
-            void SendOutFailedProcessingResult()
+            RenderingResult ProcessUnsuccessfulRendering(string logMessage, LogLevel logLevel, Exception exception = null)
             {
-                if (!FailedProcessingResults.Post(new FailedProcessingResult { ProcessedResource = resource }))
+                var failedProcessingResult = new FailedProcessingResult { ProcessedResource = resource };
+                if (!FailedProcessingResults.Post(failedProcessingResult) && !FailedProcessingResults.Completion.IsCompleted)
                     _log.Error($"Failed to post data to buffer block named [{nameof(FailedProcessingResults)}].");
+
+                switch (logLevel)
+                {
+                    case LogLevel.None:
+                    case LogLevel.Trace:
+                    case LogLevel.Debug:
+                        _log.Debug(logMessage, exception);
+                        break;
+                    case LogLevel.Information:
+                        _log.Info(logMessage, exception);
+                        break;
+                    case LogLevel.Warning:
+                        _log.Warn(logMessage, exception);
+                        break;
+                    case LogLevel.Error:
+                        _log.Error(logMessage, exception);
+                        break;
+                    case LogLevel.Critical:
+                        _log.Fatal(logMessage, exception);
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(logLevel), logLevel, null);
+                }
+
+                return null;
             }
         }
     }

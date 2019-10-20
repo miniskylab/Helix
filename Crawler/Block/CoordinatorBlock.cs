@@ -12,12 +12,13 @@ using Newtonsoft.Json;
 
 namespace Helix.Crawler
 {
-    public class CoordinatorBlock : TransformManyBlock<ProcessingResult, Resource>, ICoordinatorBlock
+    public class CoordinatorBlock : TransformManyBlock<ProcessingResult, Resource>, ICoordinatorBlock, IDisposable
     {
         readonly HashSet<string> _alreadyProcessedUrls;
         readonly ILog _log;
         readonly object _memorizationLock;
         int _remainingWorkload;
+        readonly IResourceEnricher _resourceEnricher;
         readonly StateMachine<WorkflowState, WorkflowCommand> _stateMachine;
 
         public BufferBlock<Event> Events { get; }
@@ -26,11 +27,12 @@ namespace Helix.Crawler
 
         public int RemainingWorkload => _remainingWorkload;
 
-        public CoordinatorBlock(CancellationToken cancellationToken, ILog log) : base(cancellationToken)
+        public CoordinatorBlock(CancellationToken cancellationToken, IResourceEnricher resourceEnricher, ILog log) : base(cancellationToken)
         {
             _log = log;
             _remainingWorkload = 0;
             _memorizationLock = new object();
+            _resourceEnricher = resourceEnricher;
             _alreadyProcessedUrls = new HashSet<string>();
 
             _stateMachine = new StateMachine<WorkflowState, WorkflowCommand>(
@@ -43,7 +45,7 @@ namespace Helix.Crawler
                 WorkflowState.WaitingForActivation
             );
 
-            Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true, CancellationToken = cancellationToken });
+            Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true });
             base.Completion.ContinueWith(_ => Events.Complete());
 
             Transition<WorkflowState, WorkflowCommand> Transition(WorkflowState fromState, WorkflowCommand command)
@@ -51,6 +53,8 @@ namespace Helix.Crawler
                 return new Transition<WorkflowState, WorkflowCommand>(fromState, command);
             }
         }
+
+        public void Dispose() { _stateMachine?.Dispose(); }
 
         public void SignalShutdown()
         {
@@ -72,15 +76,26 @@ namespace Helix.Crawler
             {
                 try
                 {
+                    Interlocked.Increment(ref _remainingWorkload);
                     activationSuccessful = this.Post(new SuccessfulProcessingResult
                     {
-                        NewResources = new List<Resource> { new Resource { ParentUri = null, OriginalUrl = startUrl } }
+                        NewResources = new List<Resource>
+                        {
+                            _resourceEnricher.Enrich(new Resource
+                            {
+                                ParentUri = null,
+                                OriginalUrl = startUrl,
+                                IsExtractedFromHtmlDocument = true
+                            })
+                        }
                     });
 
                     if (!activationSuccessful) throw new ArgumentException("Could not activate workflow using given start URL", startUrl);
                 }
                 catch (Exception exception)
                 {
+                    Interlocked.Decrement(ref _remainingWorkload);
+
                     _log.Error("One or more errors occurred when trying to activate workflow.", exception);
                     if (!_stateMachine.TryTransitNext(WorkflowCommand.Deactivate))
                         _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WorkflowCommand.Deactivate);

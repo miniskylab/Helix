@@ -50,7 +50,12 @@ namespace Helix.Crawler.Specifications
 
             Resource Resource(string originalUrl)
             {
-                return new Resource { ParentUri = new Uri("http://www.helix.com"), OriginalUrl = originalUrl, IsExtracted = true };
+                return new Resource
+                {
+                    ParentUri = new Uri("http://www.helix.com"),
+                    OriginalUrl = originalUrl,
+                    IsExtractedFromHtmlDocument = true
+                };
             }
         }
 

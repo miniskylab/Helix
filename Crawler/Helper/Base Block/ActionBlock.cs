@@ -11,7 +11,7 @@ namespace Helix.Crawler
 
         public virtual Task Completion => _actionBlock.Completion;
 
-        protected ActionBlock(CancellationToken cancellationToken, bool ensureOrdered = false, int maxDegreeOfParallelism = -1)
+        protected ActionBlock(CancellationToken cancellationToken, bool ensureOrdered = false, int maxDegreeOfParallelism = 1)
         {
             _actionBlock = new System.Threading.Tasks.Dataflow.ActionBlock<TInput>(
                 Act,

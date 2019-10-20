@@ -4,11 +4,11 @@ using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using Helix.Crawler.Abstractions;
 using log4net;
-using Newtonsoft.Json;
+using Microsoft.Extensions.Logging;
 
 namespace Helix.Crawler
 {
-    internal class ResourceVerifierBlock : TransformBlock<Resource, Resource>, IResourceVerifierBlock
+    internal class ResourceVerifierBlock : TransformBlock<Resource, Resource>, IResourceVerifierBlock, IDisposable
     {
         readonly CancellationToken _cancellationToken;
         readonly ILog _log;
@@ -29,16 +29,16 @@ namespace Helix.Crawler
         );
 
         public ResourceVerifierBlock(CancellationToken cancellationToken, IStatistics statistics, IResourceVerifier resourceVerifier,
-            ILog log) : base(cancellationToken, maxDegreeOfParallelism: 300)
+            ILog log) : base(cancellationToken, maxDegreeOfParallelism: Environment.ProcessorCount)
         {
             _log = log;
             _statistics = statistics;
             _resourceVerifier = resourceVerifier;
             _cancellationToken = cancellationToken;
 
-            var generalDataflowBlockOptions = new DataflowBlockOptions { CancellationToken = cancellationToken };
-            VerificationResults = new BufferBlock<VerificationResult>(generalDataflowBlockOptions);
-            FailedProcessingResults = new BufferBlock<FailedProcessingResult>(generalDataflowBlockOptions);
+            var dataflowBlockOptions = new DataflowBlockOptions { CancellationToken = cancellationToken };
+            VerificationResults = new BufferBlock<VerificationResult>(dataflowBlockOptions);
+            FailedProcessingResults = new BufferBlock<FailedProcessingResult>(dataflowBlockOptions);
             Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true, CancellationToken = cancellationToken });
 
             base.Completion.ContinueWith(_ =>
@@ -49,6 +49,8 @@ namespace Helix.Crawler
             });
         }
 
+        public void Dispose() { _resourceVerifier?.Dispose(); }
+
         protected override Resource Transform(Resource resource)
         {
             try
@@ -56,34 +58,39 @@ namespace Helix.Crawler
                 if (resource == null)
                     throw new ArgumentNullException(nameof(resource));
 
-                if (!_resourceVerifier.TryVerify(resource, _cancellationToken, out var verificationResult))
+                VerificationResult verificationResult = null;
+                if (resource.IsExtractedFromHtmlDocument)
                 {
-                    SendOutFailedProcessingResult();
-                    _log.Info($"Failed to be verified {nameof(Resource)} was discarded: {JsonConvert.SerializeObject(resource)}.");
-                    return null;
+                    if (!_resourceVerifier.TryVerify(resource, _cancellationToken, out verificationResult))
+                        return ProcessUnsuccessfulVerification(
+                            $"Failed to be verified {nameof(Resource)} was discarded: {resource.ToJson()}.",
+                            LogLevel.Information
+                        );
+
+                    var isOrphanedUri = verificationResult.StatusCode == StatusCode.OrphanedUri;
+                    if (isOrphanedUri)
+                        return ProcessUnsuccessfulVerification(
+                            $"{nameof(Resource)} with orphaned URL was discarded: {resource.ToJson()}.",
+                            LogLevel.Information
+                        );
+
+                    var uriSchemeNotSupported = verificationResult.StatusCode == StatusCode.UriSchemeNotSupported;
+                    if (uriSchemeNotSupported)
+                        return ProcessUnsuccessfulVerification(
+                            $"{nameof(Resource)} with unsupported scheme was discarded: {resource.ToJson()}.",
+                            LogLevel.Information
+                        );
                 }
 
-                var isOrphanedUri = verificationResult.StatusCode == StatusCode.OrphanedUri;
-                if (isOrphanedUri)
-                {
-                    SendOutFailedProcessingResult();
-                    _log.Info($"{nameof(Resource)} with orphaned URL was discarded: {JsonConvert.SerializeObject(resource)}.");
-                    return null;
-                }
-
-                var uriSchemeNotSupported = verificationResult.StatusCode == StatusCode.UriSchemeNotSupported;
-                if (uriSchemeNotSupported)
-                {
-                    SendOutFailedProcessingResult();
-                    _log.Info($"{nameof(Resource)} with unsupported scheme was discarded: {JsonConvert.SerializeObject(resource)}.");
-                    return null;
-                }
+                if (verificationResult == null)
+                    verificationResult = resource.ToVerificationResult();
 
                 DoStatistics();
                 SendOutVerificationResult();
                 SendOutResourceVerifiedEvent();
-
                 return resource;
+
+                #region Local Functions
 
                 void DoStatistics()
                 {
@@ -92,7 +99,7 @@ namespace Helix.Crawler
                 }
                 void SendOutVerificationResult()
                 {
-                    if (!VerificationResults.Post(verificationResult))
+                    if (!VerificationResults.Post(verificationResult) && !VerificationResults.Completion.IsCompleted)
                         _log.Error($"Failed to post data to buffer block named [{nameof(VerificationResults)}].");
                 }
                 void SendOutResourceVerifiedEvent()
@@ -102,22 +109,56 @@ namespace Helix.Crawler
                         EventType = EventType.ResourceVerified,
                         Message = $"{verificationResult.StatusCode:D} - {verificationResult.VerifiedUrl}"
                     };
-                    if (!Events.Post(resourceVerifiedEvent))
+                    if (!Events.Post(resourceVerifiedEvent) && !Events.Completion.IsCompleted)
                         _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
                 }
+
+                #endregion Local Functions
             }
             catch (Exception exception)
             {
-                SendOutFailedProcessingResult();
-                _log.Error($"One or more errors occurred while verifying: {JsonConvert.SerializeObject(resource)}.", exception);
+                return ProcessUnsuccessfulVerification(
+                    $"One or more errors occurred while verifying: {resource.ToJson()}.",
+                    LogLevel.Error,
+                    exception
+                );
+            }
+
+            #region Local Functions
+
+            Resource ProcessUnsuccessfulVerification(string logMessage, LogLevel logLevel, Exception exception = null)
+            {
+                var failedProcessingResult = new FailedProcessingResult { ProcessedResource = resource };
+                if (!FailedProcessingResults.Post(failedProcessingResult) && !FailedProcessingResults.Completion.IsCompleted)
+                    _log.Error($"Failed to post data to buffer block named [{nameof(FailedProcessingResults)}].");
+
+                switch (logLevel)
+                {
+                    case LogLevel.None:
+                    case LogLevel.Trace:
+                    case LogLevel.Debug:
+                        _log.Debug(logMessage, exception);
+                        break;
+                    case LogLevel.Information:
+                        _log.Info(logMessage, exception);
+                        break;
+                    case LogLevel.Warning:
+                        _log.Warn(logMessage, exception);
+                        break;
+                    case LogLevel.Error:
+                        _log.Error(logMessage, exception);
+                        break;
+                    case LogLevel.Critical:
+                        _log.Fatal(logMessage, exception);
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(logLevel), logLevel, null);
+                }
+
                 return null;
             }
 
-            void SendOutFailedProcessingResult()
-            {
-                if (!FailedProcessingResults.Post(new FailedProcessingResult { ProcessedResource = resource }))
-                    _log.Error($"Failed to post data to buffer block named [{nameof(FailedProcessingResults)}].");
-            }
+            #endregion Local Functions
         }
     }
 }

@@ -12,7 +12,7 @@ namespace Helix.Crawler
 
         public virtual Task Completion => _transformManyBlock.Completion;
 
-        protected TransformManyBlock(CancellationToken cancellationToken, bool ensureOrdered = false, int maxDegreeOfParallelism = -1)
+        protected TransformManyBlock(CancellationToken cancellationToken, bool ensureOrdered = false, int maxDegreeOfParallelism = 1)
         {
             _transformManyBlock = new System.Threading.Tasks.Dataflow.TransformManyBlock<TInput, TOutput>(
                 input => Transform(input),

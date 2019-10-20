@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using Helix.Crawler.Abstractions;
+using Newtonsoft.Json;
 
 namespace Helix.Crawler
 {
@@ -12,7 +13,7 @@ namespace Helix.Crawler
         public static string GetAbsoluteUrl(this Resource resource)
         {
             return resource.Uri != null
-                ? resource.OriginalUrl.EndsWith("/") ? resource.Uri?.AbsoluteUri : resource.Uri?.AbsoluteUri.TrimEnd('/')
+                ? resource.OriginalUrl.EndsWith("/") ? resource.Uri.AbsoluteUri : resource.Uri.AbsoluteUri.TrimEnd('/')
                 : resource.OriginalUrl;
         }
 
@@ -48,6 +49,8 @@ namespace Helix.Crawler
         public static bool IsCompilerGenerated(this Type type) => type.GetCustomAttribute(typeof(CompilerGeneratedAttribute), true) != null;
 
         public static bool IsWithinBrokenRange(this StatusCode statusCode) { return (int) statusCode < 0 || 400 <= (int) statusCode; }
+
+        public static string ToJson(this object @object) { return JsonConvert.SerializeObject(@object); }
 
         public static VerificationResult ToVerificationResult(this Resource resource)
         {

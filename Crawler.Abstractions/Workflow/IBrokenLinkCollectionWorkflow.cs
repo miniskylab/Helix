@@ -1,12 +1,12 @@
-using System;
+using System.Collections.Concurrent;
 
 namespace Helix.Crawler.Abstractions
 {
     public interface IBrokenLinkCollectionWorkflow
     {
-        int RemainingWorkload { get; }
+        BlockingCollection<Event> Events { get; }
 
-        event Action<Event> OnEventBroadcast;
+        int RemainingWorkload { get; }
 
         void SignalShutdown();
 

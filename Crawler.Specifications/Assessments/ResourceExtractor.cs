@@ -25,11 +25,15 @@ namespace Helix.Crawler.Specifications
             {
                 var extractedResources = resourceExtractor.ExtractResourcesFrom(inputHtmlDocument);
                 Assert.Equal(expectedOutputResources.Count, extractedResources.Count);
+
                 for (var index = 0; index < expectedOutputResources.Count; index++)
                 {
                     Assert.Equal(expectedOutputResources[index].OriginalUrl, extractedResources[index].OriginalUrl);
                     Assert.StrictEqual(expectedOutputResources[index].ParentUri, extractedResources[index].ParentUri);
-                    Assert.Equal(expectedOutputResources[index].IsExtracted, extractedResources[index].IsExtracted);
+                    Assert.Equal(
+                        expectedOutputResources[index].IsExtractedFromHtmlDocument,
+                        extractedResources[index].IsExtractedFromHtmlDocument
+                    );
                 }
             }
         }

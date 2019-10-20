@@ -195,11 +195,12 @@ namespace Helix.Gui
                     DisableCloseButton = _isClosing,
                     ShowWaitingOverlay = _isClosing,
                     BorderColor = _brokenLinkCollector.CrawlerState == CrawlerState.Faulted ? BorderColor.Error : BorderColor.Normal,
-                    StatusText = _brokenLinkCollector.CrawlerState == CrawlerState.Faulted
-                        ? "One or more errors occurred. Check the logs for more details."
-                        : _brokenLinkCollector.CrawlerState == CrawlerState.RanToCompletion
-                            ? "The crawling task has completed."
-                            : $"{@event.Message}."
+                    StatusText = _brokenLinkCollector.CrawlerState switch
+                    {
+                        CrawlerState.Faulted => "One or more errors occurred. Check the logs for more details.",
+                        CrawlerState.RanToCompletion => "The crawling task has completed.",
+                        _ => $"{@event.Message}."
+                    }
                 });
 
                 _constantRedrawTask?.Wait();
@@ -290,6 +291,7 @@ namespace Helix.Gui
             {
                 _brokenLinkCollector.OnEventBroadcast += OnStopProgressUpdated;
                 _brokenLinkCollector.Stop();
+                _brokenLinkCollector.Dispose();
 
                 var waitingTime = TimeSpan.FromMinutes(1);
                 if (_constantRedrawTask == null || _constantRedrawTask.Wait(waitingTime)) return;

@@ -8,9 +8,9 @@ namespace Helix.Crawler
 {
     public sealed class EventBroadcaster : IEventBroadcaster
     {
-        CancellationTokenSource _cancellationTokenSource;
+        readonly CancellationTokenSource _cancellationTokenSource;
         readonly Task _eventBroadcastTask;
-        BlockingCollection<Event> _events;
+        readonly BlockingCollection<Event> _events;
         bool _objectDisposed;
 
         public event Action<Event> OnEventBroadcast;
@@ -24,21 +24,19 @@ namespace Helix.Crawler
 
             _eventBroadcastTask = Task.Run(() =>
             {
-                while (!CancellationRequestedAndNoEventInQueue())
+                try
                 {
-                    try
+                    while (!_cancellationTokenSource.IsCancellationRequested)
                     {
                         var @event = _events.Take(_cancellationTokenSource.Token);
                         OnEventBroadcast?.Invoke(@event);
                     }
-                    catch (Exception exception) when (exception.IsAcknowledgingOperationCancelledException(_cancellationTokenSource.Token))
-                    {
-                        while (_events.TryTake(out var @event))
-                            OnEventBroadcast?.Invoke(@event);
-                    }
                 }
-
-                bool CancellationRequestedAndNoEventInQueue() => _cancellationTokenSource.IsCancellationRequested && _events.Count == 0;
+                catch (Exception exception) when (exception.IsAcknowledgingOperationCancelledException(_cancellationTokenSource.Token))
+                {
+                    while (_events.TryTake(out var @event))
+                        OnEventBroadcast?.Invoke(@event);
+                }
             }, _cancellationTokenSource.Token);
         }
 
@@ -55,13 +53,8 @@ namespace Helix.Crawler
             _cancellationTokenSource?.Cancel();
             _eventBroadcastTask?.Wait();
             _eventBroadcastTask?.Dispose();
-
             _cancellationTokenSource?.Dispose();
-            _cancellationTokenSource = null;
-
-            if (_events == null) return;
-            _events.Dispose();
-            _events = null;
+            _events?.Dispose();
 
             _objectDisposed = true;
         }

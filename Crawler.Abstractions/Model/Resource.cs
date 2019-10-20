@@ -6,7 +6,7 @@ namespace Helix.Crawler.Abstractions
     {
         public int Id { get; set; }
 
-        public bool IsExtracted { get; set; }
+        public bool IsExtractedFromHtmlDocument { get; set; }
 
         public bool IsInternal { get; set; }
 

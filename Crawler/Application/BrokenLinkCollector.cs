@@ -4,15 +4,18 @@ using System.IO;
 using System.Net;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
 using Helix.Core;
 using Helix.Crawler.Abstractions;
 using log4net;
 
 namespace Helix.Crawler
 {
-    public class BrokenLinkCollector : Application
+    public class BrokenLinkCollector : Application, IDisposable
     {
         IBrokenLinkCollectionWorkflow _brokenLinkCollectionWorkflow;
+        readonly Task _brokenLinkCollectionWorkflowEventConsumingTask;
+        readonly CancellationTokenSource _brokenLinkCollectionWorkflowEventConsumingTaskCts;
         readonly ILog _log;
         readonly StateMachine<CrawlerState, CrawlerCommand> _stateMachine;
 
@@ -28,6 +31,32 @@ namespace Helix.Crawler
         {
             _log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
             _stateMachine = new StateMachine<CrawlerState, CrawlerCommand>(PossibleTransitions(), CrawlerState.WaitingForInitialization);
+            _brokenLinkCollectionWorkflowEventConsumingTaskCts = new CancellationTokenSource();
+
+            var cancellationToken = _brokenLinkCollectionWorkflowEventConsumingTaskCts.Token;
+            _brokenLinkCollectionWorkflowEventConsumingTask = new Task(() =>
+            {
+                var eventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
+                try
+                {
+                    while (!cancellationToken.IsCancellationRequested)
+                    {
+                        var @event = _brokenLinkCollectionWorkflow.Events.Take(cancellationToken);
+                        eventBroadcaster.Broadcast(@event);
+
+                        if (@event.EventType == EventType.NoMoreWorkToDo)
+                            Shutdown(CrawlerCommand.MarkAsRanToCompletion);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    if (exception.IsAcknowledgingOperationCancelledException(cancellationToken))
+                        while (_brokenLinkCollectionWorkflow.Events.TryTake(out var @event))
+                            eventBroadcaster.Broadcast(@event);
+                    else
+                        _log.Error("One or more errors occured while consuming event.", exception);
+                }
+            }, cancellationToken);
 
             Dictionary<Transition<CrawlerState, CrawlerCommand>, CrawlerState> PossibleTransitions()
             {
@@ -58,6 +87,14 @@ namespace Helix.Crawler
             // TODO: A workaround for .Net Core 2.x bug. Should be removed in the future.
             AppContext.SetSwitch("System.Net.Http.UseSocketsHttpHandler", false);
             ServicePointManager.DefaultConnectionLimit = int.MaxValue;
+        }
+
+        public void Dispose()
+        {
+            _brokenLinkCollectionWorkflowEventConsumingTask?.Wait();
+            _brokenLinkCollectionWorkflowEventConsumingTask?.Dispose();
+            _brokenLinkCollectionWorkflowEventConsumingTaskCts?.Dispose();
+            _stateMachine?.Dispose();
         }
 
         public void Stop() { Shutdown(CrawlerCommand.MarkAsCancelled); }
@@ -97,15 +134,14 @@ namespace Helix.Crawler
                 {
                     _log.Info("Setting up and configuring services ...");
                     ServiceLocator.SetupAndConfigureServices(configurations);
-
-                    _brokenLinkCollectionWorkflow = ServiceLocator.Get<IBrokenLinkCollectionWorkflow>();
-
                     ServiceLocator.Get<IEventBroadcaster>().OnEventBroadcast += @event =>
                     {
                         OnEventBroadcast?.Invoke(@event);
                         if (@event.EventType != EventType.ResourceVerified && !string.IsNullOrWhiteSpace(@event.Message))
                             _log.Info(@event.Message);
                     };
+
+                    _brokenLinkCollectionWorkflow = ServiceLocator.Get<IBrokenLinkCollectionWorkflow>();
                 }
                 void RecreateDirectoryContainingScreenshotFiles()
                 {
@@ -118,11 +154,7 @@ namespace Helix.Crawler
                     var eventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
                     eventBroadcaster.Broadcast(StartProgressUpdatedEvent($"Activating {nameof(BrokenLinkCollectionWorkflow)} ..."));
 
-                    ServiceLocator.Get<IBrokenLinkCollectionWorkflow>().OnEventBroadcast += @event =>
-                    {
-                        if (@event.EventType != EventType.NoMoreWorkToDo) return;
-                        Shutdown(CrawlerCommand.MarkAsRanToCompletion);
-                    };
+                    _brokenLinkCollectionWorkflowEventConsumingTask.Start();
                     return ServiceLocator.Get<IBrokenLinkCollectionWorkflow>().TryActivate(configurations.StartUri.AbsoluteUri);
                 }
                 void StartHardwareMonitorService()
@@ -161,11 +193,14 @@ namespace Helix.Crawler
                         EventType = EventType.Completed,
                         Message = Enum.GetName(typeof(CrawlerState), CrawlerState)
                     });
+                    _log.Info(Enum.GetName(typeof(CrawlerState), _stateMachine.CurrentState));
                 }
                 catch (Exception exception)
                 {
                     _log.Error($"One or more errors occurred when stopping {nameof(BrokenLinkCollector)}.", exception);
                 }
+
+                #region Local Functions
 
                 void StopHardwareMonitorService()
                 {
@@ -189,11 +224,14 @@ namespace Helix.Crawler
                 {
                     try
                     {
-                        ServiceLocator.Get<IBrokenLinkCollectionWorkflow>().SignalShutdown();
-                        ServiceLocator.Get<IBrokenLinkCollectionWorkflow>().WaitForCompletion();
-
                         var eventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
                         eventBroadcaster.Broadcast(StopProgressUpdatedEvent("Waiting for background tasks to complete ..."));
+
+                        _brokenLinkCollectionWorkflow.SignalShutdown();
+                        ServiceLocator.Get<CancellationTokenSource>().Cancel();
+
+                        ServiceLocator.Get<IBrokenLinkCollectionWorkflow>().WaitForCompletion();
+                        _brokenLinkCollectionWorkflowEventConsumingTaskCts.Cancel();
                     }
                     catch (Exception exception)
                     {
@@ -225,6 +263,8 @@ namespace Helix.Crawler
                         Message = message
                     };
                 }
+
+                #endregion Local Functions
             });
             if (!stateTransitionSucceeded) _log.StateTransitionFailureEvent(_stateMachine.CurrentState, CrawlerCommand.Stop);
         }

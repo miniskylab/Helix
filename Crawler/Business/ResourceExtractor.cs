@@ -31,7 +31,7 @@ namespace Helix.Crawler
                     {
                         ParentUri = htmlDocument.Uri,
                         OriginalUrl = extractedUrl,
-                        IsExtracted = true
+                        IsExtractedFromHtmlDocument = true
                     }
                 );
 

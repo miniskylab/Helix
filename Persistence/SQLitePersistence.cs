@@ -16,36 +16,30 @@ namespace Helix.Persistence
 
             void EnsureDatabaseIsRecreated()
             {
-                using (var reportDatabaseContext = new SqLiteDbContext(pathToDatabaseFile))
-                {
-                    reportDatabaseContext.Database.EnsureDeleted();
-                    reportDatabaseContext.Database.EnsureCreated();
-                }
+                using var reportDatabaseContext = new SqLiteDbContext(pathToDatabaseFile);
+                reportDatabaseContext.Database.EnsureDeleted();
+                reportDatabaseContext.Database.EnsureCreated();
             }
         }
 
         public TDataTransferObject GetByPrimaryKey(params object[] primaryKeyValues)
         {
-            using (var sqLiteDbContext = new SqLiteDbContext(_pathToDatabaseFile))
-                return sqLiteDbContext.DataTransferObjects.Find(primaryKeyValues);
+            using var sqLiteDbContext = new SqLiteDbContext(_pathToDatabaseFile);
+            return sqLiteDbContext.DataTransferObjects.Find(primaryKeyValues);
         }
 
         public void Save(params TDataTransferObject[] dataTransferObjects)
         {
-            using (var sqLiteDbContext = new SqLiteDbContext(_pathToDatabaseFile))
-            {
-                sqLiteDbContext.DataTransferObjects.AddRange(dataTransferObjects);
-                sqLiteDbContext.SaveChanges();
-            }
+            using var sqLiteDbContext = new SqLiteDbContext(_pathToDatabaseFile);
+            sqLiteDbContext.DataTransferObjects.AddRange(dataTransferObjects);
+            sqLiteDbContext.SaveChanges();
         }
 
         public void Update(params TDataTransferObject[] dataTransferObjects)
         {
-            using (var sqLiteDbContext = new SqLiteDbContext(_pathToDatabaseFile))
-            {
-                sqLiteDbContext.DataTransferObjects.UpdateRange(dataTransferObjects);
-                sqLiteDbContext.SaveChanges();
-            }
+            using var sqLiteDbContext = new SqLiteDbContext(_pathToDatabaseFile);
+            sqLiteDbContext.DataTransferObjects.UpdateRange(dataTransferObjects);
+            sqLiteDbContext.SaveChanges();
         }
 
         class SqLiteDbContext : DbContext
