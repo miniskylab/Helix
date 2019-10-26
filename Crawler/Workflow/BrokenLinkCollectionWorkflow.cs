@@ -39,7 +39,42 @@ namespace Helix.Crawler
             Events = new BlockingCollection<Event>();
 
             _eventBroadcastCts = new CancellationTokenSource();
-            _eventBroadcastTask = new Task(() =>
+            _eventBroadcastTask = new Task(BroadcastEvents, _eventBroadcastCts.Token);
+
+            WireUpBlocks();
+
+            #region Local Functions
+
+            void WireUpBlocks()
+            {
+                _coordinatorBlock.LinkTo(NullTarget<Resource>(), PropagateNullObjectsOnly<Resource>());
+                _coordinatorBlock.LinkTo(_resourceVerifierBlock);
+                _coordinatorBlock.Events.LinkTo(_eventBroadcasterBlock);
+
+                _resourceVerifierBlock.LinkTo(NullTarget<Resource>(), PropagateNullObjectsOnly<Resource>());
+                _resourceVerifierBlock.LinkTo(_htmlRendererBlock);
+                _resourceVerifierBlock.FailedProcessingResults.LinkTo(_coordinatorBlock);
+                _resourceVerifierBlock.VerificationResults.LinkTo(_reportWriterBlock);
+
+                _htmlRendererBlock.LinkTo(NullTarget<RenderingResult>(), PropagateNullObjectsOnly<RenderingResult>());
+                _htmlRendererBlock.LinkTo(_processingResultGeneratorBlock);
+                _htmlRendererBlock.VerificationResults.LinkTo(_reportWriterBlock);
+                _htmlRendererBlock.FailedProcessingResults.LinkTo(_coordinatorBlock);
+                _htmlRendererBlock.Events.LinkTo(_eventBroadcasterBlock);
+
+                _processingResultGeneratorBlock.LinkTo(NullTarget<ProcessingResult>(), PropagateNullObjectsOnly<ProcessingResult>());
+                _processingResultGeneratorBlock.LinkTo(_coordinatorBlock);
+
+                _eventBroadcasterBlock.LinkTo(NullTarget<Event>(), PropagateNullObjectsOnly<Event>());
+
+                #region Local Functions
+
+                Predicate<T> PropagateNullObjectsOnly<T>() { return @object => @object == null; }
+                ITargetBlock<T> NullTarget<T>() { return DataflowBlock.NullTarget<T>(); }
+
+                #endregion Local Functions
+            }
+            void BroadcastEvents()
             {
                 try
                 {
@@ -50,38 +85,6 @@ namespace Helix.Crawler
                 {
                     log.Error("One or more errors occured while broadcast event.", exception);
                 }
-            }, _eventBroadcastCts.Token);
-
-            WireUpBlocks();
-
-            #region Local Functions
-
-            void WireUpBlocks()
-            {
-                var generalDataflowLinkOptions = new DataflowLinkOptions { PropagateCompletion = true };
-
-                _coordinatorBlock.LinkTo(NullTarget<Resource>(), PropagateNullObjectsOnly<Resource>());
-                _coordinatorBlock.LinkTo(_resourceVerifierBlock, generalDataflowLinkOptions);
-                _coordinatorBlock.Events.LinkTo(_eventBroadcasterBlock);
-
-                _resourceVerifierBlock.LinkTo(NullTarget<Resource>(), PropagateNullObjectsOnly<Resource>());
-                _resourceVerifierBlock.LinkTo(_htmlRendererBlock, generalDataflowLinkOptions);
-                _resourceVerifierBlock.FailedProcessingResults.LinkTo(_coordinatorBlock);
-                _resourceVerifierBlock.VerificationResults.LinkTo(_reportWriterBlock);
-
-                _htmlRendererBlock.LinkTo(NullTarget<RenderingResult>(), PropagateNullObjectsOnly<RenderingResult>());
-                _htmlRendererBlock.LinkTo(_processingResultGeneratorBlock, generalDataflowLinkOptions);
-                _htmlRendererBlock.VerificationResults.LinkTo(_reportWriterBlock, generalDataflowLinkOptions);
-                _htmlRendererBlock.FailedProcessingResults.LinkTo(_coordinatorBlock);
-                _htmlRendererBlock.Events.LinkTo(_eventBroadcasterBlock, generalDataflowLinkOptions);
-
-                _processingResultGeneratorBlock.LinkTo(NullTarget<ProcessingResult>(), PropagateNullObjectsOnly<ProcessingResult>());
-                _processingResultGeneratorBlock.LinkTo(_coordinatorBlock);
-
-                _eventBroadcasterBlock.LinkTo(NullTarget<Event>(), PropagateNullObjectsOnly<Event>());
-
-                Predicate<T> PropagateNullObjectsOnly<T>() { return @object => @object == null; }
-                ITargetBlock<T> NullTarget<T>() { return DataflowBlock.NullTarget<T>(); }
             }
 
             #endregion Local Functions
@@ -94,20 +97,112 @@ namespace Helix.Crawler
             Events?.Dispose();
         }
 
-        public void SignalShutdown()
+        public void Shutdown()
         {
-            try
-            {
-                _eventBroadcastCts.Cancel();
-                _eventBroadcastTask.Wait();
+            CompleteResourceVerifierBlock();
+            CompleteHtmlRendererBlock();
+            CompleteProcessingResultGeneratorBlock();
+            CompleteReportWriterBlock();
+            CompleteCoordinatorBlock();
+            CancelEventBroadcastTask();
+            CompleteEventBroadcasterBlock();
 
-                _coordinatorBlock.SignalShutdown();
-            }
-            catch (Exception exception)
+            #region Local Functions
+
+            void CompleteResourceVerifierBlock()
             {
-                if (exception.IsAcknowledgingOperationCancelledException(_eventBroadcastCts.Token)) return;
-                _log.Error($"One or more errors occurred while signaling shutdown for {nameof(BrokenLinkCollectionWorkflow)}.", exception);
+                try
+                {
+                    _resourceVerifierBlock.Complete();
+                    _resourceVerifierBlock.Completion.Wait();
+                }
+                catch (Exception exception)
+                {
+                    if (exception.IsAcknowledgingOperationCancelledException(CancellationToken.None)) return;
+                    _log.Error($"One or more errors occurred while completing {nameof(ResourceVerifierBlock)}.", exception);
+                }
             }
+            void CompleteHtmlRendererBlock()
+            {
+                try
+                {
+                    _htmlRendererBlock.Complete();
+                    _htmlRendererBlock.Completion.Wait();
+                }
+                catch (Exception exception)
+                {
+                    if (exception.IsAcknowledgingOperationCancelledException(CancellationToken.None)) return;
+                    _log.Error($"One or more errors occurred while completing {nameof(HtmlRendererBlock)}.", exception);
+                }
+            }
+            void CompleteProcessingResultGeneratorBlock()
+            {
+                try
+                {
+                    _processingResultGeneratorBlock.Complete();
+                    _processingResultGeneratorBlock.Completion.Wait();
+                }
+                catch (Exception exception)
+                {
+                    if (exception.IsAcknowledgingOperationCancelledException(CancellationToken.None)) return;
+                    _log.Error($"One or more errors occurred while completing {nameof(ProcessingResultGeneratorBlock)}.", exception);
+                }
+            }
+            void CompleteReportWriterBlock()
+            {
+                try
+                {
+                    _reportWriterBlock.Complete();
+                    _reportWriterBlock.Completion.Wait();
+                }
+                catch (Exception exception)
+                {
+                    if (exception.IsAcknowledgingOperationCancelledException(CancellationToken.None)) return;
+                    _log.Error($"One or more errors occurred while completing {nameof(ReportWriterBlock)}.", exception);
+                }
+            }
+            void CompleteCoordinatorBlock()
+            {
+                try
+                {
+                    _coordinatorBlock.Complete();
+                    _coordinatorBlock.TryReceiveAll(out _);
+                    _coordinatorBlock.Completion.Wait();
+                }
+                catch (Exception exception)
+                {
+                    if (exception.IsAcknowledgingOperationCancelledException(CancellationToken.None)) return;
+                    _log.Error($"One or more errors occurred while completing {nameof(CoordinatorBlock)}.", exception);
+                }
+            }
+            void CancelEventBroadcastTask()
+            {
+                try
+                {
+                    _eventBroadcastCts.Cancel();
+                    _eventBroadcastTask.Wait();
+                }
+                catch (Exception exception)
+                {
+                    if (exception.IsAcknowledgingOperationCancelledException(_eventBroadcastCts.Token)) return;
+                    _log.Error("One or more errors occurred while cancelling event broadcast task.", exception);
+                }
+            }
+            void CompleteEventBroadcasterBlock()
+            {
+                try
+                {
+                    _eventBroadcasterBlock.Complete();
+                    _eventBroadcasterBlock.Completion.Wait();
+                }
+                catch (Exception exception)
+                {
+                    if (exception.IsAcknowledgingOperationCancelledException(CancellationToken.None)) return;
+                    _log.Error($"One or more errors occurred while completing {nameof(EventBroadcasterBlock)}.", exception);
+                }
+            }
+
+            #endregion
         }
 
         public bool TryActivate(string startUrl)
@@ -116,26 +211,6 @@ namespace Helix.Crawler
             if (activationSucceeded) _eventBroadcastTask.Start();
 
             return activationSucceeded;
-        }
-
-        public void WaitForCompletion()
-        {
-            try
-            {
-                Task.WhenAll(
-                    _coordinatorBlock.Completion,
-                    _eventBroadcasterBlock.Completion,
-                    _htmlRendererBlock.Completion,
-                    _processingResultGeneratorBlock.Completion,
-                    _reportWriterBlock.Completion,
-                    _resourceVerifierBlock.Completion
-                ).Wait();
-            }
-            catch (Exception exception)
-            {
-                if (exception.IsAcknowledgingOperationCancelledException(CancellationToken.None)) return;
-                _log.Error("One or more errors occurred while waiting for all blocks to complete.", exception);
-            }
         }
     }
 }

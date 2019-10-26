@@ -113,7 +113,6 @@ namespace Helix.Crawler
                     containerBuilder.RegisterInstance(configurations).AsSelf();
                     containerBuilder.RegisterInstance(Activator.CreateInstance<EventBroadcaster>()).As<IEventBroadcaster>();
 
-                    containerBuilder.RegisterType<CancellationTokenSource>().AsSelf().SingleInstance();
                     containerBuilder.RegisterType<IncrementalIdGenerator>().As<IIncrementalIdGenerator>().SingleInstance();
                     containerBuilder.RegisterType<Statistics>().As<IStatistics>().SingleInstance();
                     containerBuilder.RegisterType<ReportWriter>().As<IReportWriter>().SingleInstance();

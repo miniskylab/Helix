@@ -1,30 +1,29 @@
 using System;
-using System.Threading;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 
 namespace Helix.Crawler
 {
-    public abstract class TransformBlock<TInput, TOutput> : IPropagatorBlock<TInput, TOutput>
+    public abstract class TransformBlock<TInput, TOutput> : IPropagatorBlock<TInput, TOutput>, IReceivableSourceBlock<TOutput>
     {
         readonly System.Threading.Tasks.Dataflow.TransformBlock<TInput, TOutput> _transformBlock;
 
         public virtual Task Completion => _transformBlock.Completion;
 
-        protected TransformBlock(CancellationToken cancellationToken, bool ensureOrdered = false, int maxDegreeOfParallelism = 1)
+        protected TransformBlock(bool ensureOrdered = false, int maxDegreeOfParallelism = 1)
         {
             _transformBlock = new System.Threading.Tasks.Dataflow.TransformBlock<TInput, TOutput>(
                 input => Transform(input),
                 new ExecutionDataflowBlockOptions
                 {
                     EnsureOrdered = ensureOrdered,
-                    CancellationToken = cancellationToken,
                     MaxDegreeOfParallelism = maxDegreeOfParallelism
                 }
             );
         }
 
-        public void Complete() { _transformBlock.Complete(); }
+        public virtual void Complete() { _transformBlock.Complete(); }
 
         public TOutput ConsumeMessage(DataflowMessageHeader messageHeader, ITargetBlock<TOutput> target, out bool messageConsumed)
         {
@@ -53,6 +52,10 @@ namespace Helix.Crawler
         {
             return ((ISourceBlock<TOutput>) _transformBlock).ReserveMessage(messageHeader, target);
         }
+
+        public bool TryReceive(Predicate<TOutput> filter, out TOutput item) { return _transformBlock.TryReceive(filter, out item); }
+
+        public bool TryReceiveAll(out IList<TOutput> items) { return _transformBlock.TryReceiveAll(out items); }
 
         protected abstract TOutput Transform(TInput input);
     }

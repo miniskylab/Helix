@@ -28,8 +28,7 @@ namespace Helix.Crawler
 
         public int RemainingWorkload => _remainingWorkload;
 
-        public CoordinatorBlock(CancellationToken cancellationToken, IResourceEnricher resourceEnricher, IStatistics statistics, ILog log)
-            : base(cancellationToken)
+        public CoordinatorBlock(IResourceEnricher resourceEnricher, IStatistics statistics, ILog log)
         {
             _log = log;
             _remainingWorkload = 0;
@@ -42,8 +41,7 @@ namespace Helix.Crawler
                 new Dictionary<Transition<WorkflowState, WorkflowCommand>, WorkflowState>
                 {
                     { Transition(WorkflowState.WaitingForActivation, WorkflowCommand.Activate), WorkflowState.Activated },
-                    { Transition(WorkflowState.Activated, WorkflowCommand.Deactivate), WorkflowState.WaitingForActivation },
-                    { Transition(WorkflowState.Activated, WorkflowCommand.SignalShutdown), WorkflowState.SignaledForShutdown }
+                    { Transition(WorkflowState.Activated, WorkflowCommand.Deactivate), WorkflowState.WaitingForActivation }
                 },
                 WorkflowState.WaitingForActivation
             );
@@ -58,19 +56,6 @@ namespace Helix.Crawler
         }
 
         public void Dispose() { _stateMachine?.Dispose(); }
-
-        public void SignalShutdown()
-        {
-            var stateTransitionSucceeded = _stateMachine.TryTransitNext(WorkflowCommand.SignalShutdown, () =>
-            {
-                try { Complete(); }
-                catch (Exception exception)
-                {
-                    _log.Error("One or more errors occurred while signaling shutdown for workflow.", exception);
-                }
-            });
-            if (!stateTransitionSucceeded) _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WorkflowCommand.SignalShutdown);
-        }
 
         public bool TryActivateWorkflow(string startUrl)
         {
@@ -116,18 +101,22 @@ namespace Helix.Crawler
                 if (processingResult == null)
                     throw new ArgumentNullException(nameof(processingResult));
 
-                CheckIfProcessedResourceWasRegistered();
-                UpdateStatistics();
-                SendOutResourceVerifiedEvent();
+                var isNotStartResource = processingResult.ProcessedResource != null;
+                if (isNotStartResource)
+                {
+                    CheckIfProcessedResourceWasRegistered();
+                    UpdateStatistics();
+                    SendOutResourceVerifiedEvent();
+                }
                 var newlyDiscoveredResources = RegisterNewlyDiscoveredResources();
 
                 Interlocked.Decrement(ref _remainingWorkload);
-                if (_remainingWorkload != 0) return new List<Resource>();
+                if (_remainingWorkload != 0) return new ReadOnlyCollection<Resource>(newlyDiscoveredResources);
 
                 if (!Events.Post(new Event { EventType = EventType.NoMoreWorkToDo }))
                     _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
 
-                return new ReadOnlyCollection<Resource>(newlyDiscoveredResources);
+                return new List<Resource>();
 
                 #region Local Functions
 
@@ -135,8 +124,7 @@ namespace Helix.Crawler
                 {
                     lock (_memorizationLock)
                     {
-                        var isNotStartResource = processingResult.ProcessedResource != null;
-                        if (isNotStartResource && !_alreadyProcessedUrls.Contains(processingResult.ProcessedResource.GetAbsoluteUrl()))
+                        if (!_alreadyProcessedUrls.Contains(processingResult.ProcessedResource.GetAbsoluteUrl()))
                             throw new InvalidConstraintException($"Processed resource was not registered by {nameof(CoordinatorBlock)}.");
                     }
                 }

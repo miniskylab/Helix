@@ -10,7 +10,7 @@ namespace Helix.Crawler
 {
     internal class ResourceVerifierBlock : TransformBlock<Resource, Resource>, IResourceVerifierBlock, IDisposable
     {
-        readonly CancellationToken _cancellationToken;
+        readonly CancellationTokenSource _cancellationTokenSource;
         readonly ILog _log;
         readonly IResourceVerifier _resourceVerifier;
 
@@ -24,16 +24,15 @@ namespace Helix.Crawler
             FailedProcessingResults.Completion
         );
 
-        public ResourceVerifierBlock(CancellationToken cancellationToken, IResourceVerifier resourceVerifier, ILog log)
-            : base(cancellationToken, maxDegreeOfParallelism: Environment.ProcessorCount)
+        public ResourceVerifierBlock(Configurations configurations, IResourceVerifier resourceVerifier, ILog log)
+            : base(maxDegreeOfParallelism: configurations.MaxNetworkConnectionCount)
         {
             _log = log;
             _resourceVerifier = resourceVerifier;
-            _cancellationToken = cancellationToken;
+            _cancellationTokenSource = new CancellationTokenSource();
 
-            var dataflowBlockOptions = new DataflowBlockOptions { CancellationToken = cancellationToken };
-            VerificationResults = new BufferBlock<VerificationResult>(dataflowBlockOptions);
-            FailedProcessingResults = new BufferBlock<FailedProcessingResult>(dataflowBlockOptions);
+            VerificationResults = new BufferBlock<VerificationResult>();
+            FailedProcessingResults = new BufferBlock<FailedProcessingResult>();
 
             base.Completion.ContinueWith(_ =>
             {
@@ -42,7 +41,25 @@ namespace Helix.Crawler
             });
         }
 
-        public void Dispose() { _resourceVerifier?.Dispose(); }
+        public override void Complete()
+        {
+            try
+            {
+                base.Complete();
+                _cancellationTokenSource.Cancel();
+            }
+            catch (Exception exception)
+            {
+                if (exception.IsAcknowledgingOperationCancelledException(_cancellationTokenSource.Token)) return;
+                _log.Error($"One or more errors occurred while completing {nameof(ResourceVerifierBlock)}.", exception);
+            }
+        }
+
+        public void Dispose()
+        {
+            _resourceVerifier?.Dispose();
+            _cancellationTokenSource?.Dispose();
+        }
 
         protected override Resource Transform(Resource resource)
         {
@@ -54,7 +71,7 @@ namespace Helix.Crawler
                 VerificationResult verificationResult = null;
                 if (resource.IsExtractedFromHtmlDocument)
                 {
-                    if (!_resourceVerifier.TryVerify(resource, _cancellationToken, out verificationResult))
+                    if (!_resourceVerifier.TryVerify(resource, _cancellationTokenSource.Token, out verificationResult))
                         return ProcessUnsuccessfulVerification(
                             $"Failed to be verified {nameof(Resource)} was discarded: {resource.ToJson()}.",
                             LogLevel.Information

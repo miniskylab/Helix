@@ -50,7 +50,7 @@ namespace Helix.Crawler
                 }
                 void PreCreateResourceVerifiers()
                 {
-                    for (var resourceVerifierId = 0; resourceVerifierId < configurations.ResourceVerifierCount; resourceVerifierId++)
+                    for (var resourceVerifierId = 0; resourceVerifierId < configurations.MaxNetworkConnectionCount; resourceVerifierId++)
                     {
                         var resourceVerifier = getResourceVerifier();
                         _resourceVerifierPool.Add(resourceVerifier);

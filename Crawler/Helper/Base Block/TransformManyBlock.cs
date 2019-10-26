@@ -1,31 +1,29 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 
 namespace Helix.Crawler
 {
-    public abstract class TransformManyBlock<TInput, TOutput> : IPropagatorBlock<TInput, TOutput>
+    public abstract class TransformManyBlock<TInput, TOutput> : IPropagatorBlock<TInput, TOutput>, IReceivableSourceBlock<TOutput>
     {
         readonly System.Threading.Tasks.Dataflow.TransformManyBlock<TInput, TOutput> _transformManyBlock;
 
         public virtual Task Completion => _transformManyBlock.Completion;
 
-        protected TransformManyBlock(CancellationToken cancellationToken, bool ensureOrdered = false, int maxDegreeOfParallelism = 1)
+        protected TransformManyBlock(bool ensureOrdered = false, int maxDegreeOfParallelism = 1)
         {
             _transformManyBlock = new System.Threading.Tasks.Dataflow.TransformManyBlock<TInput, TOutput>(
                 input => Transform(input),
                 new ExecutionDataflowBlockOptions
                 {
                     EnsureOrdered = ensureOrdered,
-                    CancellationToken = cancellationToken,
                     MaxDegreeOfParallelism = maxDegreeOfParallelism
                 }
             );
         }
 
-        public void Complete() { _transformManyBlock.Complete(); }
+        public virtual void Complete() { _transformManyBlock.Complete(); }
 
         public TOutput ConsumeMessage(DataflowMessageHeader messageHeader, ITargetBlock<TOutput> target, out bool messageConsumed)
         {
@@ -54,6 +52,10 @@ namespace Helix.Crawler
         {
             return ((ISourceBlock<TOutput>) _transformManyBlock).ReserveMessage(messageHeader, target);
         }
+
+        public bool TryReceive(Predicate<TOutput> filter, out TOutput item) { return _transformManyBlock.TryReceive(filter, out item); }
+
+        public bool TryReceiveAll(out IList<TOutput> items) { return _transformManyBlock.TryReceiveAll(out items); }
 
         protected abstract IEnumerable<TOutput> Transform(TInput input);
     }

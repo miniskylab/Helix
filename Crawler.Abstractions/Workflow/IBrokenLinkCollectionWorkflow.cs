@@ -8,10 +8,8 @@ namespace Helix.Crawler.Abstractions
 
         int RemainingWorkload { get; }
 
-        void SignalShutdown();
+        void Shutdown();
 
         bool TryActivate(string startUrl);
-
-        void WaitForCompletion();
     }
 }

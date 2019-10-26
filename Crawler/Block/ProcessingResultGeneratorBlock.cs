@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using Helix.Crawler.Abstractions;
 using log4net;
 using Newtonsoft.Json;
@@ -14,8 +13,7 @@ namespace Helix.Crawler
         readonly IResourceEnricher _resourceEnricher;
         readonly IResourceExtractor _resourceExtractor;
 
-        public ProcessingResultGeneratorBlock(CancellationToken cancellationToken, IResourceExtractor resourceExtractor, ILog log,
-            IResourceEnricher resourceEnricher) : base(cancellationToken)
+        public ProcessingResultGeneratorBlock(IResourceExtractor resourceExtractor, IResourceEnricher resourceEnricher, ILog log)
         {
             _log = log;
             _resourceEnricher = resourceEnricher;

@@ -13,7 +13,7 @@ namespace Helix.Crawler
 {
     public class HtmlRendererBlock : TransformBlock<Resource, RenderingResult>, IHtmlRendererBlock, IDisposable
     {
-        readonly CancellationToken _cancellationToken;
+        readonly CancellationTokenSource _cancellationTokenSource;
         readonly BlockingCollection<IHtmlRenderer> _htmlRenderers;
         readonly ILog _log;
         readonly IStatistics _statistics;
@@ -31,20 +31,18 @@ namespace Helix.Crawler
             FailedProcessingResults.Completion
         );
 
-        public HtmlRendererBlock(CancellationToken cancellationToken, IStatistics statistics, ILog log, Configurations configurations,
-            IHardwareMonitor hardwareMonitor, Func<IHtmlRenderer> getHtmlRenderer) : base(cancellationToken,
-            maxDegreeOfParallelism: Environment.ProcessorCount)
+        public HtmlRendererBlock(IStatistics statistics, ILog log, Configurations configurations, IHardwareMonitor hardwareMonitor,
+            Func<IHtmlRenderer> getHtmlRenderer) : base(maxDegreeOfParallelism: configurations.MaxHtmlRendererCount)
         {
             _log = log;
             _statistics = statistics;
-            _cancellationToken = cancellationToken;
             _htmlRenderers = new BlockingCollection<IHtmlRenderer>();
+            _cancellationTokenSource = new CancellationTokenSource();
             (int createdHtmlRenderCount, int disposedHtmlRendererCount) counter = (0, 0);
 
-            var dataflowBlockOptions = new DataflowBlockOptions { CancellationToken = cancellationToken };
-            VerificationResults = new BufferBlock<VerificationResult>(dataflowBlockOptions);
-            FailedProcessingResults = new BufferBlock<FailedProcessingResult>(dataflowBlockOptions);
-            Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true, CancellationToken = cancellationToken });
+            VerificationResults = new BufferBlock<VerificationResult>();
+            FailedProcessingResults = new BufferBlock<FailedProcessingResult>();
+            Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true });
 
             base.Completion.ContinueWith(_ =>
             {
@@ -139,7 +137,25 @@ namespace Helix.Crawler
             #endregion Local Functions
         }
 
-        public void Dispose() { _htmlRenderers?.Dispose(); }
+        public override void Complete()
+        {
+            try
+            {
+                base.Complete();
+                _cancellationTokenSource.Cancel();
+            }
+            catch (Exception exception)
+            {
+                if (exception.IsAcknowledgingOperationCancelledException(_cancellationTokenSource.Token)) return;
+                _log.Error($"One or more errors occurred while completing {nameof(HtmlRendererBlock)}.", exception);
+            }
+        }
+
+        public void Dispose()
+        {
+            _htmlRenderers?.Dispose();
+            _cancellationTokenSource?.Dispose();
+        }
 
         protected override RenderingResult Transform(Resource resource)
         {
@@ -157,7 +173,7 @@ namespace Helix.Crawler
                         LogLevel.Debug
                     );
 
-                htmlRenderer = _htmlRenderers.Take(_cancellationToken);
+                htmlRenderer = _htmlRenderers.Take(_cancellationTokenSource.Token);
                 htmlRenderer.OnResourceCaptured += CaptureResource;
 
                 var oldStatusCode = resource.StatusCode;
@@ -165,7 +181,7 @@ namespace Helix.Crawler
                     resource,
                     out var htmlText,
                     out var millisecondsPageLoadTime,
-                    _cancellationToken
+                    _cancellationTokenSource.Token
                 );
 
                 if (renderingFailed)
@@ -203,7 +219,7 @@ namespace Helix.Crawler
                     _statistics.IncrementTotalPageLoadTimeBy(millisecondsPageLoadTime.Value);
                 }
             }
-            catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(_cancellationToken))
+            catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(_cancellationTokenSource.Token))
             {
                 return ProcessUnsuccessfulRendering(
                     $"One or more errors occurred while rendering: {resource.ToJson()}.",
@@ -219,6 +235,8 @@ namespace Helix.Crawler
                     _htmlRenderers.Add(htmlRenderer, CancellationToken.None);
                 }
             }
+
+            #region Local Functions
 
             void CaptureResource(Resource capturedResource) { capturedResources.Add(capturedResource); }
             RenderingResult ProcessUnsuccessfulRendering(string logMessage, LogLevel logLevel, Exception exception = null)
@@ -252,6 +270,8 @@ namespace Helix.Crawler
 
                 return null;
             }
+
+            #endregion
         }
     }
 }

@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using Helix.Crawler.Abstractions;
 using log4net;
 using Newtonsoft.Json;
@@ -11,7 +10,7 @@ namespace Helix.Crawler
         readonly ILog _log;
         readonly IReportWriter _reportWriter;
 
-        public ReportWriterBlock(CancellationToken cancellationToken, IReportWriter reportWriter, ILog log) : base(cancellationToken)
+        public ReportWriterBlock(IReportWriter reportWriter, ILog log)
         {
             _log = log;
             _reportWriter = reportWriter;

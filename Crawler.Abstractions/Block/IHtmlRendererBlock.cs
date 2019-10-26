@@ -2,7 +2,7 @@ using System.Threading.Tasks.Dataflow;
 
 namespace Helix.Crawler.Abstractions
 {
-    public interface IHtmlRendererBlock : IPropagatorBlock<Resource, RenderingResult>
+    public interface IHtmlRendererBlock : IPropagatorBlock<Resource, RenderingResult>, IReceivableSourceBlock<RenderingResult>
     {
         BufferBlock<Event> Events { get; }
 

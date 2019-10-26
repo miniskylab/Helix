@@ -13,6 +13,8 @@ namespace Helix.Crawler.Abstractions
 
         public int MaxHtmlRendererCount { get; } = 10;
 
+        public int MaxNetworkConnectionCount { get; } = 2500;
+
         public static string PathToChromiumExecutable { get; } = Path.Combine(WorkingDirectory, "chromium/chrome.exe");
 
         public static string PathToDirectoryContainsScreenshotFiles { get; } = Path.Combine(WorkingDirectory, "screenshots");
@@ -29,8 +31,6 @@ namespace Helix.Crawler.Abstractions
         public string RemoteHost { get; }
 
         public int ResourceExtractorCount { get; } = 300;
-
-        public int ResourceVerifierCount { get; } = 2500;
 
         public Uri StartUri { get; }
 
