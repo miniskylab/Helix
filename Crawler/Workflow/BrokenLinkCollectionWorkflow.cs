@@ -68,7 +68,6 @@ namespace Helix.Crawler
                 _resourceVerifierBlock.LinkTo(_htmlRendererBlock, generalDataflowLinkOptions);
                 _resourceVerifierBlock.FailedProcessingResults.LinkTo(_coordinatorBlock);
                 _resourceVerifierBlock.VerificationResults.LinkTo(_reportWriterBlock);
-                _resourceVerifierBlock.Events.LinkTo(_eventBroadcasterBlock);
 
                 _htmlRendererBlock.LinkTo(NullTarget<RenderingResult>(), PropagateNullObjectsOnly<RenderingResult>());
                 _htmlRendererBlock.LinkTo(_processingResultGeneratorBlock, generalDataflowLinkOptions);

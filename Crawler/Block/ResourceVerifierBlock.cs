@@ -13,9 +13,6 @@ namespace Helix.Crawler
         readonly CancellationToken _cancellationToken;
         readonly ILog _log;
         readonly IResourceVerifier _resourceVerifier;
-        readonly IStatistics _statistics;
-
-        public BufferBlock<Event> Events { get; }
 
         public BufferBlock<FailedProcessingResult> FailedProcessingResults { get; }
 
@@ -24,26 +21,22 @@ namespace Helix.Crawler
         public override Task Completion => Task.WhenAll(
             base.Completion,
             VerificationResults.Completion,
-            FailedProcessingResults.Completion,
-            Events.Completion
+            FailedProcessingResults.Completion
         );
 
-        public ResourceVerifierBlock(CancellationToken cancellationToken, IStatistics statistics, IResourceVerifier resourceVerifier,
-            ILog log) : base(cancellationToken, maxDegreeOfParallelism: Environment.ProcessorCount)
+        public ResourceVerifierBlock(CancellationToken cancellationToken, IResourceVerifier resourceVerifier, ILog log)
+            : base(cancellationToken, maxDegreeOfParallelism: Environment.ProcessorCount)
         {
             _log = log;
-            _statistics = statistics;
             _resourceVerifier = resourceVerifier;
             _cancellationToken = cancellationToken;
 
             var dataflowBlockOptions = new DataflowBlockOptions { CancellationToken = cancellationToken };
             VerificationResults = new BufferBlock<VerificationResult>(dataflowBlockOptions);
             FailedProcessingResults = new BufferBlock<FailedProcessingResult>(dataflowBlockOptions);
-            Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true, CancellationToken = cancellationToken });
 
             base.Completion.ContinueWith(_ =>
             {
-                Events.Complete();
                 VerificationResults.Complete();
                 FailedProcessingResults.Complete();
             });
@@ -85,32 +78,15 @@ namespace Helix.Crawler
                 if (verificationResult == null)
                     verificationResult = resource.ToVerificationResult();
 
-                DoStatistics();
                 SendOutVerificationResult();
-                SendOutResourceVerifiedEvent();
                 return resource;
 
                 #region Local Functions
 
-                void DoStatistics()
-                {
-                    if (resource.StatusCode.IsWithinBrokenRange()) _statistics.IncrementBrokenUrlCount();
-                    else _statistics.IncrementValidUrlCount();
-                }
                 void SendOutVerificationResult()
                 {
                     if (!VerificationResults.Post(verificationResult) && !VerificationResults.Completion.IsCompleted)
                         _log.Error($"Failed to post data to buffer block named [{nameof(VerificationResults)}].");
-                }
-                void SendOutResourceVerifiedEvent()
-                {
-                    var resourceVerifiedEvent = new Event
-                    {
-                        EventType = EventType.ResourceVerified,
-                        Message = $"{verificationResult.StatusCode:D} - {verificationResult.VerifiedUrl}"
-                    };
-                    if (!Events.Post(resourceVerifiedEvent) && !Events.Completion.IsCompleted)
-                        _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
                 }
 
                 #endregion Local Functions

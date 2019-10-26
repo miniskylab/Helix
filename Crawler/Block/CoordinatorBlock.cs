@@ -20,6 +20,7 @@ namespace Helix.Crawler
         int _remainingWorkload;
         readonly IResourceEnricher _resourceEnricher;
         readonly StateMachine<WorkflowState, WorkflowCommand> _stateMachine;
+        readonly IStatistics _statistics;
 
         public BufferBlock<Event> Events { get; }
 
@@ -27,10 +28,12 @@ namespace Helix.Crawler
 
         public int RemainingWorkload => _remainingWorkload;
 
-        public CoordinatorBlock(CancellationToken cancellationToken, IResourceEnricher resourceEnricher, ILog log) : base(cancellationToken)
+        public CoordinatorBlock(CancellationToken cancellationToken, IResourceEnricher resourceEnricher, IStatistics statistics, ILog log)
+            : base(cancellationToken)
         {
             _log = log;
             _remainingWorkload = 0;
+            _statistics = statistics;
             _memorizationLock = new object();
             _resourceEnricher = resourceEnricher;
             _alreadyProcessedUrls = new HashSet<string>();
@@ -113,18 +116,51 @@ namespace Helix.Crawler
                 if (processingResult == null)
                     throw new ArgumentNullException(nameof(processingResult));
 
-                lock (_memorizationLock)
+                CheckIfProcessedResourceWasRegistered();
+                UpdateStatistics();
+                SendOutResourceVerifiedEvent();
+                var newlyDiscoveredResources = RegisterNewlyDiscoveredResources();
+
+                Interlocked.Decrement(ref _remainingWorkload);
+                if (_remainingWorkload != 0) return new List<Resource>();
+
+                if (!Events.Post(new Event { EventType = EventType.NoMoreWorkToDo }))
+                    _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
+
+                return new ReadOnlyCollection<Resource>(newlyDiscoveredResources);
+
+                #region Local Functions
+
+                void CheckIfProcessedResourceWasRegistered()
+                {
+                    lock (_memorizationLock)
+                    {
+                        var isNotStartResource = processingResult.ProcessedResource != null;
+                        if (isNotStartResource && !_alreadyProcessedUrls.Contains(processingResult.ProcessedResource.GetAbsoluteUrl()))
+                            throw new InvalidConstraintException($"Processed resource was not registered by {nameof(CoordinatorBlock)}.");
+                    }
+                }
+                void UpdateStatistics()
+                {
+                    if (processingResult.ProcessedResource.StatusCode.IsWithinBrokenRange()) _statistics.IncrementBrokenUrlCount();
+                    else _statistics.IncrementValidUrlCount();
+                }
+                void SendOutResourceVerifiedEvent()
                 {
                     var processedResource = processingResult.ProcessedResource;
-                    var isStartResource = processedResource == null;
-
-                    if (!isStartResource && !_alreadyProcessedUrls.Contains(processedResource.GetAbsoluteUrl()))
-                        throw new InvalidConstraintException($"Processed resource was not registered by {nameof(CoordinatorBlock)}.");
+                    var resourceVerifiedEvent = new Event
+                    {
+                        EventType = EventType.ResourceVerified,
+                        Message = $"{processedResource.StatusCode:D} - {processedResource.GetAbsoluteUrl()}"
+                    };
+                    if (!Events.Post(resourceVerifiedEvent) && !Events.Completion.IsCompleted)
+                        _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
                 }
-
-                var newResources = new List<Resource>();
-                if (processingResult is SuccessfulProcessingResult successfulProcessingResult)
+                IList<Resource> RegisterNewlyDiscoveredResources()
                 {
+                    if (!(processingResult is SuccessfulProcessingResult successfulProcessingResult)) return new List<Resource>();
+
+                    var newResources = new List<Resource>();
                     foreach (var newResource in successfulProcessingResult.NewResources)
                     {
                         lock (_memorizationLock)
@@ -135,15 +171,10 @@ namespace Helix.Crawler
                         newResources.Add(newResource);
                         Interlocked.Increment(ref _remainingWorkload);
                     }
+                    return newResources;
                 }
 
-                Interlocked.Decrement(ref _remainingWorkload);
-                if (_remainingWorkload != 0) return new ReadOnlyCollection<Resource>(newResources);
-
-                if (!Events.Post(new Event { EventType = EventType.NoMoreWorkToDo }))
-                    _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
-
-                return new ReadOnlyCollection<Resource>(newResources);
+                #endregion Local Functions
             }
             catch (Exception exception)
             {
