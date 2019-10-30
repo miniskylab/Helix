@@ -9,17 +9,14 @@ namespace Helix.Crawler
 {
     public sealed class ResourceVerifier : IResourceVerifier
     {
-        readonly Configurations _configurations;
         readonly HttpClient _httpClient;
         readonly IHttpContentTypeToResourceTypeDictionary _httpContentTypeToResourceTypeDictionary;
         bool _objectDisposed;
         Task<HttpResponseMessage> _sendingGETRequestTask;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public ResourceVerifier(IHttpContentTypeToResourceTypeDictionary httpContentTypeToResourceTypeDictionary,
-            Configurations configurations, HttpClient httpClient)
+        public ResourceVerifier(IHttpContentTypeToResourceTypeDictionary httpContentTypeToResourceTypeDictionary, HttpClient httpClient)
         {
-            _configurations = configurations;
             _httpContentTypeToResourceTypeDictionary = httpContentTypeToResourceTypeDictionary;
             _objectDisposed = false;
             _httpClient = httpClient;
@@ -42,19 +39,12 @@ namespace Helix.Crawler
         }
 
         // TODO: Refactor this method so that, it returns Task<bool>. We can then have a singleton ResourceVerifier
-        public bool TryVerify(Resource resource, CancellationToken cancellationToken, out VerificationResult verificationResult)
+        public VerificationResult Verify(Resource resource, CancellationToken cancellationToken)
         {
             if (_objectDisposed) throw new ObjectDisposedException(nameof(ResourceVerifier));
 
-            verificationResult = null;
-            if (!resource.IsInternal && !_configurations.VerifyExternalUrls) return false;
-
             var resourceIsAlreadyVerified = resource.StatusCode != default;
-            if (resourceIsAlreadyVerified)
-            {
-                verificationResult = resource.ToVerificationResult();
-                return true;
-            }
+            if (resourceIsAlreadyVerified) return resource.ToVerificationResult();
 
             try
             {
@@ -87,12 +77,8 @@ namespace Helix.Crawler
                         throw;
                 }
             }
-            finally
-            {
-                verificationResult = resource.ToVerificationResult();
-            }
 
-            return true;
+            return resource.ToVerificationResult();
         }
     }
 }

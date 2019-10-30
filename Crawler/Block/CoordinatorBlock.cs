@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Data;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
@@ -15,6 +15,7 @@ namespace Helix.Crawler
     public class CoordinatorBlock : TransformManyBlock<ProcessingResult, Resource>, ICoordinatorBlock, IDisposable
     {
         readonly HashSet<string> _alreadyProcessedUrls;
+        readonly Configurations _configurations;
         readonly ILog _log;
         readonly object _memorizationLock;
         int _remainingWorkload;
@@ -28,12 +29,13 @@ namespace Helix.Crawler
 
         public int RemainingWorkload => _remainingWorkload;
 
-        public CoordinatorBlock(IResourceEnricher resourceEnricher, IStatistics statistics, ILog log)
+        public CoordinatorBlock(Configurations configurations, IResourceEnricher resourceEnricher, IStatistics statistics, ILog log)
         {
             _log = log;
             _remainingWorkload = 0;
             _statistics = statistics;
             _memorizationLock = new object();
+            _configurations = configurations;
             _resourceEnricher = resourceEnricher;
             _alreadyProcessedUrls = new HashSet<string>();
 
@@ -72,6 +74,7 @@ namespace Helix.Crawler
                             _resourceEnricher.Enrich(new Resource
                             {
                                 ParentUri = null,
+                                IsInternal = true,
                                 OriginalUrl = startUrl,
                                 IsExtractedFromHtmlDocument = true
                             })
@@ -108,10 +111,10 @@ namespace Helix.Crawler
                     UpdateStatistics();
                     SendOutResourceVerifiedEvent();
                 }
-                var newlyDiscoveredResources = RegisterNewlyDiscoveredResources();
+                var newlyDiscoveredResources = DiscoverNewResources().Where(r => r.IsInternal || _configurations.VerifyExternalUrls);
 
                 Interlocked.Decrement(ref _remainingWorkload);
-                if (_remainingWorkload != 0) return new ReadOnlyCollection<Resource>(newlyDiscoveredResources);
+                if (_remainingWorkload != 0) return newlyDiscoveredResources;
 
                 if (!Events.Post(new Event { EventType = EventType.NoMoreWorkToDo }))
                     _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
@@ -144,7 +147,7 @@ namespace Helix.Crawler
                     if (!Events.Post(resourceVerifiedEvent) && !Events.Completion.IsCompleted)
                         _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
                 }
-                IList<Resource> RegisterNewlyDiscoveredResources()
+                IEnumerable<Resource> DiscoverNewResources()
                 {
                     if (!(processingResult is SuccessfulProcessingResult successfulProcessingResult)) return new List<Resource>();
 

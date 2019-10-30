@@ -68,14 +68,10 @@ namespace Helix.Crawler
                 if (resource == null)
                     throw new ArgumentNullException(nameof(resource));
 
-                VerificationResult verificationResult = null;
+                VerificationResult verificationResult;
                 if (resource.IsExtractedFromHtmlDocument)
                 {
-                    if (!_resourceVerifier.TryVerify(resource, _cancellationTokenSource.Token, out verificationResult))
-                        return ProcessUnsuccessfulVerification(
-                            $"Failed to be verified {nameof(Resource)} was discarded: {resource.ToJson()}.",
-                            LogLevel.Information
-                        );
+                    verificationResult = _resourceVerifier.Verify(resource, _cancellationTokenSource.Token);
 
                     var isOrphanedUri = verificationResult.StatusCode == StatusCode.OrphanedUri;
                     if (isOrphanedUri)
@@ -91,9 +87,7 @@ namespace Helix.Crawler
                             LogLevel.Information
                         );
                 }
-
-                if (verificationResult == null)
-                    verificationResult = resource.ToVerificationResult();
+                else verificationResult = resource.ToVerificationResult();
 
                 SendOutVerificationResult();
                 return resource;

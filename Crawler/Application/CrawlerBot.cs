@@ -273,7 +273,7 @@ namespace Helix.Crawler
                         while (_scheduler.RemainingWorkload != 0 && !_scheduler.CancellationToken.IsCancellationRequested)
                             _scheduler.CreateTask((resourceVerifier, resource) =>
                             {
-                                if (!resourceVerifier.TryVerify(resource, _scheduler.CancellationToken, out var verificationResult)) return;
+                                var verificationResult = resourceVerifier.Verify(resource, _scheduler.CancellationToken);
                                 var isOrphanedUri = verificationResult.StatusCode == StatusCode.OrphanedUri;
                                 var uriSchemeNotSupported = verificationResult.StatusCode == StatusCode.UriSchemeNotSupported;
                                 if (isOrphanedUri || uriSchemeNotSupported) return;
