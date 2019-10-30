@@ -167,11 +167,15 @@ namespace Helix.Crawler
                 if (resource == null)
                     throw new ArgumentNullException(nameof(resource));
 
-                if (!resource.IsExtractedFromHtmlDocument)
+                var resourceSizeInMb = resource.Size / 1024f / 1024f;
+                if (resourceSizeInMb > 10)
                     return ProcessUnsuccessfulRendering(
-                        $"{nameof(Resource)} which was not extracted from HTML document was skipped: {resource.ToJson()}",
-                        LogLevel.Debug
+                        $"Resource was not queued for rendering because it was too big ({resourceSizeInMb} MB): {resource.ToJson()}",
+                        LogLevel.Information
                     );
+
+                if (!resource.IsInternal || resource.ResourceType != ResourceType.Html || !resource.IsExtractedFromHtmlDocument)
+                    return ProcessUnsuccessfulRendering(null, LogLevel.None);
 
                 htmlRenderer = _htmlRenderers.Take(_cancellationTokenSource.Token);
                 htmlRenderer.OnResourceCaptured += CaptureResource;
@@ -192,10 +196,7 @@ namespace Helix.Crawler
 
                 UpdateStatusCodeIfChanged();
                 if (resource.StatusCode.IsWithinBrokenRange())
-                    return ProcessUnsuccessfulRendering(
-                        $"Broken {nameof(Resource)} was discarded: {resource.ToJson()}",
-                        LogLevel.Information
-                    );
+                    return ProcessUnsuccessfulRendering(null, LogLevel.None);
 
                 DoStatisticsIfHasPageLoadTime();
                 return new RenderingResult
@@ -248,6 +249,7 @@ namespace Helix.Crawler
                 switch (logLevel)
                 {
                     case LogLevel.None:
+                        break;
                     case LogLevel.Trace:
                     case LogLevel.Debug:
                         _log.Debug(logMessage, exception);
