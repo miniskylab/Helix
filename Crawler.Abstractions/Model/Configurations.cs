@@ -21,8 +21,6 @@ namespace Helix.Crawler.Abstractions
 
         public static string PathToElectronJsExecutable { get; } = Path.Combine(WorkingDirectory, "ui/electron.exe");
 
-        public static string PathToLogFile { get; } = Path.Combine(WorkingDirectory, "helix.log");
-
         public static string PathToReportFile { get; } = Path.Combine(WorkingDirectory, "report.sqlite3");
 
         public static string PathToSqLiteBrowserExecutable { get; } =
@@ -41,6 +39,8 @@ namespace Helix.Crawler.Abstractions
         public bool UseIncognitoWebBrowser { get; } = true;
 
         public bool VerifyExternalUrls { get; }
+
+        public static string PathToLogFile => Path.Combine(WorkingDirectory, $"logs\\{nameof(Helix)}.{DateTime.Now:yyyyMMdd-HHmmss}.log");
 
         public static string WorkingDirectory => Path.GetDirectoryName(Assembly.GetEntryAssembly()?.Location);
 

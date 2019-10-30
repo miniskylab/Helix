@@ -35,7 +35,7 @@ namespace Helix.Crawler
             var hierarchy = (Hierarchy) LogManager.GetRepository(Assembly.GetEntryAssembly());
             var rollingFileAppender = new RollingFileAppender
             {
-                File = $"logs\\{nameof(Helix)}.{DateTime.Now:yyyyMMdd-HHmmss}.log",
+                File = Configurations.PathToLogFile,
                 AppendToFile = false,
                 PreserveLogFileNameExtension = true,
                 RollingStyle = RollingFileAppender.RollingMode.Size,
