@@ -1,6 +1,5 @@
 using System;
 using System.Net.Http;
-using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Helix.Crawler.Abstractions;
@@ -39,22 +38,11 @@ namespace Helix.Crawler
                 resource.Size = httpResponseMessage.Content.Headers.ContentLength;
                 resource.ResourceType = _httpContentTypeToResourceTypeDictionary[httpContentType];
             }
-            catch (AggregateException aggregateException)
+            catch (TaskCanceledException)
             {
-                switch (aggregateException.InnerException)
-                {
-                    case TaskCanceledException _:
-                        resource.StatusCode = cancellationToken.IsCancellationRequested
-                            ? StatusCode.Processing
-                            : StatusCode.RequestTimeout;
-                        break;
-                    case HttpRequestException _:
-                    case SocketException _:
-                        resource.StatusCode = StatusCode.BadRequest;
-                        break;
-                    default:
-                        throw;
-                }
+                resource.StatusCode = cancellationToken.IsCancellationRequested
+                    ? StatusCode.Processing
+                    : StatusCode.RequestTimeout;
             }
             finally
             {
