@@ -116,6 +116,7 @@ namespace Helix.Crawler
                     containerBuilder.RegisterType<IncrementalIdGenerator>().As<IIncrementalIdGenerator>().SingleInstance();
                     containerBuilder.RegisterType<Statistics>().As<IStatistics>().SingleInstance();
                     containerBuilder.RegisterType<ReportWriter>().As<IReportWriter>().SingleInstance();
+                    containerBuilder.RegisterType<ResourceVerifier>().As<IResourceVerifier>().SingleInstance();
                     containerBuilder.RegisterType<Memory>().As<IMemory>().SingleInstance();
                     containerBuilder.RegisterType<Scheduler>().As<IScheduler>().SingleInstance();
                     containerBuilder.RegisterType<HardwareMonitor>().As<IHardwareMonitor>().SingleInstance();

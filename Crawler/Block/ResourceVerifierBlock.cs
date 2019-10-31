@@ -55,11 +55,7 @@ namespace Helix.Crawler
             }
         }
 
-        public void Dispose()
-        {
-            _resourceVerifier?.Dispose();
-            _cancellationTokenSource?.Dispose();
-        }
+        public void Dispose() { _cancellationTokenSource?.Dispose(); }
 
         protected override Resource Transform(Resource resource)
         {
@@ -71,7 +67,7 @@ namespace Helix.Crawler
                 VerificationResult verificationResult;
                 if (resource.IsExtractedFromHtmlDocument)
                 {
-                    verificationResult = _resourceVerifier.Verify(resource, _cancellationTokenSource.Token);
+                    verificationResult = _resourceVerifier.Verify(resource, _cancellationTokenSource.Token).Result;
 
                     var isOrphanedUri = verificationResult.StatusCode == StatusCode.OrphanedUri;
                     if (isOrphanedUri)

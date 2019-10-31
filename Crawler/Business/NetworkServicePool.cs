@@ -129,7 +129,6 @@ namespace Helix.Crawler
             {
                 while (_resourceVerifierPool?.Any() ?? false)
                 {
-                    _resourceVerifierPool.Take().Dispose();
                     _statistics.DisposedResourceVerifierCount++;
                 }
                 _resourceVerifierPool?.Dispose();

@@ -1,10 +1,10 @@
-using System;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Helix.Crawler.Abstractions
 {
-    public interface IResourceVerifier : IDisposable
+    public interface IResourceVerifier
     {
-        VerificationResult Verify(Resource resource, CancellationToken cancellationToken);
+        Task<VerificationResult> Verify(Resource resource, CancellationToken cancellationToken);
     }
 }
