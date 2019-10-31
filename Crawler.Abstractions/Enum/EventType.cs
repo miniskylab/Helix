@@ -6,7 +6,7 @@
         ResourceVerified,
         StartProgressUpdated,
         StopProgressUpdated,
-        ReportFileCreated,
+        WorkflowActivated,
         Completed,
         NoMoreWorkToDo
     }

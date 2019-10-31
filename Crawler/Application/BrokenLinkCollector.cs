@@ -115,9 +115,7 @@ namespace Helix.Crawler
                     SetupAndConfigureServices();
                     RecreateDirectoryContainingScreenshotFiles();
                     StartHardwareMonitorService();
-
-                    if (!TryActivateWorkflow())
-                        throw new Exception("Failed to activate workflow.");
+                    ActivateWorkflow();
 
                     if (!_stateMachine.TryTransitNext(CrawlerCommand.Run))
                         _log.StateTransitionFailureEvent(_stateMachine.CurrentState, CrawlerCommand.Run);
@@ -134,6 +132,8 @@ namespace Helix.Crawler
                     ServiceLocator.Get<IBrokenLinkCollectionWorkflow>().Shutdown();
                     Shutdown(CrawlerCommand.MarkAsFaulted);
                 }
+
+                #region Local Functions
 
                 void SetupAndConfigureServices()
                 {
@@ -154,13 +154,17 @@ namespace Helix.Crawler
                         Directory.Delete(Configurations.PathToDirectoryContainsScreenshotFiles, true);
                     Directory.CreateDirectory(Configurations.PathToDirectoryContainsScreenshotFiles);
                 }
-                bool TryActivateWorkflow()
+                void ActivateWorkflow()
                 {
                     var eventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
                     eventBroadcaster.Broadcast(StartProgressUpdatedEvent($"Activating {nameof(BrokenLinkCollectionWorkflow)} ..."));
 
                     _brokenLinkCollectionWorkflowEventConsumingTask.Start();
-                    return ServiceLocator.Get<IBrokenLinkCollectionWorkflow>().TryActivate(configurations.StartUri.AbsoluteUri);
+
+                    if (!_brokenLinkCollectionWorkflow.TryActivate(configurations.StartUri.AbsoluteUri))
+                        throw new Exception("Failed to activate workflow.");
+
+                    eventBroadcaster.Broadcast(new Event { EventType = EventType.WorkflowActivated });
                 }
                 void StartHardwareMonitorService()
                 {
@@ -175,6 +179,8 @@ namespace Helix.Crawler
                         Message = message
                     };
                 }
+
+                #endregion
             });
             if (!stateTransitionSucceeded) _log.StateTransitionFailureEvent(_stateMachine.CurrentState, CrawlerCommand.Initialize);
             return tryStartResult;

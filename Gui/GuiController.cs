@@ -134,7 +134,7 @@ namespace Helix.Gui
 
             _brokenLinkCollector = new BrokenLinkCollector();
             _brokenLinkCollector.OnEventBroadcast += OnStartProgressUpdated;
-            _brokenLinkCollector.OnEventBroadcast += OnReportFileCreated;
+            _brokenLinkCollector.OnEventBroadcast += OnWorkflowActivated;
             _brokenLinkCollector.OnEventBroadcast += OnResourceVerified;
             _brokenLinkCollector.OnEventBroadcast += OnCompleted;
 
@@ -177,10 +177,10 @@ namespace Helix.Gui
                 }
                 Redraw(new Frame { StatusText = @event.Message });
             }
-            void OnReportFileCreated(Event @event)
+            void OnWorkflowActivated(Event @event)
             {
-                if (@event.EventType != EventType.ReportFileCreated) return;
-                _brokenLinkCollector.OnEventBroadcast -= OnReportFileCreated;
+                if (@event.EventType != EventType.WorkflowActivated) return;
+                _brokenLinkCollector.OnEventBroadcast -= OnWorkflowActivated;
                 Redraw(new Frame { DisablePreviewButton = false });
             }
             void OnCompleted(Event @event)
