@@ -109,11 +109,12 @@ namespace Helix.Crawler
                 {
                     CheckIfProcessedResourceWasRegistered();
                     UpdateStatistics();
-                    SendOutResourceVerifiedEvent();
                 }
-                var newlyDiscoveredResources = DiscoverNewResources().Where(r => r.IsInternal || _configurations.VerifyExternalUrls);
 
+                var newlyDiscoveredResources = DiscoverNewResources().Where(r => r.IsInternal || _configurations.VerifyExternalUrls);
                 Interlocked.Decrement(ref _remainingWorkload);
+
+                if (isNotStartResource) SendOutResourceVerifiedEvent();
                 if (_remainingWorkload != 0) return newlyDiscoveredResources;
 
                 if (!Events.Post(new Event { EventType = EventType.NoMoreWorkToDo }))
