@@ -1,5 +1,5 @@
-using Helix.Crawler;
-using Helix.Crawler.Abstractions;
+using Helix.Bot;
+using Helix.Bot.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -21,8 +21,6 @@ namespace Helix.Specifications
                 new ServiceDescriptor(typeof(IResourceEnricher), typeof(ResourceEnricher), ServiceLifetime.Transient),
                 new ServiceDescriptor(typeof(IResourceScope), typeof(ResourceScope), ServiceLifetime.Transient),
                 new ServiceDescriptor(typeof(Configurations), new Configurations()),
-                new ServiceDescriptor(typeof(IMemory), typeof(Memory), ServiceLifetime.Singleton),
-                new ServiceDescriptor(typeof(IScheduler), typeof(Scheduler), ServiceLifetime.Singleton),
                 new ServiceDescriptor(typeof(IIncrementalIdGenerator), typeof(IncrementalIdGenerator), ServiceLifetime.Singleton)
             }).BuildServiceProvider();
         }

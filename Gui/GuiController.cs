@@ -5,8 +5,8 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Helix.Crawler;
-using Helix.Crawler.Abstractions;
+using Helix.Bot;
+using Helix.Bot.Abstractions;
 using Helix.IPC;
 using Helix.IPC.Abstractions;
 using JetBrains.Annotations;
@@ -18,7 +18,7 @@ namespace Helix.Gui
     public static class GuiController
     {
         static BrokenLinkCollector _brokenLinkCollector;
-        static Task _constantRedrawTask;
+        static Task _elapsedTimeUpdateTask;
         static bool _isClosing;
         static Process _sqLiteProcess;
         static readonly ISynchronousServerSocket CommunicationSocketToGui;
@@ -69,7 +69,7 @@ namespace Helix.Gui
                 DisableCloseButton = true
             });
 
-            var working = _brokenLinkCollector != null && !CrawlerState.Completed.HasFlag(_brokenLinkCollector.CrawlerState);
+            var working = _brokenLinkCollector != null && !BotState.Completed.HasFlag(_brokenLinkCollector.BotState);
             if (working) StopWorking();
 
             ManualResetEvent.Set();
@@ -135,16 +135,16 @@ namespace Helix.Gui
             _brokenLinkCollector = new BrokenLinkCollector();
             _brokenLinkCollector.OnEventBroadcast += OnStartProgressUpdated;
             _brokenLinkCollector.OnEventBroadcast += OnWorkflowActivated;
-            _brokenLinkCollector.OnEventBroadcast += OnResourceVerified;
-            _brokenLinkCollector.OnEventBroadcast += OnCompleted;
+            _brokenLinkCollector.OnEventBroadcast += OnWorkingProgressUpdated;
+            _brokenLinkCollector.OnEventBroadcast += OnWorkflowCompleted;
 
             Redraw(new Frame
             {
                 DisableMainButton = true,
                 DisableStopButton = true,
                 DisableCloseButton = true,
-                DisableConfigurationPanel = true,
                 DisablePreviewButton = true,
+                DisableConfigurationPanel = true,
                 BorderColor = BorderColor.Normal,
                 MainButtonFunctionality = MainButtonFunctionality.Start
             });
@@ -156,7 +156,7 @@ namespace Helix.Gui
                     DisableCloseButton = false,
                     MainButtonFunctionality = MainButtonFunctionality.Pause
                 });
-                RedrawEvery(TimeSpan.FromSeconds(1));
+                UpdateElapsedTimeOnGuiEvery(TimeSpan.FromSeconds(1));
             }
             else
             {
@@ -168,24 +168,42 @@ namespace Helix.Gui
                 });
             }
 
+            #region Local Functions
+
+            void OnWorkingProgressUpdated(Event @event)
+            {
+                if (!(@event is WorkingProgressReportEvent workingProgressReportEvent)) return;
+                Redraw(new Frame
+                {
+                    StatusText = workingProgressReportEvent.Message,
+                    ValidUrlCount = workingProgressReportEvent.ValidUrlCount,
+                    BrokenUrlCount = workingProgressReportEvent.BrokenUrlCount,
+                    VerifiedUrlCount = workingProgressReportEvent.VerifiedUrlCount,
+                    RemainingWorkload = workingProgressReportEvent.RemainingWorkload,
+                    MillisecondsAveragePageLoadTime = workingProgressReportEvent.MillisecondsAveragePageLoadTime
+                });
+            }
             void OnStartProgressUpdated(Event @event)
             {
-                if (@event.EventType != EventType.StartProgressUpdated)
+                if (@event is StartProgressReportEvent)
                 {
-                    _brokenLinkCollector.OnEventBroadcast -= OnStartProgressUpdated;
+                    Redraw(new Frame { StatusText = @event.Message });
                     return;
                 }
-                Redraw(new Frame { StatusText = @event.Message });
+                _brokenLinkCollector.OnEventBroadcast -= OnStartProgressUpdated;
             }
             void OnWorkflowActivated(Event @event)
             {
-                if (@event.EventType != EventType.WorkflowActivated) return;
+                if (!(@event is WorkflowActivatedEvent)) return;
+
                 _brokenLinkCollector.OnEventBroadcast -= OnWorkflowActivated;
                 Redraw(new Frame { DisablePreviewButton = false });
             }
-            void OnCompleted(Event @event)
+            void OnWorkflowCompleted(Event @event)
             {
-                if (@event.EventType != EventType.Completed) return;
+                if (!(@event is WorkflowCompletedEvent)) return;
+
+                _elapsedTimeUpdateTask?.Wait();
                 Redraw(new Frame
                 {
                     DisableStopButton = true,
@@ -194,48 +212,31 @@ namespace Helix.Gui
                     MainButtonFunctionality = MainButtonFunctionality.Start,
                     DisableCloseButton = _isClosing,
                     ShowWaitingOverlay = _isClosing,
-                    BorderColor = _brokenLinkCollector.CrawlerState == CrawlerState.Faulted ? BorderColor.Error : BorderColor.Normal,
-                    StatusText = _brokenLinkCollector.CrawlerState switch
+                    BorderColor = _brokenLinkCollector.BotState == BotState.Faulted ? BorderColor.Error : BorderColor.Normal,
+                    ElapsedTime = ElapsedTimeStopwatch.Elapsed.ToString("hh' : 'mm' : 'ss"),
+                    StatusText = _brokenLinkCollector.BotState switch
                     {
-                        CrawlerState.Faulted => "One or more errors occurred. Check the logs for more details.",
-                        CrawlerState.RanToCompletion => "The crawling task has completed.",
+                        BotState.Faulted => "One or more errors occurred. Check the logs for more details.",
+                        BotState.RanToCompletion => "The crawling task has completed.",
                         _ => $"{@event.Message}."
                     }
                 });
-
-                _constantRedrawTask?.Wait();
-                if (_brokenLinkCollector.CrawlerState == CrawlerState.Faulted) return;
-                Redraw(new Frame
-                {
-                    VerifiedUrlCount = BrokenLinkCollector.Statistics?.VerifiedUrlCount,
-                    ValidUrlCount = BrokenLinkCollector.Statistics?.ValidUrlCount,
-                    BrokenUrlCount = BrokenLinkCollector.Statistics?.BrokenUrlCount,
-                    MillisecondsAveragePageLoadTime = BrokenLinkCollector.Statistics?.MillisecondsAveragePageLoadTime,
-                    RemainingWorkload = _brokenLinkCollector.RemainingWorkload,
-                    ElapsedTime = ElapsedTimeStopwatch.Elapsed.ToString("hh' : 'mm' : 'ss")
-                });
             }
-            void RedrawEvery(TimeSpan timeSpan)
+            void UpdateElapsedTimeOnGuiEvery(TimeSpan timeSpan)
             {
-                _constantRedrawTask = Task.Run(() =>
+                _elapsedTimeUpdateTask = Task.Run(() =>
                 {
                     ElapsedTimeStopwatch.Restart();
-                    while (!CrawlerState.Completed.HasFlag(_brokenLinkCollector.CrawlerState))
+                    while (!BotState.Completed.HasFlag(_brokenLinkCollector.BotState))
                     {
-                        Redraw(new Frame
-                        {
-                            VerifiedUrlCount = BrokenLinkCollector.Statistics?.VerifiedUrlCount,
-                            ValidUrlCount = BrokenLinkCollector.Statistics?.ValidUrlCount,
-                            BrokenUrlCount = BrokenLinkCollector.Statistics?.BrokenUrlCount,
-                            MillisecondsAveragePageLoadTime = BrokenLinkCollector.Statistics?.MillisecondsAveragePageLoadTime,
-                            RemainingWorkload = _brokenLinkCollector.RemainingWorkload,
-                            ElapsedTime = ElapsedTimeStopwatch.Elapsed.ToString("hh' : 'mm' : 'ss")
-                        });
+                        Redraw(new Frame { ElapsedTime = ElapsedTimeStopwatch.Elapsed.ToString("hh' : 'mm' : 'ss") });
                         Thread.Sleep(timeSpan);
                     }
                     ElapsedTimeStopwatch.Stop();
                 });
             }
+
+            #endregion
         }
 
         [UsedImplicitly]
@@ -270,19 +271,6 @@ namespace Helix.Gui
 
         #region Helper
 
-        static void OnResourceVerified(Event @event)
-        {
-            if (@event.EventType != EventType.ResourceVerified) return;
-            Redraw(new Frame
-            {
-                VerifiedUrlCount = BrokenLinkCollector.Statistics?.VerifiedUrlCount,
-                ValidUrlCount = BrokenLinkCollector.Statistics?.ValidUrlCount,
-                BrokenUrlCount = BrokenLinkCollector.Statistics?.BrokenUrlCount,
-                RemainingWorkload = _brokenLinkCollector.RemainingWorkload,
-                StatusText = @event.Message
-            });
-        }
-
         static void Redraw(Frame frame) { CommunicationSocketToGui.Send(new Message { Payload = JsonConvert.SerializeObject(frame) }); }
 
         static void StopWorking()
@@ -294,7 +282,7 @@ namespace Helix.Gui
                 _brokenLinkCollector.Dispose();
 
                 var waitingTime = TimeSpan.FromMinutes(1);
-                if (_constantRedrawTask == null || _constantRedrawTask.Wait(waitingTime)) return;
+                if (_elapsedTimeUpdateTask == null || _elapsedTimeUpdateTask.Wait(waitingTime)) return;
                 Log.Error($"Constant redrawing task failed to finish after {waitingTime.TotalSeconds} seconds.");
             }
             catch (Exception exception)
@@ -302,11 +290,15 @@ namespace Helix.Gui
                 Log.Error("One or more errors occurred when stopping working.", exception);
             }
 
+            #region Local Functions
+
             void OnStopProgressUpdated(Event @event)
             {
-                if (@event.EventType != EventType.StopProgressUpdated) return;
+                if (!(@event is StopProgressReportEvent)) return;
                 Redraw(new Frame { WaitingOverlayProgressText = @event.Message });
             }
+
+            #endregion
         }
 
         #endregion

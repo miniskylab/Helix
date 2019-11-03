@@ -3,17 +3,17 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.28803.156
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Crawler", "Crawler\Crawler.csproj", "{B6463DEE-522A-48E8-BDE8-932E70A12C67}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Bot", "Bot\Bot.csproj", "{B6463DEE-522A-48E8-BDE8-932E70A12C67}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gui", "Gui\Gui.csproj", "{991CE751-A64C-4EDA-8447-98EF02B1118A}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Crawler.Abstractions", "Crawler.Abstractions\Crawler.Abstractions.csproj", "{4BE3E84C-8721-4566-BF09-F4BF78BBF9A2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Bot.Abstractions", "Bot.Abstractions\Bot.Abstractions.csproj", "{4BE3E84C-8721-4566-BF09-F4BF78BBF9A2}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IPC", "IPC\IPC.csproj", "{C9ABBA75-6398-43EF-9697-8B3EA841D689}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IPC.Abstractions", "IPC.Abstractions\IPC.Abstractions.csproj", "{02DF229B-9382-4C00-A610-A8409F0A5CC0}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Crawler.Specifications", "Crawler.Specifications\Crawler.Specifications.csproj", "{C4B21D76-24E0-42CF-A9D8-9BCC8D043126}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Bot.Specifications", "Bot.Specifications\Bot.Specifications.csproj", "{C4B21D76-24E0-42CF-A9D8-9BCC8D043126}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Specifications", "Specifications\Specifications.csproj", "{9EE24964-6BDA-4F86-ACB4-792E1E616472}"
 EndProject
