@@ -6,6 +6,10 @@ namespace Helix.Bot.Abstractions
     {
         BufferBlock<FailedProcessingResult> FailedProcessingResults { get; }
 
+        int InputCount { get; }
+
+        int OutputCount { get; }
+
         BufferBlock<VerificationResult> VerificationResults { get; }
     }
 }

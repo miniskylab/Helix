@@ -6,6 +6,10 @@ namespace Helix.Bot.Abstractions
     {
         BufferBlock<Event> Events { get; }
 
+        int InputCount { get; }
+
+        int OutputCount { get; }
+
         bool TryActivateWorkflow(string startUrl);
     }
 }

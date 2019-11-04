@@ -3,7 +3,6 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Helix.Bot.Abstractions;
-using Helix.Core;
 using Helix.WebBrowser.Abstractions;
 using log4net;
 using Titanium.Web.Proxy.EventArguments;
@@ -34,7 +33,7 @@ namespace Helix.Bot
 
             Task EnsureInternal(object _, SessionEventArgs networkTraffic)
             {
-                return Task.Factory.StartNew(() =>
+                return Task.Run(() =>
                 {
                     Interlocked.Increment(ref _activeHttpTrafficCount);
                     try
@@ -43,7 +42,7 @@ namespace Helix.Bot
                         networkTraffic.HttpClient.Request.Host = networkTraffic.HttpClient.Request.RequestUri.Host;
                     }
                     finally { Interlocked.Decrement(ref _activeHttpTrafficCount); }
-                }, _networkTrafficCts.Token, TaskCreationOptions.None, PriorityTaskScheduler.Highest);
+                }, _networkTrafficCts.Token);
             }
             Task CaptureNetworkTraffic(object _, SessionEventArgs networkTraffic)
             {
@@ -51,7 +50,7 @@ namespace Helix.Bot
                 var request = networkTraffic.HttpClient.Request;
                 var response = networkTraffic.HttpClient.Response;
                 var uriBeingRendered = _resourceBeingRendered.Uri;
-                return Task.Factory.StartNew(() =>
+                return Task.Run(() =>
                 {
                     Interlocked.Increment(ref _activeHttpTrafficCount);
                     try
@@ -77,7 +76,7 @@ namespace Helix.Bot
                         });
                     }
                     finally { Interlocked.Decrement(ref _activeHttpTrafficCount); }
-                }, _networkTrafficCts.Token, TaskCreationOptions.None, PriorityTaskScheduler.Highest);
+                }, _networkTrafficCts.Token);
 
                 bool TryFollowRedirects()
                 {

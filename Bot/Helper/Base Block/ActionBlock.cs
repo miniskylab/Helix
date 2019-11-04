@@ -10,6 +10,8 @@ namespace Helix.Bot
 
         public virtual Task Completion => _actionBlock.Completion;
 
+        public int InputCount => _actionBlock.InputCount;
+
         protected ActionBlock(bool ensureOrdered = false, int maxDegreeOfParallelism = 1)
         {
             _actionBlock = new System.Threading.Tasks.Dataflow.ActionBlock<TInput>(

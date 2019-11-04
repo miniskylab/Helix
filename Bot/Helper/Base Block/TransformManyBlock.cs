@@ -11,6 +11,10 @@ namespace Helix.Bot
 
         public virtual Task Completion => _transformManyBlock.Completion;
 
+        public int InputCount => _transformManyBlock.InputCount;
+
+        public int OutputCount => _transformManyBlock.OutputCount;
+
         protected TransformManyBlock(bool ensureOrdered = false, int maxDegreeOfParallelism = 1)
         {
             _transformManyBlock = new System.Threading.Tasks.Dataflow.TransformManyBlock<TInput, TOutput>(
