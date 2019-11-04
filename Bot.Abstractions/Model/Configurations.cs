@@ -28,8 +28,6 @@ namespace Helix.Bot.Abstractions
 
         public string RemoteHost { get; }
 
-        public int ResourceExtractorCount { get; } = 300;
-
         public Uri StartUri { get; }
 
         public bool TakeScreenshotEvidence { get; } = true;

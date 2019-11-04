@@ -14,7 +14,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Bot\Bot.csproj" />
+      <ProjectReference Include="..\Bot\Bot.csproj" PrivateAssets="All" />
     </ItemGroup>
 
 </Project>
