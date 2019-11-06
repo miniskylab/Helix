@@ -46,10 +46,14 @@ namespace Helix.Bot
             Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true });
             base.Completion.ContinueWith(_ => Events.Complete());
 
+            #region Local Functions
+
             Transition<WorkflowState, WorkflowCommand> Transition(WorkflowState fromState, WorkflowCommand command)
             {
                 return new Transition<WorkflowState, WorkflowCommand>(fromState, command);
             }
+
+            #endregion
         }
 
         public void Dispose() { _stateMachine?.Dispose(); }
@@ -100,18 +104,12 @@ namespace Helix.Bot
                     throw new ArgumentNullException(nameof(processingResult));
 
                 var isNotStartResource = processingResult.ProcessedResource != null;
-                if (isNotStartResource)
-                {
-                    CheckIfProcessedResourceWasRegistered();
-                    UpdateStatistics();
-                }
+                if (isNotStartResource) CheckIfProcessedResourceWasRegistered();
 
                 var newlyDiscoveredResources = DiscoverNewResources().Where(r => r.IsInternal || _configurations.VerifyExternalUrls);
                 _statistics.DecrementRemainingWorkload();
 
-                if (isNotStartResource) SendOutWorkingProgressReportEvent();
                 if (_statistics.TakeSnapshot().RemainingWorkload != 0) return newlyDiscoveredResources;
-
                 if (!Events.Post(new NoMoreWorkToDoEvent()))
                     _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
 
@@ -127,37 +125,7 @@ namespace Helix.Bot
                             throw new InvalidConstraintException($"Processed resource was not registered by {nameof(CoordinatorBlock)}.");
                     }
                 }
-                void UpdateStatistics()
-                {
-                    switch (processingResult)
-                    {
-                        case SuccessfulProcessingResult successfulProcessingResult:
-                            _statistics.IncrementValidUrlCount();
-                            _statistics.IncrementSuccessfullyRenderedPageCount();
-                            _statistics.IncrementTotalPageLoadTimeBy(successfulProcessingResult.MillisecondsPageLoadTime);
-                            break;
-                        case FailedProcessingResult _:
-                            if (processingResult.ProcessedResource.StatusCode.IsWithinBrokenRange()) _statistics.IncrementBrokenUrlCount();
-                            else _statistics.IncrementValidUrlCount();
-                            break;
-                    }
-                }
-                void SendOutWorkingProgressReportEvent()
-                {
-                    var processedResource = processingResult.ProcessedResource;
-                    var statisticsSnapshot = _statistics.TakeSnapshot();
-                    var workingProgressReportEvent = new WorkingProgressReportEvent
-                    {
-                        ValidUrlCount = statisticsSnapshot.ValidUrlCount,
-                        BrokenUrlCount = statisticsSnapshot.BrokenUrlCount,
-                        VerifiedUrlCount = statisticsSnapshot.VerifiedUrlCount,
-                        RemainingWorkload = statisticsSnapshot.RemainingWorkload,
-                        Message = $"{processedResource.StatusCode:D} - {processedResource.GetAbsoluteUrl()}",
-                        MillisecondsAveragePageLoadTime = statisticsSnapshot.MillisecondsAveragePageLoadTime
-                    };
-                    if (!Events.Post(workingProgressReportEvent) && !Events.Completion.IsCompleted)
-                        _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
-                }
+
                 IEnumerable<Resource> DiscoverNewResources()
                 {
                     if (!(processingResult is SuccessfulProcessingResult successfulProcessingResult)) return new List<Resource>();

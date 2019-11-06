@@ -136,6 +136,7 @@ namespace Helix.Gui
             _brokenLinkCollector.OnEventBroadcast += OnStartProgressUpdated;
             _brokenLinkCollector.OnEventBroadcast += OnWorkflowActivated;
             _brokenLinkCollector.OnEventBroadcast += OnWorkingProgressUpdated;
+            _brokenLinkCollector.OnEventBroadcast += OnAveragePageLoadTimeUpdated;
             _brokenLinkCollector.OnEventBroadcast += OnWorkflowCompleted;
 
             Redraw(new Frame
@@ -170,20 +171,7 @@ namespace Helix.Gui
 
             #region Local Functions
 
-            void OnWorkingProgressUpdated(Event @event)
-            {
-                if (!(@event is WorkingProgressReportEvent workingProgressReportEvent)) return;
-                Redraw(new Frame
-                {
-                    StatusText = workingProgressReportEvent.Message,
-                    ValidUrlCount = workingProgressReportEvent.ValidUrlCount,
-                    BrokenUrlCount = workingProgressReportEvent.BrokenUrlCount,
-                    VerifiedUrlCount = workingProgressReportEvent.VerifiedUrlCount,
-                    RemainingWorkload = workingProgressReportEvent.RemainingWorkload,
-                    MillisecondsAveragePageLoadTime = workingProgressReportEvent.MillisecondsAveragePageLoadTime
-                });
-            }
-            void OnStartProgressUpdated(Event @event)
+            static void OnStartProgressUpdated(Event @event)
             {
                 if (@event is StartProgressReportEvent)
                 {
@@ -192,14 +180,31 @@ namespace Helix.Gui
                 }
                 _brokenLinkCollector.OnEventBroadcast -= OnStartProgressUpdated;
             }
-            void OnWorkflowActivated(Event @event)
+            static void OnWorkflowActivated(Event @event)
             {
                 if (!(@event is WorkflowActivatedEvent)) return;
 
                 _brokenLinkCollector.OnEventBroadcast -= OnWorkflowActivated;
                 Redraw(new Frame { DisablePreviewButton = false });
             }
-            void OnWorkflowCompleted(Event @event)
+            static void OnWorkingProgressUpdated(Event @event)
+            {
+                if (!(@event is WorkingProgressReportEvent workingProgressReportEvent)) return;
+                Redraw(new Frame
+                {
+                    StatusText = workingProgressReportEvent.Message,
+                    ValidUrlCount = workingProgressReportEvent.ValidUrlCount,
+                    BrokenUrlCount = workingProgressReportEvent.BrokenUrlCount,
+                    VerifiedUrlCount = workingProgressReportEvent.VerifiedUrlCount,
+                    RemainingWorkload = workingProgressReportEvent.RemainingWorkload
+                });
+            }
+            static void OnAveragePageLoadTimeUpdated(Event @event)
+            {
+                if (!(@event is AveragePageLoadTimeUpdatedEvent averagePageLoadTimeUpdatedEvent)) return;
+                Redraw(new Frame { MillisecondsAveragePageLoadTime = averagePageLoadTimeUpdatedEvent.MillisecondsAveragePageLoadTime });
+            }
+            static void OnWorkflowCompleted(Event @event)
             {
                 if (!(@event is WorkflowCompletedEvent)) return;
 

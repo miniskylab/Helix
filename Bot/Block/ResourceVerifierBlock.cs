@@ -12,6 +12,9 @@ namespace Helix.Bot
         readonly CancellationTokenSource _cancellationTokenSource;
         readonly ILog _log;
         readonly IResourceVerifier _resourceVerifier;
+        readonly IStatistics _statistics;
+
+        public BufferBlock<Event> Events { get; }
 
         public BufferBlock<FailedProcessingResult> FailedProcessingResults { get; }
 
@@ -19,22 +22,26 @@ namespace Helix.Bot
 
         public override Task Completion => Task.WhenAll(
             base.Completion,
+            Events.Completion,
             VerificationResults.Completion,
             FailedProcessingResults.Completion
         );
 
-        public ResourceVerifierBlock(Configurations configurations, IResourceVerifier resourceVerifier, ILog log)
+        public ResourceVerifierBlock(Configurations configurations, IResourceVerifier resourceVerifier, IStatistics statistics, ILog log)
             : base(maxDegreeOfParallelism: configurations.MaxNetworkConnectionCount)
         {
             _log = log;
+            _statistics = statistics;
             _resourceVerifier = resourceVerifier;
             _cancellationTokenSource = new CancellationTokenSource();
 
+            Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true });
             VerificationResults = new BufferBlock<VerificationResult>();
             FailedProcessingResults = new BufferBlock<FailedProcessingResult>();
 
             base.Completion.ContinueWith(_ =>
             {
+                Events.Complete();
                 VerificationResults.Complete();
                 FailedProcessingResults.Complete();
             });
@@ -67,7 +74,9 @@ namespace Helix.Bot
                     ? _resourceVerifier.Verify(resource, _cancellationTokenSource.Token).Result
                     : resource.ToVerificationResult();
 
+                UpdateStatistics();
                 SendOutVerificationResult();
+                SendOutWorkingProgressReportEvent();
                 return resource;
 
                 #region Local Functions
@@ -76,6 +85,25 @@ namespace Helix.Bot
                 {
                     if (!VerificationResults.Post(verificationResult) && !VerificationResults.Completion.IsCompleted)
                         _log.Error($"Failed to post data to buffer block named [{nameof(VerificationResults)}].");
+                }
+                void UpdateStatistics()
+                {
+                    if (verificationResult.StatusCode.IsWithinBrokenRange()) _statistics.IncrementBrokenUrlCount();
+                    else _statistics.IncrementValidUrlCount();
+                }
+                void SendOutWorkingProgressReportEvent()
+                {
+                    var statisticsSnapshot = _statistics.TakeSnapshot();
+                    var workingProgressReportEvent = new WorkingProgressReportEvent
+                    {
+                        ValidUrlCount = statisticsSnapshot.ValidUrlCount,
+                        BrokenUrlCount = statisticsSnapshot.BrokenUrlCount,
+                        VerifiedUrlCount = statisticsSnapshot.VerifiedUrlCount,
+                        RemainingWorkload = statisticsSnapshot.RemainingWorkload,
+                        Message = $"{verificationResult.StatusCode:D} - {resource.GetAbsoluteUrl()}"
+                    };
+                    if (!Events.Post(workingProgressReportEvent) && !Events.Completion.IsCompleted)
+                        _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
                 }
 
                 #endregion Local Functions

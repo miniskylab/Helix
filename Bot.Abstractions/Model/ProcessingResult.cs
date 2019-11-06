@@ -4,8 +4,6 @@ namespace Helix.Bot.Abstractions
 {
     public class SuccessfulProcessingResult : ProcessingResult
     {
-        public long MillisecondsPageLoadTime { get; set; }
-
         public List<Resource> NewResources { get; set; }
     }
 

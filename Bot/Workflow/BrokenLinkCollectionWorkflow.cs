@@ -51,8 +51,9 @@ namespace Helix.Bot
 
                 _resourceVerifierBlock.LinkTo(NullTarget<Resource>(), PropagateNullObjectsOnly<Resource>());
                 _resourceVerifierBlock.LinkTo(_htmlRendererBlock);
-                _resourceVerifierBlock.FailedProcessingResults.LinkTo(_coordinatorBlock);
+                _resourceVerifierBlock.Events.LinkTo(_eventBroadcasterBlock);
                 _resourceVerifierBlock.VerificationResults.LinkTo(_reportWriterBlock);
+                _resourceVerifierBlock.FailedProcessingResults.LinkTo(_coordinatorBlock);
 
                 _htmlRendererBlock.LinkTo(NullTarget<RenderingResult>(), PropagateNullObjectsOnly<RenderingResult>());
                 _htmlRendererBlock.LinkTo(_processingResultGeneratorBlock);

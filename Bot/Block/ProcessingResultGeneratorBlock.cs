@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data;
 using System.Linq;
 using Helix.Bot.Abstractions;
 using log4net;
@@ -32,13 +31,9 @@ namespace Helix.Bot
                 newResources.AddRange(renderingResult.CapturedResources);
                 newResources.AddRange(_resourceExtractor.ExtractResourcesFrom(renderingResult.HtmlDocument));
 
-                if (!renderingResult.MillisecondsPageLoadTime.HasValue)
-                    throw new InvalidConstraintException($"{nameof(SuccessfulProcessingResult)} must have page load time");
-
                 return new SuccessfulProcessingResult
                 {
                     ProcessedResource = renderingResult.RenderedResource,
-                    MillisecondsPageLoadTime = renderingResult.MillisecondsPageLoadTime.Value,
                     NewResources = newResources.Select(_resourceEnricher.Enrich).ToList()
                 };
             }

@@ -16,6 +16,7 @@ namespace Helix.Bot
         readonly CancellationTokenSource _cancellationTokenSource;
         readonly BlockingCollection<IHtmlRenderer> _htmlRenderers;
         readonly ILog _log;
+        readonly IStatistics _statistics;
 
         public BufferBlock<Event> Events { get; }
 
@@ -30,10 +31,11 @@ namespace Helix.Bot
             FailedProcessingResults.Completion
         );
 
-        public HtmlRendererBlock(Configurations configurations, IHardwareMonitor hardwareMonitor, Func<IHtmlRenderer> getHtmlRenderer,
-            ILog log) : base(maxDegreeOfParallelism: configurations.MaxHtmlRendererCount)
+        public HtmlRendererBlock(Configurations configurations, IHardwareMonitor hardwareMonitor, IStatistics statistics, ILog log,
+            Func<IHtmlRenderer> getHtmlRenderer) : base(maxDegreeOfParallelism: configurations.MaxHtmlRendererCount)
         {
             _log = log;
+            _statistics = statistics;
             _htmlRenderers = new BlockingCollection<IHtmlRenderer>();
             _cancellationTokenSource = new CancellationTokenSource();
             (int createdHtmlRenderCount, int disposedHtmlRendererCount) counter = (0, 0);
@@ -192,6 +194,9 @@ namespace Helix.Bot
                     );
 
                 UpdateStatusCodeIfChanged();
+                DoStatisticsIfHasPageLoadTime();
+                SendOutAveragePageLoadTimeUpdatedEvent();
+
                 if (resource.StatusCode.IsWithinBrokenRange())
                     return ProcessUnsuccessfulRendering(null, LogLevel.None);
 
@@ -199,7 +204,6 @@ namespace Helix.Bot
                 {
                     RenderedResource = resource,
                     CapturedResources = capturedResources,
-                    MillisecondsPageLoadTime = millisecondsPageLoadTime,
                     HtmlDocument = new HtmlDocument { Uri = resource.Uri, HtmlText = htmlText }
                 };
 
@@ -211,6 +215,22 @@ namespace Helix.Bot
                     if (oldStatusCode == newStatusCode) return;
                     if (!VerificationResults.Post(resource.ToVerificationResult()) && !VerificationResults.Completion.IsCompleted)
                         _log.Error($"Failed to post data to buffer block named [{nameof(VerificationResults)}].");
+                }
+                void DoStatisticsIfHasPageLoadTime()
+                {
+                    if (!millisecondsPageLoadTime.HasValue) return;
+                    _statistics.IncrementSuccessfullyRenderedPageCount();
+                    _statistics.IncrementTotalPageLoadTimeBy(millisecondsPageLoadTime.Value);
+                }
+                void SendOutAveragePageLoadTimeUpdatedEvent()
+                {
+                    var statisticsSnapshot = _statistics.TakeSnapshot();
+                    var averagePageLoadTimeUpdatedEvent = new AveragePageLoadTimeUpdatedEvent
+                    {
+                        MillisecondsAveragePageLoadTime = statisticsSnapshot.MillisecondsAveragePageLoadTime
+                    };
+                    if (!Events.Post(averagePageLoadTimeUpdatedEvent) && !Events.Completion.IsCompleted)
+                        _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
                 }
 
                 #endregion

@@ -8,8 +8,6 @@ namespace Helix.Bot.Abstractions
 
         public HtmlDocument HtmlDocument { get; set; }
 
-        public long? MillisecondsPageLoadTime { get; set; }
-
         public Resource RenderedResource { get; set; }
     }
 }
