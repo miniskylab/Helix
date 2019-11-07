@@ -152,14 +152,13 @@ namespace Helix.Bot
                 }
                 void ActivateWorkflow()
                 {
-                    var eventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
-                    eventBroadcaster.Broadcast(StartProgressReportEvent($"Activating {nameof(BrokenLinkCollectionWorkflow)} ..."));
-
+                    _log.Info($"Activating {nameof(BrokenLinkCollectionWorkflow)} ...");
                     _brokenLinkCollectionWorkflowEventConsumingTask.Start();
 
                     if (!_brokenLinkCollectionWorkflow.TryActivate(configurations.StartUri.AbsoluteUri))
                         throw new Exception("Failed to activate workflow.");
 
+                    var eventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
                     eventBroadcaster.Broadcast(new WorkflowActivatedEvent());
                 }
                 void StartHardwareMonitorService()
