@@ -76,7 +76,7 @@ namespace Helix.Bot
 
                 UpdateStatistics();
                 SendOutVerificationResult();
-                SendOutWorkingProgressReportEvent();
+                SendOutResourceVerifiedEvent();
                 return resource;
 
                 #region Local Functions
@@ -91,18 +91,17 @@ namespace Helix.Bot
                     if (verificationResult.StatusCode.IsWithinBrokenRange()) _statistics.IncrementBrokenUrlCount();
                     else _statistics.IncrementValidUrlCount();
                 }
-                void SendOutWorkingProgressReportEvent()
+                void SendOutResourceVerifiedEvent()
                 {
                     var statisticsSnapshot = _statistics.TakeSnapshot();
-                    var workingProgressReportEvent = new WorkingProgressReportEvent
+                    var resourceVerifiedEvent = new ResourceVerifiedEvent
                     {
                         ValidUrlCount = statisticsSnapshot.ValidUrlCount,
                         BrokenUrlCount = statisticsSnapshot.BrokenUrlCount,
                         VerifiedUrlCount = statisticsSnapshot.VerifiedUrlCount,
-                        RemainingWorkload = statisticsSnapshot.RemainingWorkload,
                         Message = $"{verificationResult.StatusCode:D} - {resource.GetAbsoluteUrl()}"
                     };
-                    if (!Events.Post(workingProgressReportEvent) && !Events.Completion.IsCompleted)
+                    if (!Events.Post(resourceVerifiedEvent) && !Events.Completion.IsCompleted)
                         _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
                 }
 

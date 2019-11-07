@@ -1,6 +1,6 @@
 ﻿namespace Helix.Bot.Abstractions
 {
-    public class AveragePageLoadTimeUpdatedEvent : Event
+    public class ResourceRenderedEvent : Event
     {
         public double MillisecondsAveragePageLoadTime { get; set; }
     }

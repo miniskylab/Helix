@@ -109,10 +109,10 @@ namespace Helix.Bot
                 var newlyDiscoveredResources = DiscoverNewResources().Where(r => r.IsInternal || _configurations.VerifyExternalUrls);
                 _statistics.DecrementRemainingWorkload();
 
+                SendOut(new ResourceProcessedEvent { RemainingWorkload = _statistics.TakeSnapshot().RemainingWorkload });
                 if (_statistics.TakeSnapshot().RemainingWorkload != 0) return newlyDiscoveredResources;
-                if (!Events.Post(new NoMoreWorkToDoEvent()))
-                    _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
 
+                SendOut(new NoMoreWorkToDoEvent());
                 return new List<Resource>();
 
                 #region Local Functions
@@ -125,7 +125,6 @@ namespace Helix.Bot
                             throw new InvalidConstraintException($"Processed resource was not registered by {nameof(CoordinatorBlock)}.");
                     }
                 }
-
                 IEnumerable<Resource> DiscoverNewResources()
                 {
                     if (!(processingResult is SuccessfulProcessingResult successfulProcessingResult)) return new List<Resource>();
@@ -142,6 +141,11 @@ namespace Helix.Bot
                         _statistics.IncrementRemainingWorkload();
                     }
                     return newResources;
+                }
+                void SendOut(Event @event)
+                {
+                    if (!Events.Post(@event))
+                        _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
                 }
 
                 #endregion Local Functions

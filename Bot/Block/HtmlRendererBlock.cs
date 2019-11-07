@@ -195,7 +195,7 @@ namespace Helix.Bot
 
                 UpdateStatusCodeIfChanged();
                 DoStatisticsIfHasPageLoadTime();
-                SendOutAveragePageLoadTimeUpdatedEvent();
+                SendOutResourceRenderedEvent();
 
                 if (resource.StatusCode.IsWithinBrokenRange())
                     return ProcessUnsuccessfulRendering(null, LogLevel.None);
@@ -222,14 +222,14 @@ namespace Helix.Bot
                     _statistics.IncrementSuccessfullyRenderedPageCount();
                     _statistics.IncrementTotalPageLoadTimeBy(millisecondsPageLoadTime.Value);
                 }
-                void SendOutAveragePageLoadTimeUpdatedEvent()
+                void SendOutResourceRenderedEvent()
                 {
                     var statisticsSnapshot = _statistics.TakeSnapshot();
-                    var averagePageLoadTimeUpdatedEvent = new AveragePageLoadTimeUpdatedEvent
+                    var resourceRenderedEvent = new ResourceRenderedEvent
                     {
                         MillisecondsAveragePageLoadTime = statisticsSnapshot.MillisecondsAveragePageLoadTime
                     };
-                    if (!Events.Post(averagePageLoadTimeUpdatedEvent) && !Events.Completion.IsCompleted)
+                    if (!Events.Post(resourceRenderedEvent) && !Events.Completion.IsCompleted)
                         _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
                 }
 

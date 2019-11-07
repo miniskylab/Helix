@@ -138,7 +138,7 @@ namespace Helix.Bot
                     ServiceLocator.Get<IEventBroadcaster>().OnEventBroadcast += @event =>
                     {
                         OnEventBroadcast?.Invoke(@event);
-                        if (!(@event is WorkingProgressReportEvent) && !string.IsNullOrWhiteSpace(@event.Message))
+                        if (!(@event is ResourceVerifiedEvent) && !string.IsNullOrWhiteSpace(@event.Message))
                             _log.Info(@event.Message);
                     };
 

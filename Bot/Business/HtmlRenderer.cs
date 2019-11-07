@@ -12,6 +12,7 @@ namespace Helix.Bot
     public sealed class HtmlRenderer : IHtmlRenderer
     {
         int _activeHttpTrafficCount;
+        readonly ILog _log;
         CancellationTokenSource _networkTrafficCts;
         bool _objectDisposed;
         Resource _resourceBeingRendered;
@@ -24,6 +25,7 @@ namespace Helix.Bot
         public HtmlRenderer(Configurations configurations, IResourceScope resourceScope, ILog log, IWebBrowser webBrowser,
             IHttpContentTypeToResourceTypeDictionary httpContentTypeToResourceTypeDictionary)
         {
+            _log = log;
             _webBrowser = webBrowser;
             _webBrowser.BeforeRequest += EnsureInternal;
             _webBrowser.BeforeResponse += CaptureNetworkTraffic;
@@ -59,7 +61,7 @@ namespace Helix.Bot
                         if (TryFollowRedirects()) return;
                         if (ParentUriWasFound())
                         {
-                            UpdateStatusCodeIfNotMatch();
+                            UpdateStatusCodeIfChanged();
                             TakeScreenshotIfNecessary();
                             return;
                         }
@@ -77,6 +79,8 @@ namespace Helix.Bot
                     }
                     finally { Interlocked.Decrement(ref _activeHttpTrafficCount); }
                 }, _networkTrafficCts.Token);
+
+                #region Local Functions
 
                 bool TryFollowRedirects()
                 {
@@ -97,19 +101,22 @@ namespace Helix.Bot
                     var uriBeingRenderedWithoutScheme = uriBeingRendered.Host + uriBeingRendered.PathAndQuery + uriBeingRendered.Fragment;
                     return capturedUriWithoutScheme.Equals(uriBeingRenderedWithoutScheme);
                 }
-                void UpdateStatusCodeIfNotMatch()
+                void UpdateStatusCodeIfChanged()
                 {
-                    if (response.StatusCode == (int) _resourceBeingRendered.StatusCode) return;
                     var newStatusCode = response.StatusCode;
                     var oldStatusCode = (int) _resourceBeingRendered.StatusCode;
+                    if (newStatusCode == oldStatusCode) return;
+
+                    _resourceBeingRendered.StatusCode = (StatusCode) newStatusCode;
                     log.Info($"StatusCode changed from [{oldStatusCode}] to [{newStatusCode}] at [{_resourceBeingRendered.Uri}]");
-                    _resourceBeingRendered.StatusCode = (StatusCode) response.StatusCode;
                 }
                 void TakeScreenshotIfNecessary()
                 {
                     if (_resourceBeingRendered.StatusCode.IsWithinBrokenRange() && configurations.TakeScreenshotEvidence)
                         _takeScreenshot = true;
                 }
+
+                #endregion
             }
         }
 
@@ -137,9 +144,10 @@ namespace Helix.Bot
 
             var pathToDirectoryContainsScreenshotFiles = Configurations.PathToDirectoryContainsScreenshotFiles;
             var pathToScreenshotFile = Path.Combine(pathToDirectoryContainsScreenshotFiles, $"{_resourceBeingRendered.Id}.png");
-            _webBrowser.TryTakeScreenshot(pathToScreenshotFile);
-            _takeScreenshot = false;
+            if (!_webBrowser.TryTakeScreenshot(pathToScreenshotFile))
+                _log.Error($"Failed to take screenshot at URL: {_resourceBeingRendered.GetAbsoluteUrl()}");
 
+            _takeScreenshot = false;
             return renderingResult;
 
             void EnsureNetworkTrafficIsHalted()

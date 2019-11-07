@@ -135,8 +135,9 @@ namespace Helix.Gui
             _brokenLinkCollector = new BrokenLinkCollector();
             _brokenLinkCollector.OnEventBroadcast += OnStartProgressUpdated;
             _brokenLinkCollector.OnEventBroadcast += OnWorkflowActivated;
-            _brokenLinkCollector.OnEventBroadcast += OnWorkingProgressUpdated;
-            _brokenLinkCollector.OnEventBroadcast += OnAveragePageLoadTimeUpdated;
+            _brokenLinkCollector.OnEventBroadcast += OnResourceVerified;
+            _brokenLinkCollector.OnEventBroadcast += OnResourceRendered;
+            _brokenLinkCollector.OnEventBroadcast += OnResourceProcessed;
             _brokenLinkCollector.OnEventBroadcast += OnWorkflowCompleted;
 
             Redraw(new Frame
@@ -187,22 +188,26 @@ namespace Helix.Gui
                 _brokenLinkCollector.OnEventBroadcast -= OnWorkflowActivated;
                 Redraw(new Frame { DisablePreviewButton = false });
             }
-            static void OnWorkingProgressUpdated(Event @event)
+            static void OnResourceVerified(Event @event)
             {
-                if (!(@event is WorkingProgressReportEvent workingProgressReportEvent)) return;
+                if (!(@event is ResourceVerifiedEvent resourceVerifiedEvent)) return;
                 Redraw(new Frame
                 {
-                    StatusText = workingProgressReportEvent.Message,
-                    ValidUrlCount = workingProgressReportEvent.ValidUrlCount,
-                    BrokenUrlCount = workingProgressReportEvent.BrokenUrlCount,
-                    VerifiedUrlCount = workingProgressReportEvent.VerifiedUrlCount,
-                    RemainingWorkload = workingProgressReportEvent.RemainingWorkload
+                    StatusText = resourceVerifiedEvent.Message,
+                    ValidUrlCount = resourceVerifiedEvent.ValidUrlCount,
+                    BrokenUrlCount = resourceVerifiedEvent.BrokenUrlCount,
+                    VerifiedUrlCount = resourceVerifiedEvent.VerifiedUrlCount
                 });
             }
-            static void OnAveragePageLoadTimeUpdated(Event @event)
+            static void OnResourceRendered(Event @event)
             {
-                if (!(@event is AveragePageLoadTimeUpdatedEvent averagePageLoadTimeUpdatedEvent)) return;
-                Redraw(new Frame { MillisecondsAveragePageLoadTime = averagePageLoadTimeUpdatedEvent.MillisecondsAveragePageLoadTime });
+                if (!(@event is ResourceRenderedEvent resourceRenderedEvent)) return;
+                Redraw(new Frame { MillisecondsAveragePageLoadTime = resourceRenderedEvent.MillisecondsAveragePageLoadTime });
+            }
+            static void OnResourceProcessed(Event @event)
+            {
+                if (!(@event is ResourceProcessedEvent resourceProcessedEvent)) return;
+                Redraw(new Frame { RemainingWorkload = resourceProcessedEvent.RemainingWorkload });
             }
             static void OnWorkflowCompleted(Event @event)
             {
