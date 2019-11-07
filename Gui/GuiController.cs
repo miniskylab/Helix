@@ -171,7 +171,7 @@ namespace Helix.Gui
 
             #region Local Functions
 
-            static void OnStartProgressUpdated(Event @event)
+            void OnStartProgressUpdated(Event @event)
             {
                 if (@event is StartProgressReportEvent)
                 {
@@ -180,7 +180,7 @@ namespace Helix.Gui
                 }
                 _brokenLinkCollector.OnEventBroadcast -= OnStartProgressUpdated;
             }
-            static void OnWorkflowActivated(Event @event)
+            void OnWorkflowActivated(Event @event)
             {
                 if (!(@event is WorkflowActivatedEvent)) return;
 
