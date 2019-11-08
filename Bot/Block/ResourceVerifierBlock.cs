@@ -105,7 +105,7 @@ namespace Helix.Bot
                         _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
                 }
 
-                #endregion Local Functions
+                #endregion
             }
             catch (Exception exception)
             {
