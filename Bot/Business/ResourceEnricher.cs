@@ -18,7 +18,7 @@ namespace Helix.Bot
 
         public Resource Enrich(Resource resource)
         {
-            if (resource == null) throw new ArgumentNullException();
+            if (resource == null) throw new ArgumentNullException(nameof(resource));
             if (resource.StatusCode != default && resource.Uri == null) throw new InvalidConstraintException();
 
             resource.Id = _incrementalIdGenerator.GetNext();

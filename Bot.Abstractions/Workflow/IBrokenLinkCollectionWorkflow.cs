@@ -1,10 +1,10 @@
-using System.Collections.Concurrent;
+using System;
 
 namespace Helix.Bot.Abstractions
 {
     public interface IBrokenLinkCollectionWorkflow
     {
-        BlockingCollection<Event> Events { get; }
+        event Action<Event> OnEventBroadcast;
 
         void Shutdown();
 

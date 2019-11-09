@@ -1,7 +1,5 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
@@ -11,10 +9,10 @@ using Microsoft.Extensions.Logging;
 
 namespace Helix.Bot
 {
-    public class HtmlRendererBlock : TransformBlock<Resource, RenderingResult>, IHtmlRendererBlock, IDisposable
+    public class HtmlRendererBlock : TransformBlock<Tuple<IHtmlRenderer, Resource>, RenderingResult>,
+                                     IHtmlRendererBlock, IDisposable
     {
         readonly CancellationTokenSource _cancellationTokenSource;
-        readonly BlockingCollection<IHtmlRenderer> _htmlRenderers;
         readonly ILog _log;
         readonly IStatistics _statistics;
 
@@ -22,118 +20,29 @@ namespace Helix.Bot
 
         public BufferBlock<FailedProcessingResult> FailedProcessingResults { get; }
 
+        public BufferBlock<IHtmlRenderer> HtmlRenderers { get; }
+
         public BufferBlock<VerificationResult> VerificationResults { get; }
 
         public override Task Completion => Task.WhenAll(
             base.Completion,
             Events.Completion,
+            HtmlRenderers.Completion,
             VerificationResults.Completion,
             FailedProcessingResults.Completion
         );
 
-        public HtmlRendererBlock(Configurations configurations, IHardwareMonitor hardwareMonitor, IStatistics statistics, ILog log,
-            Func<IHtmlRenderer> getHtmlRenderer) : base(maxDegreeOfParallelism: configurations.MaxHtmlRendererCount)
+        public HtmlRendererBlock(Configurations configurations, IStatistics statistics, ILog log)
+            : base(maxDegreeOfParallelism: configurations.MaxHtmlRendererCount)
         {
             _log = log;
             _statistics = statistics;
-            _htmlRenderers = new BlockingCollection<IHtmlRenderer>();
             _cancellationTokenSource = new CancellationTokenSource();
-            (int createdHtmlRenderCount, int disposedHtmlRendererCount) counter = (0, 0);
 
+            HtmlRenderers = new BufferBlock<IHtmlRenderer>();
             VerificationResults = new BufferBlock<VerificationResult>();
             FailedProcessingResults = new BufferBlock<FailedProcessingResult>();
             Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true });
-
-            base.Completion.ContinueWith(_ =>
-            {
-                FailedProcessingResults.Complete();
-                VerificationResults.Complete();
-                DisposeHtmlRenderers();
-                Events.Complete();
-                CheckMemoryLeak();
-
-                #region Local Functions
-
-                void CheckMemoryLeak()
-                {
-                    if (counter.disposedHtmlRendererCount == counter.createdHtmlRenderCount) return;
-                    var resourceName = $"{nameof(HtmlRenderer)}{(counter.createdHtmlRenderCount > 1 ? "s" : string.Empty)}";
-                    var disposedCountText = counter.disposedHtmlRendererCount == 0 ? "none" : $"only {counter.disposedHtmlRendererCount}";
-                    _log.Warn(
-                        "Orphaned resources detected! " +
-                        $"{counter.createdHtmlRenderCount} {resourceName} were created but {disposedCountText} could be found and disposed."
-                    );
-                }
-                void DisposeHtmlRenderers()
-                {
-                    while (_htmlRenderers.Any())
-                    {
-                        _htmlRenderers.Take().Dispose();
-                        counter.disposedHtmlRendererCount++;
-
-                        var stopProgressReportEvent = new StopProgressReportEvent
-                        {
-                            Message = $"Closing web browsers ({counter.disposedHtmlRendererCount}/{counter.createdHtmlRenderCount}) ..."
-                        };
-                        if (!Events.Post(stopProgressReportEvent) && !Events.Completion.IsCompleted)
-                            _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
-                    }
-                    _htmlRenderers?.Dispose();
-                }
-
-                #endregion Local Functions
-            });
-
-            CreateHtmlRenderer();
-            CreateAndDestroyHtmlRenderersAdaptively();
-
-            #region Local Functions
-
-            void CreateHtmlRenderer()
-            {
-                _htmlRenderers.Add(getHtmlRenderer(), CancellationToken.None);
-                counter.createdHtmlRenderCount++;
-            }
-            void CreateAndDestroyHtmlRenderersAdaptively()
-            {
-                hardwareMonitor.OnLowCpuAndMemoryUsage += (averageCpuUsage, memoryUsage) =>
-                {
-                    if (_htmlRenderers.Count > 0 || counter.createdHtmlRenderCount == configurations.MaxHtmlRendererCount) return;
-                    CreateHtmlRenderer();
-
-                    _log.Info(
-                        $"Low CPU usage ({averageCpuUsage}%) and low memory usage ({memoryUsage}%) detected. " +
-                        $"Browser count increased from {counter.createdHtmlRenderCount - 1} to {counter.createdHtmlRenderCount}."
-                    );
-                };
-                hardwareMonitor.OnHighCpuOrMemoryUsage += (averageCpuUsage, memoryUsage) =>
-                {
-                    if (counter.createdHtmlRenderCount == 1) return;
-                    _htmlRenderers.Take().Dispose();
-                    counter.createdHtmlRenderCount--;
-
-                    if (averageCpuUsage == null && memoryUsage == null)
-                        throw new ArgumentException(nameof(averageCpuUsage), nameof(memoryUsage));
-
-                    if (averageCpuUsage != null && memoryUsage != null)
-                        _log.Info(
-                            $"High CPU usage ({averageCpuUsage}%) and high memory usage ({memoryUsage}%) detected. " +
-                            $"Browser count decreased from {counter.createdHtmlRenderCount + 1} to {counter.createdHtmlRenderCount}."
-                        );
-                    else if (averageCpuUsage != null)
-                        _log.Info(
-                            $"High CPU usage ({averageCpuUsage}%) detected. " +
-                            $"Browser count decreased from {counter.createdHtmlRenderCount + 1} to {counter.createdHtmlRenderCount}."
-                        );
-                    else
-                        _log.Info(
-                            $"High memory usage ({memoryUsage}%) detected. " +
-                            $"Browser count decreased from {counter.createdHtmlRenderCount + 1} to {counter.createdHtmlRenderCount}."
-                        );
-                };
-            }
-
-            #endregion Local Functions
         }
 
         public override void Complete()
@@ -142,6 +51,12 @@ namespace Helix.Bot
             {
                 base.Complete();
                 _cancellationTokenSource.Cancel();
+
+                base.Completion.Wait();
+                Events.Complete();
+                HtmlRenderers.Complete();
+                VerificationResults.Complete();
+                FailedProcessingResults.Complete();
             }
             catch (Exception exception)
             {
@@ -150,22 +65,18 @@ namespace Helix.Bot
             }
         }
 
-        public void Dispose()
-        {
-            _htmlRenderers?.Dispose();
-            _cancellationTokenSource?.Dispose();
-        }
+        public void Dispose() { _cancellationTokenSource?.Dispose(); }
 
-        protected override RenderingResult Transform(Resource resource)
+        protected override RenderingResult Transform(Tuple<IHtmlRenderer, Resource> htmlRendererAndResource)
         {
-            IHtmlRenderer htmlRenderer = null;
+            if (htmlRendererAndResource == null)
+                throw new ArgumentNullException(nameof(htmlRendererAndResource));
+
             var capturedResources = new List<Resource>();
+            var (htmlRenderer, resource) = htmlRendererAndResource;
 
             try
             {
-                if (resource == null)
-                    throw new ArgumentNullException(nameof(resource));
-
                 var resourceSizeInMb = resource.Size / 1024f / 1024f;
                 if (resourceSizeInMb > 10)
                     return ProcessUnsuccessfulRendering(
@@ -176,10 +87,8 @@ namespace Helix.Bot
                 if (!resource.IsInternal || resource.ResourceType != ResourceType.Html || !resource.IsExtractedFromHtmlDocument)
                     return ProcessUnsuccessfulRendering(null, LogLevel.None);
 
-                htmlRenderer = _htmlRenderers.Take(_cancellationTokenSource.Token);
-                htmlRenderer.OnResourceCaptured += CaptureResource;
-
                 var oldStatusCode = resource.StatusCode;
+                htmlRenderer.OnResourceCaptured += CaptureResource;
                 var renderingFailed = !htmlRenderer.TryRender(
                     resource,
                     out var htmlText,
@@ -193,8 +102,8 @@ namespace Helix.Bot
                         LogLevel.Information
                     );
 
+                DoStatistics();
                 UpdateStatusCodeIfChanged();
-                DoStatisticsIfHasPageLoadTime();
                 SendOutResourceRenderedEvent();
 
                 if (resource.StatusCode.IsWithinBrokenRange())
@@ -209,18 +118,23 @@ namespace Helix.Bot
 
                 #region Local Functions
 
+                void DoStatistics()
+                {
+                    if (millisecondsPageLoadTime.HasValue)
+                        _statistics.IncrementSuccessfullyRenderedPageCount(millisecondsPageLoadTime.Value);
+
+                    var newStatusCode = resource.StatusCode;
+                    if (oldStatusCode.IsWithinBrokenRange() && !newStatusCode.IsWithinBrokenRange())
+                        _statistics.IncrementValidUrlCountAndDecrementBrokenUrlCount();
+                    else if (!oldStatusCode.IsWithinBrokenRange() && newStatusCode.IsWithinBrokenRange())
+                        _statistics.DecrementValidUrlCountAndIncrementBrokenUrlCount();
+                }
                 void UpdateStatusCodeIfChanged()
                 {
                     var newStatusCode = resource.StatusCode;
                     if (oldStatusCode == newStatusCode) return;
                     if (!VerificationResults.Post(resource.ToVerificationResult()) && !VerificationResults.Completion.IsCompleted)
                         _log.Error($"Failed to post data to buffer block named [{nameof(VerificationResults)}].");
-                }
-                void DoStatisticsIfHasPageLoadTime()
-                {
-                    if (!millisecondsPageLoadTime.HasValue) return;
-                    _statistics.IncrementSuccessfullyRenderedPageCount();
-                    _statistics.IncrementTotalPageLoadTimeBy(millisecondsPageLoadTime.Value);
                 }
                 void SendOutResourceRenderedEvent()
                 {
@@ -245,11 +159,9 @@ namespace Helix.Bot
             }
             finally
             {
-                if (htmlRenderer != null)
-                {
-                    htmlRenderer.OnResourceCaptured -= CaptureResource;
-                    _htmlRenderers.Add(htmlRenderer, CancellationToken.None);
-                }
+                htmlRenderer.OnResourceCaptured -= CaptureResource;
+                if (!HtmlRenderers.Post(htmlRenderer) && !HtmlRenderers.Completion.IsCompleted)
+                    _log.Error($"Failed to post data to buffer block named [{nameof(HtmlRenderers)}].");
             }
 
             #region Local Functions

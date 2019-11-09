@@ -35,8 +35,12 @@ namespace Helix.Bot
                     }
                 );
 
+                #region Local Functions
+
                 bool IsNullOrWhiteSpace() { return string.IsNullOrWhiteSpace(extractedUrl); }
                 bool IsJavaScriptCode() { return extractedUrl.StartsWith("javascript:", StringComparison.InvariantCultureIgnoreCase); }
+
+                #endregion
             }
 
             return new ReadOnlyCollection<Resource>(extractedResources);

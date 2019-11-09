@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Reflection;
-using System.Threading;
 using System.Threading.Tasks;
 using Helix.Bot.Abstractions;
 using Helix.Core;
@@ -14,8 +13,6 @@ namespace Helix.Bot
     public class BrokenLinkCollector : Application, IDisposable
     {
         IBrokenLinkCollectionWorkflow _brokenLinkCollectionWorkflow;
-        readonly Task _brokenLinkCollectionWorkflowEventConsumingTask;
-        readonly CancellationTokenSource _brokenLinkCollectionWorkflowEventConsumingTaskCts;
         readonly ILog _log;
         readonly StateMachine<BotState, BotCommand> _stateMachine;
 
@@ -27,10 +24,6 @@ namespace Helix.Bot
         {
             _log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
             _stateMachine = new StateMachine<BotState, BotCommand>(PossibleTransitions(), BotState.WaitingForInitialization);
-            _brokenLinkCollectionWorkflowEventConsumingTaskCts = new CancellationTokenSource();
-
-            var cancellationToken = _brokenLinkCollectionWorkflowEventConsumingTaskCts.Token;
-            _brokenLinkCollectionWorkflowEventConsumingTask = new Task(ConsumeBrokenLinkCollectionWorkflowEvents, cancellationToken);
 
             #region Local Functions
 
@@ -56,29 +49,6 @@ namespace Helix.Bot
                     return new Transition<BotState, BotCommand>(fromState, command);
                 }
             }
-            void ConsumeBrokenLinkCollectionWorkflowEvents()
-            {
-                var eventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
-                try
-                {
-                    while (!cancellationToken.IsCancellationRequested)
-                    {
-                        var @event = _brokenLinkCollectionWorkflow.Events.Take(cancellationToken);
-                        eventBroadcaster.Broadcast(@event);
-
-                        if (@event is NoMoreWorkToDoEvent)
-                            Shutdown(BotCommand.MarkAsRanToCompletion);
-                    }
-                }
-                catch (Exception exception)
-                {
-                    if (exception.IsAcknowledgingOperationCancelledException(cancellationToken))
-                        while (_brokenLinkCollectionWorkflow.Events.TryTake(out var @event))
-                            eventBroadcaster.Broadcast(@event);
-                    else
-                        _log.Error("One or more errors occured while consuming event.", exception);
-                }
-            }
 
             #endregion
         }
@@ -90,13 +60,7 @@ namespace Helix.Bot
             ServicePointManager.DefaultConnectionLimit = int.MaxValue;
         }
 
-        public void Dispose()
-        {
-            _brokenLinkCollectionWorkflowEventConsumingTask?.Wait();
-            _brokenLinkCollectionWorkflowEventConsumingTask?.Dispose();
-            _brokenLinkCollectionWorkflowEventConsumingTaskCts?.Dispose();
-            _stateMachine?.Dispose();
-        }
+        public void Dispose() { _stateMachine?.Dispose(); }
 
         public void Stop() { Shutdown(BotCommand.MarkAsCancelled); }
 
@@ -143,6 +107,12 @@ namespace Helix.Bot
                     };
 
                     _brokenLinkCollectionWorkflow = ServiceLocator.Get<IBrokenLinkCollectionWorkflow>();
+                    _brokenLinkCollectionWorkflow.OnEventBroadcast += @event =>
+                    {
+                        ServiceLocator.Get<IEventBroadcaster>().Broadcast(@event);
+                        if (@event is NoMoreWorkToDoEvent)
+                            Task.Run(() => Shutdown(BotCommand.MarkAsRanToCompletion));
+                    };
                 }
                 void RecreateDirectoryContainingScreenshotFiles()
                 {
@@ -153,8 +123,6 @@ namespace Helix.Bot
                 void ActivateWorkflow()
                 {
                     _log.Info($"Activating {nameof(BrokenLinkCollectionWorkflow)} ...");
-                    _brokenLinkCollectionWorkflowEventConsumingTask.Start();
-
                     if (!_brokenLinkCollectionWorkflow.TryActivate(configurations.StartUri.AbsoluteUri))
                         throw new Exception("Failed to activate workflow.");
 
@@ -223,7 +191,6 @@ namespace Helix.Bot
                         eventBroadcaster.Broadcast(StopProgressReportEvent("Waiting for background tasks to complete ..."));
 
                         _brokenLinkCollectionWorkflow.Shutdown();
-                        _brokenLinkCollectionWorkflowEventConsumingTaskCts.Cancel();
                     }
                     catch (Exception exception)
                     {
@@ -246,7 +213,7 @@ namespace Helix.Bot
                 }
                 Event StopProgressReportEvent(string message) { return new StopProgressReportEvent { Message = message }; }
 
-                #endregion Local Functions
+                #endregion
             });
             if (!stateTransitionSucceeded) _log.StateTransitionFailureEvent(_stateMachine.CurrentState, BotCommand.Stop);
         }

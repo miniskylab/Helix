@@ -4,7 +4,6 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Reflection;
-using System.Threading;
 using Autofac;
 using Autofac.Core;
 using Helix.Bot.Abstractions;
@@ -118,7 +117,6 @@ namespace Helix.Bot
                     containerBuilder.RegisterType<HardwareMonitor>().As<IHardwareMonitor>().SingleInstance();
                     containerBuilder.RegisterType<BrokenLinkCollectionWorkflow>().As<IBrokenLinkCollectionWorkflow>().SingleInstance();
 
-                    containerBuilder.Register(_ => Get<CancellationTokenSource>().Token).SingleInstance();
                     containerBuilder.Register(_ => CreateAndConfigureHttpClient()).SingleInstance();
 
                     HttpClient CreateAndConfigureHttpClient()
@@ -143,7 +141,7 @@ namespace Helix.Bot
                     }
                 }
 
-                #endregion Local Functions
+                #endregion
             }
 
             class Log4NetModule : Autofac.Module

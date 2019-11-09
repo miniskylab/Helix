@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using Helix.Bot.Abstractions;
 using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace Helix.Bot
 {
@@ -14,6 +15,8 @@ namespace Helix.Bot
         readonly IResourceVerifier _resourceVerifier;
         readonly IStatistics _statistics;
 
+        public BufferBlock<Resource> BrokenResources { get; }
+
         public BufferBlock<Event> Events { get; }
 
         public BufferBlock<FailedProcessingResult> FailedProcessingResults { get; }
@@ -23,6 +26,7 @@ namespace Helix.Bot
         public override Task Completion => Task.WhenAll(
             base.Completion,
             Events.Completion,
+            BrokenResources.Completion,
             VerificationResults.Completion,
             FailedProcessingResults.Completion
         );
@@ -35,16 +39,10 @@ namespace Helix.Bot
             _resourceVerifier = resourceVerifier;
             _cancellationTokenSource = new CancellationTokenSource();
 
-            Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true });
+            BrokenResources = new BufferBlock<Resource>();
             VerificationResults = new BufferBlock<VerificationResult>();
             FailedProcessingResults = new BufferBlock<FailedProcessingResult>();
-
-            base.Completion.ContinueWith(_ =>
-            {
-                Events.Complete();
-                VerificationResults.Complete();
-                FailedProcessingResults.Complete();
-            });
+            Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true });
         }
 
         public override void Complete()
@@ -52,7 +50,17 @@ namespace Helix.Bot
             try
             {
                 base.Complete();
+                TryReceiveAll(out _);
+
+                BrokenResources.Complete();
+                BrokenResources.TryReceiveAll(out _);
+
                 _cancellationTokenSource.Cancel();
+                base.Completion.Wait();
+
+                Events.Complete();
+                VerificationResults.Complete();
+                FailedProcessingResults.Complete();
             }
             catch (Exception exception)
             {
@@ -77,19 +85,28 @@ namespace Helix.Bot
                 UpdateStatistics();
                 SendOutVerificationResult();
                 SendOutResourceVerifiedEvent();
-                return resource;
+
+                if (!resource.IsInternal) return ProcessUnsuccessfulResourceVerification(null, LogLevel.None);
+                return resource.StatusCode.IsWithinBrokenRange() ? BrokenResource() : resource;
 
                 #region Local Functions
 
+                void UpdateStatistics()
+                {
+                    if (verificationResult.StatusCode.IsWithinBrokenRange()) _statistics.IncrementBrokenUrlCount();
+                    else _statistics.IncrementValidUrlCount();
+                }
                 void SendOutVerificationResult()
                 {
                     if (!VerificationResults.Post(verificationResult) && !VerificationResults.Completion.IsCompleted)
                         _log.Error($"Failed to post data to buffer block named [{nameof(VerificationResults)}].");
                 }
-                void UpdateStatistics()
+                Resource BrokenResource()
                 {
-                    if (verificationResult.StatusCode.IsWithinBrokenRange()) _statistics.IncrementBrokenUrlCount();
-                    else _statistics.IncrementValidUrlCount();
+                    if (!BrokenResources.Post(resource) && !BrokenResources.Completion.IsCompleted)
+                        _log.Error($"Failed to post data to buffer block named [{nameof(BrokenResources)}].");
+
+                    return null;
                 }
                 void SendOutResourceVerifiedEvent()
                 {
@@ -109,13 +126,49 @@ namespace Helix.Bot
             }
             catch (Exception exception)
             {
+                return ProcessUnsuccessfulResourceVerification(
+                    $"One or more errors occurred while verifying: {resource.ToJson()}.",
+                    LogLevel.Error,
+                    exception
+                );
+            }
+
+            #region Local Functions
+
+            Resource ProcessUnsuccessfulResourceVerification(string logMessage, LogLevel logLevel, Exception exception = null)
+            {
                 var failedProcessingResult = new FailedProcessingResult { ProcessedResource = resource };
                 if (!FailedProcessingResults.Post(failedProcessingResult) && !FailedProcessingResults.Completion.IsCompleted)
                     _log.Error($"Failed to post data to buffer block named [{nameof(FailedProcessingResults)}].");
 
-                _log.Error($"One or more errors occurred while verifying: {resource.ToJson()}.", exception);
+                switch (logLevel)
+                {
+                    case LogLevel.None:
+                        break;
+                    case LogLevel.Trace:
+                    case LogLevel.Debug:
+                        _log.Debug(logMessage, exception);
+                        break;
+                    case LogLevel.Information:
+                        _log.Info(logMessage, exception);
+                        break;
+                    case LogLevel.Warning:
+                        _log.Warn(logMessage, exception);
+                        break;
+                    case LogLevel.Error:
+                        _log.Error(logMessage, exception);
+                        break;
+                    case LogLevel.Critical:
+                        _log.Fatal(logMessage, exception);
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(logLevel), logLevel, null);
+                }
+
                 return null;
             }
+
+            #endregion
         }
     }
 }

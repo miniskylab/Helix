@@ -1,11 +1,12 @@
 ﻿using System;
+using JetBrains.Annotations;
 
 namespace Helix.Bot.Abstractions
 {
     [Flags]
     public enum BotState
     {
-        None = 0,
+        [UsedImplicitly] None = 0,
         WaitingForInitialization = 1,
         WaitingToRun = 1 << 1,
         WaitingForStop = 1 << 2,

@@ -44,7 +44,6 @@ namespace Helix.Bot
             );
 
             Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true });
-            base.Completion.ContinueWith(_ => Events.Complete());
 
             #region Local Functions
 
@@ -54,6 +53,15 @@ namespace Helix.Bot
             }
 
             #endregion
+        }
+
+        public override void Complete()
+        {
+            base.Complete();
+            TryReceiveAll(out _);
+
+            base.Completion.Wait();
+            Events.Complete();
         }
 
         public void Dispose() { _stateMachine?.Dispose(); }
@@ -106,11 +114,12 @@ namespace Helix.Bot
                 var isNotStartResource = processingResult.ProcessedResource != null;
                 if (isNotStartResource) CheckIfProcessedResourceWasRegistered();
 
-                var newlyDiscoveredResources = DiscoverNewResources().Where(r => r.IsInternal || _configurations.VerifyExternalUrls);
+                var newlyDiscoveredResources = DiscoverNewResources();
                 _statistics.DecrementRemainingWorkload();
 
-                SendOut(new ResourceProcessedEvent { RemainingWorkload = _statistics.TakeSnapshot().RemainingWorkload });
-                if (_statistics.TakeSnapshot().RemainingWorkload != 0) return newlyDiscoveredResources;
+                var remainingWorkload = _statistics.TakeSnapshot().RemainingWorkload;
+                SendOut(new ResourceProcessedEvent { RemainingWorkload = remainingWorkload });
+                if (remainingWorkload > 0) return newlyDiscoveredResources;
 
                 SendOut(new NoMoreWorkToDoEvent());
                 return new List<Resource>();
@@ -125,19 +134,23 @@ namespace Helix.Bot
                             throw new InvalidConstraintException($"Processed resource was not registered by {nameof(CoordinatorBlock)}.");
                     }
                 }
-                IEnumerable<Resource> DiscoverNewResources()
+                List<Resource> DiscoverNewResources()
                 {
                     if (!(processingResult is SuccessfulProcessingResult successfulProcessingResult)) return new List<Resource>();
 
                     var newResources = new List<Resource>();
-                    foreach (var newResource in successfulProcessingResult.NewResources)
+                    var discoveredResources = successfulProcessingResult.NewResources
+                        .Where(resource => resource.IsInternal || _configurations.VerifyExternalUrls)
+                        .ToList();
+
+                    foreach (var discoveredResource in discoveredResources)
                     {
                         lock (_memorizationLock)
                         {
-                            if (_alreadyProcessedUrls.Contains(newResource.GetAbsoluteUrl())) continue;
-                            _alreadyProcessedUrls.Add(newResource.GetAbsoluteUrl());
+                            if (_alreadyProcessedUrls.Contains(discoveredResource.GetAbsoluteUrl())) continue;
+                            _alreadyProcessedUrls.Add(discoveredResource.GetAbsoluteUrl());
                         }
-                        newResources.Add(newResource);
+                        newResources.Add(discoveredResource);
                         _statistics.IncrementRemainingWorkload();
                     }
                     return newResources;
@@ -148,7 +161,7 @@ namespace Helix.Bot
                         _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
                 }
 
-                #endregion Local Functions
+                #endregion
             }
             catch (Exception exception)
             {

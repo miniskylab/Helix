@@ -1,5 +1,8 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Helix.Bot.Abstractions
 {
+    [SuppressMessage("ReSharper", "UnusedMember.Global")]
     public enum StatusCode
     {
         Unknown = 0,

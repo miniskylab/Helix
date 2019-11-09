@@ -19,6 +19,15 @@ namespace Helix.Bot
             lock (_remainingWorkloadCalculationLock) _remainingWorkload--;
         }
 
+        public void DecrementValidUrlCountAndIncrementBrokenUrlCount()
+        {
+            lock (_urlCountLock)
+            {
+                _validUrlCount--;
+                _brokenUrlCount++;
+            }
+        }
+
         public void IncrementBrokenUrlCount()
         {
             lock (_urlCountLock) _brokenUrlCount++;
@@ -29,19 +38,27 @@ namespace Helix.Bot
             lock (_remainingWorkloadCalculationLock) _remainingWorkload++;
         }
 
-        public void IncrementSuccessfullyRenderedPageCount()
+        public void IncrementSuccessfullyRenderedPageCount(double millisecondsPageLoadTime)
         {
-            lock (_averagePageLoadTimeCalculationLock) _successfullyRenderedPageCount++;
-        }
-
-        public void IncrementTotalPageLoadTimeBy(double milliseconds)
-        {
-            lock (_averagePageLoadTimeCalculationLock) _millisecondsTotalPageLoadTime += milliseconds;
+            lock (_averagePageLoadTimeCalculationLock)
+            {
+                _successfullyRenderedPageCount++;
+                _millisecondsTotalPageLoadTime += millisecondsPageLoadTime;
+            }
         }
 
         public void IncrementValidUrlCount()
         {
             lock (_urlCountLock) _validUrlCount++;
+        }
+
+        public void IncrementValidUrlCountAndDecrementBrokenUrlCount()
+        {
+            lock (_urlCountLock)
+            {
+                _validUrlCount++;
+                _brokenUrlCount--;
+            }
         }
 
         public StatisticsSnapshot TakeSnapshot()

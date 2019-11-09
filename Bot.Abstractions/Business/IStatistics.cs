@@ -4,15 +4,17 @@ namespace Helix.Bot.Abstractions
     {
         void DecrementRemainingWorkload();
 
+        void DecrementValidUrlCountAndIncrementBrokenUrlCount();
+
         void IncrementBrokenUrlCount();
 
         void IncrementRemainingWorkload();
 
-        void IncrementSuccessfullyRenderedPageCount();
-
-        void IncrementTotalPageLoadTimeBy(double milliseconds);
+        void IncrementSuccessfullyRenderedPageCount(double millisecondsPageLoadTime);
 
         void IncrementValidUrlCount();
+
+        void IncrementValidUrlCountAndDecrementBrokenUrlCount();
 
         StatisticsSnapshot TakeSnapshot();
     }
