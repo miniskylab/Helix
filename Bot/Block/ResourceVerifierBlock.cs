@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using Helix.Bot.Abstractions;
+using Helix.Core;
 using log4net;
 using Microsoft.Extensions.Logging;
 

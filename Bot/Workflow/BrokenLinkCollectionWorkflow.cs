@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks.Dataflow;
 using Helix.Bot.Abstractions;
+using Helix.Core;
 using log4net;
 
 namespace Helix.Bot
@@ -104,13 +105,13 @@ namespace Helix.Bot
 
         public void OnError(Exception exception)
         {
-            _log.Error($"One or more errors occured while observing data from {nameof(EventBroadcasterBlock)}.", exception);
+            _log.Error($"One or more errors occurred while observing data from {nameof(EventBroadcasterBlock)}.", exception);
         }
 
         public void OnNext(Event @event)
         {
             try { OnEventBroadcast?.Invoke(@event); }
-            catch (Exception exception) { _log.Error("One or more errors occured while broadcast event.", exception); }
+            catch (Exception exception) { _log.Error("One or more errors occurred while broadcast event.", exception); }
         }
 
         public void Shutdown()

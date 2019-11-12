@@ -199,7 +199,13 @@ namespace Helix.WebBrowser
 
             var stateTransitionSucceeded = _stateMachine.TryTransitNext(WebBrowserCommand.TryRender, () =>
             {
+                Task cancellationTask = null;
                 var renderingFinishedCts = new CancellationTokenSource();
+                var renderingFinishedOrCancelledCancellationToken = CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken,
+                    renderingFinishedCts.Token
+                ).Token;
+
                 try
                 {
                     CurrentUri = uri ?? throw new ArgumentNullException(nameof(uri));
@@ -213,9 +219,19 @@ namespace Helix.WebBrowser
                 }
                 finally
                 {
-                    _pageLoadTimeStopwatch.Reset();
-                    renderingFinishedCts.Cancel();
-                    renderingFinishedCts.Dispose();
+                    try
+                    {
+                        _pageLoadTimeStopwatch.Reset();
+                        renderingFinishedCts.Cancel();
+                        renderingFinishedCts.Dispose();
+                        cancellationTask?.Wait(renderingFinishedOrCancelledCancellationToken);
+                        cancellationTask?.Dispose();
+                    }
+                    catch (Exception exception)
+                    {
+                        if (!exception.IsAcknowledgingOperationCancelledException(renderingFinishedOrCancelledCancellationToken))
+                            _log.Error("One or more errors occurred while doing post render cleanup.", exception);
+                    }
 
                     var webBrowserIsNotIdle = _stateMachine.CurrentState != WebBrowserState.Idle;
                     var cannotTransitToIdleState = !_stateMachine.TryTransitNext(WebBrowserCommand.TransitToIdleState);
@@ -225,7 +241,7 @@ namespace Helix.WebBrowser
 
                 void EnsureCancellable()
                 {
-                    Task.Run(() =>
+                    cancellationTask = Task.Run(() =>
                     {
                         while (true)
                         {
@@ -237,7 +253,7 @@ namespace Helix.WebBrowser
                             }
                             Thread.Sleep(1000);
                         }
-                    }, CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, renderingFinishedCts.Token).Token);
+                    }, renderingFinishedOrCancelledCancellationToken);
                 }
                 bool TryGoToUri()
                 {
@@ -327,7 +343,7 @@ namespace Helix.WebBrowser
                     if (!pathToDirectoryContainsScreenshotFile.Exists) pathToDirectoryContainsScreenshotFile.Create();
 
                     var screenShot = _chromeDriver.GetScreenshot();
-                    Task.Run(() => { screenShot.SaveAsFile(pathToScreenshotFile, ScreenshotImageFormat.Png); });
+                    screenShot.SaveAsFile(pathToScreenshotFile, ScreenshotImageFormat.Png);
                     screenshotTakingResult = true;
                 }
                 catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
