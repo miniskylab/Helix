@@ -85,9 +85,10 @@ namespace Helix.Bot
                         LogLevel.Information
                     );
 
-                var isValidResource = !resource.StatusCode.IsWithinBrokenRange();
-                var isNotHtmlResource = resource.ResourceType != ResourceType.Html;
-                if (!resource.IsInternal || !resource.IsExtractedFromHtmlDocument || isValidResource && isNotHtmlResource)
+                var resourceIsNotBroken = !resource.StatusCode.IsWithinBrokenRange();
+                var resourceTypeIsNotRenderable = !(ResourceType.Html | ResourceType.Unknown).HasFlag(resource.ResourceType);
+                var resourceShouldNotBeRendered = resourceIsNotBroken && resourceTypeIsNotRenderable;
+                if (!resource.IsInternal || !resource.IsExtractedFromHtmlDocument || resourceShouldNotBeRendered)
                     return ProcessUnsuccessfulRendering(null, LogLevel.None);
 
                 var oldStatusCode = resource.StatusCode;
