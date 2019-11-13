@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using Helix.Bot.Abstractions;
+using Helix.Core;
 using log4net;
 using Microsoft.Extensions.Logging;
 
@@ -84,7 +85,9 @@ namespace Helix.Bot
                         LogLevel.Information
                     );
 
-                if (!resource.IsInternal || resource.ResourceType != ResourceType.Html || !resource.IsExtractedFromHtmlDocument)
+                var isValidResource = !resource.StatusCode.IsWithinBrokenRange();
+                var isNotHtmlResource = resource.ResourceType != ResourceType.Html;
+                if (!resource.IsInternal || !resource.IsExtractedFromHtmlDocument || isValidResource && isNotHtmlResource)
                     return ProcessUnsuccessfulRendering(null, LogLevel.None);
 
                 var oldStatusCode = resource.StatusCode;
