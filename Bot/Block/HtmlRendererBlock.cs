@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
@@ -70,12 +69,7 @@ namespace Helix.Bot
 
         protected override RenderingResult Transform(Tuple<IHtmlRenderer, Resource> htmlRendererAndResource)
         {
-            if (htmlRendererAndResource == null)
-                throw new ArgumentNullException(nameof(htmlRendererAndResource));
-
-            var capturedResources = new List<Resource>();
-            var (htmlRenderer, resource) = htmlRendererAndResource;
-
+            var (htmlRenderer, resource) = htmlRendererAndResource ?? throw new ArgumentNullException(nameof(htmlRendererAndResource));
             try
             {
                 var resourceSizeInMb = resource.Size / 1024f / 1024f;
@@ -92,11 +86,11 @@ namespace Helix.Bot
                     return ProcessUnsuccessfulRendering(null, LogLevel.None);
 
                 var oldStatusCode = resource.StatusCode;
-                htmlRenderer.OnResourceCaptured += CaptureResource;
                 var renderingFailed = !htmlRenderer.TryRender(
                     resource,
                     out var htmlText,
                     out var millisecondsPageLoadTime,
+                    out var capturedResources,
                     _cancellationTokenSource.Token
                 );
 
@@ -163,14 +157,12 @@ namespace Helix.Bot
             }
             finally
             {
-                htmlRenderer.OnResourceCaptured -= CaptureResource;
                 if (!HtmlRenderers.Post(htmlRenderer) && !HtmlRenderers.Completion.IsCompleted)
                     _log.Error($"Failed to post data to buffer block named [{nameof(HtmlRenderers)}].");
             }
 
             #region Local Functions
 
-            void CaptureResource(Resource capturedResource) { capturedResources.Add(capturedResource); }
             RenderingResult ProcessUnsuccessfulRendering(string logMessage, LogLevel logLevel, Exception exception = null)
             {
                 var failedProcessingResult = new FailedProcessingResult { ProcessedResource = resource };

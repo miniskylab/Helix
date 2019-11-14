@@ -1,5 +1,8 @@
 ﻿using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Helix.Bot.Abstractions;
@@ -12,14 +15,13 @@ namespace Helix.Bot
     public sealed class HtmlRenderer : IHtmlRenderer
     {
         int _activeHttpTrafficCount;
+        BlockingCollection<Resource> _capturedResources;
         readonly ILog _log;
         CancellationTokenSource _networkTrafficCts;
         bool _objectDisposed;
         Resource _resourceBeingRendered;
         bool _takeScreenshot;
         readonly IWebBrowser _webBrowser;
-
-        public event Action<Resource> OnResourceCaptured;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public HtmlRenderer(Configurations configurations, IResourceScope resourceScope, ILog log, IWebBrowser webBrowser,
@@ -32,6 +34,8 @@ namespace Helix.Bot
 
             _objectDisposed = false;
             _takeScreenshot = false;
+
+            #region Local Functions
 
             Task EnsureInternal(object _, SessionEventArgs networkTraffic)
             {
@@ -67,7 +71,7 @@ namespace Helix.Bot
                         }
 
                         if (_resourceBeingRendered.StatusCode.IsWithinBrokenRange()) return;
-                        OnResourceCaptured?.Invoke(new Resource
+                        _capturedResources.Add(new Resource
                         {
                             ParentUri = parentUri,
                             OriginalUrl = request.Url,
@@ -118,37 +122,53 @@ namespace Helix.Bot
 
                 #endregion
             }
+
+            #endregion
         }
 
         public void Dispose()
         {
             if (_objectDisposed) return;
+            _capturedResources?.Dispose();
             _networkTrafficCts?.Dispose();
             _webBrowser?.Dispose();
             _objectDisposed = true;
         }
 
-        public bool TryRender(Resource resource, out string html, out long? millisecondsPageLoadTime, CancellationToken cancellationToken)
+        public bool TryRender(Resource resource, out string html, out long? millisecondsPageLoadTime, out List<Resource> capturedResources,
+            CancellationToken cancellationToken)
         {
             if (_objectDisposed) throw new ObjectDisposedException(nameof(HtmlRenderer));
             EnsureNetworkTrafficIsHalted();
 
-            _networkTrafficCts = new CancellationTokenSource();
-            _resourceBeingRendered = resource;
+            try
+            {
+                _resourceBeingRendered = resource;
+                _networkTrafficCts = new CancellationTokenSource();
+                _capturedResources = new BlockingCollection<Resource>();
 
-            var uri = resource.Uri;
-            var renderingResult = _webBrowser.TryRender(uri, out html, out millisecondsPageLoadTime, cancellationToken);
+                var uri = resource.Uri;
+                var renderingResult = _webBrowser.TryRender(uri, out html, out millisecondsPageLoadTime, cancellationToken);
 
-            if (resource.StatusCode.IsWithinBrokenRange()) millisecondsPageLoadTime = null;
-            if (!_takeScreenshot) return renderingResult;
+                if (resource.StatusCode.IsWithinBrokenRange()) millisecondsPageLoadTime = null;
+                if (!_takeScreenshot) return renderingResult;
 
-            var pathToDirectoryContainsScreenshotFiles = Configurations.PathToDirectoryContainsScreenshotFiles;
-            var pathToScreenshotFile = Path.Combine(pathToDirectoryContainsScreenshotFiles, $"{_resourceBeingRendered.Id}.png");
-            if (!_webBrowser.TryTakeScreenshot(pathToScreenshotFile))
-                _log.Error($"Failed to take screenshot at URL: {_resourceBeingRendered.GetAbsoluteUrl()}");
+                var pathToDirectoryContainsScreenshotFiles = Configurations.PathToDirectoryContainsScreenshotFiles;
+                var pathToScreenshotFile = Path.Combine(pathToDirectoryContainsScreenshotFiles, $"{_resourceBeingRendered.Id}.png");
+                if (!_webBrowser.TryTakeScreenshot(pathToScreenshotFile))
+                    _log.Error($"Failed to take screenshot at URL: {_resourceBeingRendered.GetAbsoluteUrl()}");
 
-            _takeScreenshot = false;
-            return renderingResult;
+                _takeScreenshot = false;
+                return renderingResult;
+            }
+            finally
+            {
+                capturedResources = _capturedResources.ToList();
+                _capturedResources.Dispose();
+                _capturedResources = null;
+            }
+
+            #region Local Functions
 
             void EnsureNetworkTrafficIsHalted()
             {
@@ -156,6 +176,8 @@ namespace Helix.Bot
                 while (_activeHttpTrafficCount > 0) Thread.Sleep(100);
                 _networkTrafficCts?.Dispose();
             }
+
+            #endregion
         }
     }
 }
