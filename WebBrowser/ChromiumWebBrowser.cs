@@ -161,6 +161,46 @@ namespace Helix.WebBrowser
             SetupHttpProxyServer();
             GetUserAgentString();
             OpenWebBrowser(StartArguments);
+
+            #region Local Functions
+
+            void SetupHttpProxyServer()
+            {
+                if (_httpProxyServer != null) return;
+                _httpProxyServer = new ProxyServer();
+                _httpProxyServer.AddEndPoint(new ExplicitProxyEndPoint(IPAddress.Loopback, 0));
+                _httpProxyServer.Start();
+            }
+            void SetupStateMachine()
+            {
+                _stateMachine = new StateMachine<WebBrowserState, WebBrowserCommand>
+                (
+                    new Dictionary<Transition<WebBrowserState, WebBrowserCommand>, WebBrowserState>
+                    {
+                        { Transition(WebBrowserState.WaitingForOpening, WebBrowserCommand.Open), WebBrowserState.Opening },
+                        { Transition(WebBrowserState.Opening, WebBrowserCommand.TransitToIdleState), WebBrowserState.Idle },
+                        { Transition(WebBrowserState.Idle, WebBrowserCommand.TryRender), WebBrowserState.TryRendering },
+                        { Transition(WebBrowserState.Idle, WebBrowserCommand.TryTakeScreenshot), WebBrowserState.TryTakingScreenshot },
+                        { Transition(WebBrowserState.Idle, WebBrowserCommand.Dispose), WebBrowserState.Disposing },
+                        { Transition(WebBrowserState.Idle, WebBrowserCommand.Close), WebBrowserState.Closing },
+                        { Transition(WebBrowserState.TryRendering, WebBrowserCommand.Close), WebBrowserState.Closing },
+                        { Transition(WebBrowserState.TryRendering, WebBrowserCommand.TransitToIdleState), WebBrowserState.Idle },
+                        { Transition(WebBrowserState.TryTakingScreenshot, WebBrowserCommand.Close), WebBrowserState.Closing },
+                        { Transition(WebBrowserState.TryTakingScreenshot, WebBrowserCommand.TransitToIdleState), WebBrowserState.Idle },
+                        { Transition(WebBrowserState.Disposing, WebBrowserCommand.Close), WebBrowserState.Closing },
+                        { Transition(WebBrowserState.Closing, WebBrowserCommand.TransitToDisposedState), WebBrowserState.Disposed },
+                        { Transition(WebBrowserState.Closing, WebBrowserCommand.Open), WebBrowserState.Opening }
+                    },
+                    WebBrowserState.WaitingForOpening
+                );
+
+                Transition<WebBrowserState, WebBrowserCommand> Transition(WebBrowserState fromState, WebBrowserCommand command)
+                {
+                    return new Transition<WebBrowserState, WebBrowserCommand>(fromState, command);
+                }
+            }
+
+            #endregion
         }
 
         public void Dispose()
@@ -239,6 +279,8 @@ namespace Helix.WebBrowser
                         _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WebBrowserCommand.TransitToIdleState);
                 }
 
+                #region Local Functions
+
                 void EnsureCancellable()
                 {
                     cancellationTask = Task.Run(() =>
@@ -288,6 +330,8 @@ namespace Helix.WebBrowser
                         _httpProxyServer.BeforeResponse -= BeforeResponse;
                     }
 
+                    #region Local Functions
+
                     Task BeforeRequest(object sender, SessionEventArgs networkTraffic)
                     {
                         return this.BeforeRequest?.Invoke(sender, networkTraffic);
@@ -296,6 +340,8 @@ namespace Helix.WebBrowser
                     {
                         return this.BeforeResponse?.Invoke(sender, networkTraffic);
                     }
+
+                    #endregion
                 }
                 bool TryGetPageSource(out string pageSource)
                 {
@@ -323,6 +369,8 @@ namespace Helix.WebBrowser
                         return false;
                     }
                 }
+
+                #endregion
             });
             if (!stateTransitionSucceeded) _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WebBrowserCommand.TryRender);
 
@@ -457,43 +505,6 @@ namespace Helix.WebBrowser
         {
             CloseWebBrowser(forcibly);
             OpenWebBrowser(StartArguments);
-        }
-
-        void SetupHttpProxyServer()
-        {
-            if (_httpProxyServer != null) return;
-            _httpProxyServer = new ProxyServer();
-            _httpProxyServer.AddEndPoint(new ExplicitProxyEndPoint(IPAddress.Loopback, 0));
-            _httpProxyServer.Start();
-        }
-
-        void SetupStateMachine()
-        {
-            _stateMachine = new StateMachine<WebBrowserState, WebBrowserCommand>
-            (
-                new Dictionary<Transition<WebBrowserState, WebBrowserCommand>, WebBrowserState>
-                {
-                    { Transition(WebBrowserState.WaitingForOpening, WebBrowserCommand.Open), WebBrowserState.Opening },
-                    { Transition(WebBrowserState.Opening, WebBrowserCommand.TransitToIdleState), WebBrowserState.Idle },
-                    { Transition(WebBrowserState.Idle, WebBrowserCommand.TryRender), WebBrowserState.TryRendering },
-                    { Transition(WebBrowserState.Idle, WebBrowserCommand.TryTakeScreenshot), WebBrowserState.TryTakingScreenshot },
-                    { Transition(WebBrowserState.Idle, WebBrowserCommand.Dispose), WebBrowserState.Disposing },
-                    { Transition(WebBrowserState.Idle, WebBrowserCommand.Close), WebBrowserState.Closing },
-                    { Transition(WebBrowserState.TryRendering, WebBrowserCommand.Close), WebBrowserState.Closing },
-                    { Transition(WebBrowserState.TryRendering, WebBrowserCommand.TransitToIdleState), WebBrowserState.Idle },
-                    { Transition(WebBrowserState.TryTakingScreenshot, WebBrowserCommand.Close), WebBrowserState.Closing },
-                    { Transition(WebBrowserState.TryTakingScreenshot, WebBrowserCommand.TransitToIdleState), WebBrowserState.Idle },
-                    { Transition(WebBrowserState.Disposing, WebBrowserCommand.Close), WebBrowserState.Closing },
-                    { Transition(WebBrowserState.Closing, WebBrowserCommand.TransitToDisposedState), WebBrowserState.Disposed },
-                    { Transition(WebBrowserState.Closing, WebBrowserCommand.Open), WebBrowserState.Opening }
-                },
-                WebBrowserState.WaitingForOpening
-            );
-
-            Transition<WebBrowserState, WebBrowserCommand> Transition(WebBrowserState fromState, WebBrowserCommand command)
-            {
-                return new Transition<WebBrowserState, WebBrowserCommand>(fromState, command);
-            }
         }
 
         static bool TimeoutExceptionOccurred(Exception exception)
