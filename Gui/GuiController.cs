@@ -150,6 +150,7 @@ namespace Helix.Gui
                 BorderColor = BorderColor.Normal,
                 MainButtonFunctionality = MainButtonFunctionality.Start
             });
+
             if (_brokenLinkCollector.TryStart(new Configurations(configurationJsonString)))
             {
                 Redraw(new Frame

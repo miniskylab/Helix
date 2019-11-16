@@ -12,7 +12,7 @@ namespace Helix.Bot
 
         public bool IsInternalResource(Resource resource)
         {
-            if (resource == null || resource.Uri == null) throw new ArgumentNullException();
+            if (resource == null || resource.Uri == null) throw new ArgumentNullException(nameof(resource));
             if (IsStartUri(resource.Uri)) return true;
             if (resource.Uri.Authority.Equals(_configurations.RemoteHost, StringComparison.OrdinalIgnoreCase)) return true;
 

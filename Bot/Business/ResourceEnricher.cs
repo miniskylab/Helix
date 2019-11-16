@@ -28,6 +28,7 @@ namespace Helix.Bot
                 else if (UriSchemeIsNotSupported()) resource.StatusCode = StatusCode.UriSchemeNotSupported;
                 else if (IsOrphanedUri()) resource.StatusCode = StatusCode.OrphanedUri;
                 else StripFragment();
+                resource.Uri = resource.OriginalUri;
             }
 
             if (resource.Uri != null) resource.IsInternal = _resourceScope.IsInternalResource(resource);
@@ -38,24 +39,24 @@ namespace Helix.Bot
                 if (!Uri.TryCreate(resource.OriginalUrl, UriKind.RelativeOrAbsolute, out var relativeOrAbsoluteUri)) return false;
                 if (relativeOrAbsoluteUri.IsAbsoluteUri)
                 {
-                    resource.Uri = relativeOrAbsoluteUri;
+                    resource.OriginalUri = relativeOrAbsoluteUri;
                     return true;
                 }
 
                 if (!Uri.TryCreate(resource.ParentUri, resource.OriginalUrl, out var absoluteUri)) return false;
-                resource.Uri = absoluteUri;
+                resource.OriginalUri = absoluteUri;
                 return true;
             }
-            bool UriSchemeIsNotSupported() { return resource.Uri.Scheme != "http" && resource.Uri.Scheme != "https"; }
+            bool UriSchemeIsNotSupported() { return resource.OriginalUri.Scheme != "http" && resource.OriginalUri.Scheme != "https"; }
             bool IsOrphanedUri()
             {
                 // TODO: Investigate where those orphaned Uri-s came from.
-                return resource.ParentUri == null && !_resourceScope.IsStartUri(resource.Uri);
+                return resource.ParentUri == null && !_resourceScope.IsStartUri(resource.OriginalUri);
             }
             void StripFragment()
             {
-                if (string.IsNullOrWhiteSpace(resource.Uri.Fragment)) return;
-                resource.Uri = new UriBuilder(resource.Uri) { Fragment = string.Empty }.Uri;
+                if (string.IsNullOrWhiteSpace(resource.OriginalUri.Fragment)) return;
+                resource.OriginalUri = new UriBuilder(resource.OriginalUri) { Fragment = string.Empty }.Uri;
             }
         }
     }

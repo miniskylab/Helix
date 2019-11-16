@@ -36,8 +36,6 @@ namespace Helix.Bot.Abstractions
 
         public bool UseIncognitoWebBrowser { get; } = true;
 
-        public bool VerifyExternalUrls { get; }
-
         public static string PathToLogFile => Path.Combine(WorkingDirectory, $"logs\\{nameof(Helix)}.{DateTime.Now:yyyyMMdd-HHmmss}.log");
 
         public static string WorkingDirectory => Path.GetDirectoryName(Assembly.GetEntryAssembly()?.Location);
@@ -47,7 +45,6 @@ namespace Helix.Bot.Abstractions
         public Configurations(string configurationJsonString)
         {
             var tokens = JObject.Parse(configurationJsonString);
-            VerifyExternalUrls = (bool) (tokens.SelectToken(nameof(VerifyExternalUrls)) ?? false);
             StartUri = ValidateStartUri((string) tokens.SelectToken(nameof(StartUri)) ?? string.Empty);
 
             RemoteHost = ((string) tokens.SelectToken(nameof(RemoteHost)) ?? string.Empty).ToLower();

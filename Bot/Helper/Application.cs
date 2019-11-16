@@ -1,4 +1,3 @@
-using System;
 using System.Data;
 using System.Linq;
 using System.Net.Http;
@@ -108,7 +107,6 @@ namespace Helix.Bot
                 void RegisterSingletonServices()
                 {
                     containerBuilder.RegisterInstance(configurations).AsSelf();
-                    containerBuilder.RegisterInstance(Activator.CreateInstance<EventBroadcaster>()).As<IEventBroadcaster>();
 
                     containerBuilder.RegisterType<IncrementalIdGenerator>().As<IIncrementalIdGenerator>().SingleInstance();
                     containerBuilder.RegisterType<Statistics>().As<IStatistics>().SingleInstance();

@@ -16,12 +16,11 @@ namespace Helix.Bot
     {
         int _activeHttpTrafficCount;
         BlockingCollection<Resource> _capturedResources;
-        readonly ILog _log;
         CancellationTokenSource _networkTrafficCts;
         bool _objectDisposed;
         Resource _resourceBeingRendered;
         bool _takeScreenshot;
-        readonly IWebBrowser _webBrowser;
+        bool _uriBeingRenderedWasFoundInCapturedNetworkTraffic;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public HtmlRenderer(Configurations configurations, IResourceScope resourceScope, ILog log, IWebBrowser webBrowser,
@@ -52,32 +51,35 @@ namespace Helix.Bot
             }
             Task CaptureNetworkTraffic(object _, SessionEventArgs networkTraffic)
             {
-                var parentUri = _webBrowser.CurrentUri;
                 var request = networkTraffic.HttpClient.Request;
                 var response = networkTraffic.HttpClient.Response;
-                var uriBeingRendered = _resourceBeingRendered.Uri;
                 return Task.Run(() =>
                 {
                     Interlocked.Increment(ref _activeHttpTrafficCount);
                     try
                     {
                         if (request.Method.ToUpperInvariant() != "GET") return;
-                        if (TryFollowRedirects()) return;
-                        if (ParentUriWasFound())
+                        if (!_uriBeingRenderedWasFoundInCapturedNetworkTraffic)
                         {
-                            UpdateStatusCodeIfChanged();
-                            TakeScreenshotIfNecessary();
-                            return;
+                            if (TryFollowRedirects()) return;
+                            if (UriBeingRenderedWasFoundInCapturedNetworkTraffic())
+                            {
+                                UpdateStatusCodeIfChanged();
+                                TakeScreenshotIfConfigured();
+                                _uriBeingRenderedWasFoundInCapturedNetworkTraffic = true;
+                                return;
+                            }
                         }
 
                         if (_resourceBeingRendered.StatusCode.IsWithinBrokenRange()) return;
                         _capturedResources.Add(new Resource
                         {
-                            ParentUri = parentUri,
-                            OriginalUrl = request.Url,
+                            ParentUri = _resourceBeingRendered.Uri,
                             Uri = request.RequestUri,
-                            StatusCode = (StatusCode) response.StatusCode,
+                            OriginalUrl = request.Url,
+                            OriginalUri = request.RequestUri,
                             Size = response.ContentLength,
+                            StatusCode = (StatusCode) response.StatusCode,
                             ResourceType = httpContentTypeToResourceTypeDictionary[response.ContentType]
                         });
                     }
@@ -91,16 +93,17 @@ namespace Helix.Bot
                     if (response.StatusCode < 300 || 400 <= response.StatusCode) return false;
                     if (!response.Headers.Headers.TryGetValue("Location", out var locationHeader)) return false;
                     if (!Uri.TryCreate(locationHeader.Value, UriKind.RelativeOrAbsolute, out var redirectUri)) return false;
-                    uriBeingRendered = redirectUri.IsAbsoluteUri ? redirectUri : new Uri(_resourceBeingRendered.Uri, redirectUri);
+                    _resourceBeingRendered.Uri = redirectUri.IsAbsoluteUri ? redirectUri : new Uri(_resourceBeingRendered.Uri, redirectUri);
                     return true;
                 }
-                bool ParentUriWasFound()
+                bool UriBeingRenderedWasFoundInCapturedNetworkTraffic()
                 {
                     var capturedUri = request.RequestUri;
-                    var bothSchemesAreNotEqual = !capturedUri.Scheme.Equals(uriBeingRendered.Scheme);
-                    var strictTransportSecurity = uriBeingRendered.Scheme == "http" && capturedUri.Scheme == "https";
+                    var bothSchemesAreNotEqual = !capturedUri.Scheme.Equals(_resourceBeingRendered.Uri.Scheme);
+                    var strictTransportSecurity = _resourceBeingRendered.Uri.Scheme == "http" && capturedUri.Scheme == "https";
                     if (bothSchemesAreNotEqual && !strictTransportSecurity) return false;
 
+                    var uriBeingRendered = _resourceBeingRendered.Uri;
                     var capturedUriWithoutScheme = capturedUri.Host + capturedUri.PathAndQuery + capturedUri.Fragment;
                     var uriBeingRenderedWithoutScheme = uriBeingRendered.Host + uriBeingRendered.PathAndQuery + uriBeingRendered.Fragment;
                     return capturedUriWithoutScheme.Equals(uriBeingRenderedWithoutScheme);
@@ -114,7 +117,7 @@ namespace Helix.Bot
                     _resourceBeingRendered.StatusCode = (StatusCode) newStatusCode;
                     log.Info($"StatusCode changed from [{oldStatusCode}] to [{newStatusCode}] at [{_resourceBeingRendered.Uri}]");
                 }
-                void TakeScreenshotIfNecessary()
+                void TakeScreenshotIfConfigured()
                 {
                     if (_resourceBeingRendered.StatusCode.IsWithinBrokenRange() && configurations.TakeScreenshotEvidence)
                         _takeScreenshot = true;
@@ -146,10 +149,9 @@ namespace Helix.Bot
                 _resourceBeingRendered = resource;
                 _networkTrafficCts = new CancellationTokenSource();
                 _capturedResources = new BlockingCollection<Resource>();
+                _uriBeingRenderedWasFoundInCapturedNetworkTraffic = false;
 
-                var uri = resource.Uri;
-                var renderingResult = _webBrowser.TryRender(uri, out html, out millisecondsPageLoadTime, cancellationToken);
-
+                var renderingResult = _webBrowser.TryRender(resource.Uri, out html, out millisecondsPageLoadTime, cancellationToken);
                 if (resource.StatusCode.IsWithinBrokenRange()) millisecondsPageLoadTime = null;
                 if (!_takeScreenshot) return renderingResult;
 
@@ -179,5 +181,12 @@ namespace Helix.Bot
 
             #endregion
         }
+
+        #region Injected Services
+
+        readonly ILog _log;
+        readonly IWebBrowser _webBrowser;
+
+        #endregion
     }
 }

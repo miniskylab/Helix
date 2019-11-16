@@ -13,6 +13,7 @@ namespace Helix.Bot
     {
         readonly CancellationTokenSource _cancellationTokenSource;
         readonly ILog _log;
+        readonly IResourceScope _resourceScope;
         readonly IResourceVerifier _resourceVerifier;
         readonly IStatistics _statistics;
 
@@ -32,11 +33,12 @@ namespace Helix.Bot
             FailedProcessingResults.Completion
         );
 
-        public ResourceVerifierBlock(Configurations configurations, IResourceVerifier resourceVerifier, IStatistics statistics, ILog log)
-            : base(maxDegreeOfParallelism: configurations.MaxNetworkConnectionCount)
+        public ResourceVerifierBlock(Configurations configurations, IResourceVerifier resourceVerifier, IStatistics statistics, ILog log,
+            IResourceScope resourceScope) : base(maxDegreeOfParallelism: configurations.MaxNetworkConnectionCount)
         {
             _log = log;
             _statistics = statistics;
+            _resourceScope = resourceScope;
             _resourceVerifier = resourceVerifier;
             _cancellationTokenSource = new CancellationTokenSource();
 
@@ -83,6 +85,13 @@ namespace Helix.Bot
                     ? _resourceVerifier.Verify(resource, _cancellationTokenSource.Token).Result
                     : resource.ToVerificationResult();
 
+                var redirectHappened = !resource.OriginalUri.Equals(resource.Uri);
+                if (_resourceScope.IsStartUri(resource.OriginalUri) && redirectHappened)
+                    return ProcessUnsuccessfulResourceVerification(
+                        $"Redirect happened. Please provide a start url without any redirect. Or use this url: {resource.GetAbsoluteUrl()}",
+                        LogLevel.Error
+                    );
+
                 UpdateStatistics();
                 SendOutVerificationResult();
                 SendOutResourceVerifiedEvent();
@@ -102,13 +111,6 @@ namespace Helix.Bot
                     if (!VerificationResults.Post(verificationResult) && !VerificationResults.Completion.IsCompleted)
                         _log.Error($"Failed to post data to buffer block named [{nameof(VerificationResults)}].");
                 }
-                Resource BrokenResource()
-                {
-                    if (!BrokenResources.Post(resource) && !BrokenResources.Completion.IsCompleted)
-                        _log.Error($"Failed to post data to buffer block named [{nameof(BrokenResources)}].");
-
-                    return null;
-                }
                 void SendOutResourceVerifiedEvent()
                 {
                     var statisticsSnapshot = _statistics.TakeSnapshot();
@@ -121,6 +123,13 @@ namespace Helix.Bot
                     };
                     if (!Events.Post(resourceVerifiedEvent) && !Events.Completion.IsCompleted)
                         _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
+                }
+                Resource BrokenResource()
+                {
+                    if (!BrokenResources.Post(resource) && !BrokenResources.Completion.IsCompleted)
+                        _log.Error($"Failed to post data to buffer block named [{nameof(BrokenResources)}].");
+
+                    return null;
                 }
 
                 #endregion

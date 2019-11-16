@@ -10,6 +10,8 @@ namespace Helix.Bot.Abstractions
 
         public bool IsInternal { get; set; }
 
+        public Uri OriginalUri { get; set; }
+
         // TODO:
         // public bool Localized { get; set; }
 

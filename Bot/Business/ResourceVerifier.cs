@@ -10,12 +10,15 @@ namespace Helix.Bot
     {
         readonly HttpClient _httpClient;
         readonly IHttpContentTypeToResourceTypeDictionary _httpContentTypeToResourceTypeDictionary;
+        readonly IResourceScope _resourceScope;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public ResourceVerifier(IHttpContentTypeToResourceTypeDictionary httpContentTypeToResourceTypeDictionary, HttpClient httpClient)
+        public ResourceVerifier(IHttpContentTypeToResourceTypeDictionary httpContentTypeToResourceTypeDictionary, HttpClient httpClient,
+            IResourceScope resourceScope)
         {
-            _httpContentTypeToResourceTypeDictionary = httpContentTypeToResourceTypeDictionary;
             _httpClient = httpClient;
+            _resourceScope = resourceScope;
+            _httpContentTypeToResourceTypeDictionary = httpContentTypeToResourceTypeDictionary;
         }
 
         public async Task<VerificationResult> Verify(Resource resource, CancellationToken cancellationToken)
@@ -34,9 +37,13 @@ namespace Helix.Bot
 
                 var httpResponseMessage = await sendingGETRequestTask;
                 var httpContentType = httpResponseMessage.Content.Headers.ContentType?.ToString();
+                resource.Uri = httpResponseMessage.RequestMessage.RequestUri;
                 resource.StatusCode = (StatusCode) httpResponseMessage.StatusCode;
                 resource.Size = httpResponseMessage.Content.Headers.ContentLength;
                 resource.ResourceType = _httpContentTypeToResourceTypeDictionary[httpContentType];
+
+                if (!_resourceScope.IsStartUri(resource.OriginalUri))
+                    resource.IsInternal = _resourceScope.IsInternalResource(resource);
             }
             catch (TaskCanceledException)
             {
@@ -44,14 +51,8 @@ namespace Helix.Bot
                     ? StatusCode.Processing
                     : StatusCode.RequestTimeout;
             }
-            catch (HttpRequestException)
-            {
-                resource.StatusCode = StatusCode.Failed;
-            }
-            finally
-            {
-                sendingGETRequestTask?.Dispose();
-            }
+            catch (HttpRequestException) { resource.StatusCode = StatusCode.Failed; }
+            finally { sendingGETRequestTask?.Dispose(); }
 
             return resource.ToVerificationResult();
         }

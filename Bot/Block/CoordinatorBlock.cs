@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Linq;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using Helix.Bot.Abstractions;
@@ -14,10 +13,10 @@ namespace Helix.Bot
     public class CoordinatorBlock : TransformManyBlock<ProcessingResult, Resource>, ICoordinatorBlock, IDisposable
     {
         readonly HashSet<string> _alreadyProcessedUrls;
-        readonly Configurations _configurations;
         readonly ILog _log;
         readonly object _memorizationLock;
         readonly IResourceEnricher _resourceEnricher;
+        readonly IResourceScope _resourceScope;
         readonly StateMachine<WorkflowState, WorkflowCommand> _stateMachine;
         readonly IStatistics _statistics;
 
@@ -25,12 +24,12 @@ namespace Helix.Bot
 
         public override Task Completion => Task.WhenAll(base.Completion, Events.Completion);
 
-        public CoordinatorBlock(Configurations configurations, IResourceEnricher resourceEnricher, IStatistics statistics, ILog log)
+        public CoordinatorBlock(IResourceEnricher resourceEnricher, IStatistics statistics, IResourceScope resourceScope, ILog log)
         {
             _log = log;
             _statistics = statistics;
+            _resourceScope = resourceScope;
             _memorizationLock = new object();
-            _configurations = configurations;
             _resourceEnricher = resourceEnricher;
             _alreadyProcessedUrls = new HashSet<string>();
 
@@ -111,8 +110,19 @@ namespace Helix.Bot
                 if (processingResult == null)
                     throw new ArgumentNullException(nameof(processingResult));
 
-                var isNotStartResource = processingResult.ProcessedResource != null;
-                if (isNotStartResource) CheckIfProcessedResourceWasRegistered();
+                var processedResource = processingResult.ProcessedResource;
+                var isNotInitialProcessingResult = processedResource != null;
+                if (isNotInitialProcessingResult)
+                {
+                    var redirectHappened = !processedResource.OriginalUri.Equals(processedResource.Uri);
+                    if (_resourceScope.IsStartUri(processedResource.OriginalUri) && redirectHappened)
+                    {
+                        SendOut(new RedirectHappenedAtStartUrlEvent { FinalUrlAfterRedirects = processedResource.GetAbsoluteUrl() });
+                        return null;
+                    }
+
+                    CheckIfProcessedResourceWasRegistered();
+                }
 
                 var newlyDiscoveredResources = DiscoverNewResources();
                 _statistics.DecrementRemainingWorkload();
@@ -126,24 +136,12 @@ namespace Helix.Bot
 
                 #region Local Functions
 
-                void CheckIfProcessedResourceWasRegistered()
-                {
-                    lock (_memorizationLock)
-                    {
-                        if (!_alreadyProcessedUrls.Contains(processingResult.ProcessedResource.GetAbsoluteUrl()))
-                            throw new InvalidConstraintException($"Processed resource was not registered by {nameof(CoordinatorBlock)}.");
-                    }
-                }
                 List<Resource> DiscoverNewResources()
                 {
                     if (!(processingResult is SuccessfulProcessingResult successfulProcessingResult)) return new List<Resource>();
 
                     var newResources = new List<Resource>();
-                    var discoveredResources = successfulProcessingResult.NewResources
-                        .Where(resource => resource.IsInternal || _configurations.VerifyExternalUrls)
-                        .ToList();
-
-                    foreach (var discoveredResource in discoveredResources)
+                    foreach (var discoveredResource in successfulProcessingResult.NewResources)
                     {
                         lock (_memorizationLock)
                         {
@@ -155,9 +153,20 @@ namespace Helix.Bot
                     }
                     return newResources;
                 }
+                void CheckIfProcessedResourceWasRegistered()
+                {
+                    lock (_memorizationLock)
+                    {
+                        var redirectHappened = !processedResource.OriginalUri.Equals(processedResource.Uri);
+                        if (!redirectHappened && !_alreadyProcessedUrls.Contains(processedResource.GetAbsoluteUrl()))
+                            throw new InvalidConstraintException($"Processed resource was not registered by {nameof(CoordinatorBlock)}.");
+
+                        if (redirectHappened) _alreadyProcessedUrls.Add(processedResource.GetAbsoluteUrl());
+                    }
+                }
                 void SendOut(Event @event)
                 {
-                    if (!Events.Post(@event))
+                    if (!Events.Post(@event) && !Events.Completion.IsCompleted)
                         _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
                 }
 

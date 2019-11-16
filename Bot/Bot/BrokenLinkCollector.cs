@@ -97,21 +97,22 @@ namespace Helix.Bot
 
                 void SetupAndConfigureServices()
                 {
-                    _log.Info("Setting up and configuring services ...");
+                    Broadcast(new StartProgressReportEvent { Message = "Setting up and configuring services ..." });
                     ServiceLocator.SetupAndConfigureServices(configurations);
-                    ServiceLocator.Get<IEventBroadcaster>().OnEventBroadcast += @event =>
-                    {
-                        OnEventBroadcast?.Invoke(@event);
-                        if (!(@event is ResourceVerifiedEvent) && !string.IsNullOrWhiteSpace(@event.Message))
-                            _log.Info(@event.Message);
-                    };
 
                     _brokenLinkCollectionWorkflow = ServiceLocator.Get<IBrokenLinkCollectionWorkflow>();
                     _brokenLinkCollectionWorkflow.OnEventBroadcast += @event =>
                     {
-                        ServiceLocator.Get<IEventBroadcaster>().Broadcast(@event);
-                        if (@event is NoMoreWorkToDoEvent)
-                            Task.Run(() => Shutdown(BotCommand.MarkAsRanToCompletion));
+                        Broadcast(@event);
+                        switch (@event)
+                        {
+                            case NoMoreWorkToDoEvent _:
+                                Task.Run(() => Shutdown(BotCommand.MarkAsRanToCompletion));
+                                break;
+                            case RedirectHappenedAtStartUrlEvent _:
+                                Task.Run(() => Shutdown(BotCommand.MarkAsFaulted));
+                                break;
+                        }
                     };
                 }
                 void RecreateDirectoryContainingScreenshotFiles()
@@ -122,16 +123,15 @@ namespace Helix.Bot
                 }
                 void ActivateWorkflow()
                 {
-                    _log.Info($"Activating {nameof(BrokenLinkCollectionWorkflow)} ...");
+                    Broadcast(new StartProgressReportEvent { Message = $"Activating {nameof(BrokenLinkCollectionWorkflow)} ..." });
                     if (!_brokenLinkCollectionWorkflow.TryActivate(configurations.StartUri.AbsoluteUri))
                         throw new Exception("Failed to activate workflow.");
 
-                    var eventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
-                    eventBroadcaster.Broadcast(new WorkflowActivatedEvent());
+                    Broadcast(new WorkflowActivatedEvent());
                 }
                 void StartHardwareMonitorService()
                 {
-                    ServiceLocator.Get<IEventBroadcaster>().Broadcast(StartProgressReportEvent("Starting hardware monitor service ..."));
+                    Broadcast(StartProgressReportEvent("Starting hardware monitor service ..."));
                     ServiceLocator.Get<IHardwareMonitor>().StartMonitoring();
                 }
                 Event StartProgressReportEvent(string message) { return new StartProgressReportEvent { Message = message }; }
@@ -140,6 +140,13 @@ namespace Helix.Bot
             });
             if (!stateTransitionSucceeded) _log.StateTransitionFailureEvent(_stateMachine.CurrentState, BotCommand.Initialize);
             return tryStartResult;
+        }
+
+        void Broadcast(Event @event)
+        {
+            OnEventBroadcast?.Invoke(@event);
+            if (!(@event is ResourceVerifiedEvent) && !string.IsNullOrWhiteSpace(@event.Message))
+                _log.Info(@event.Message);
         }
 
         void Shutdown(BotCommand botCommand)
@@ -172,9 +179,7 @@ namespace Helix.Bot
                         var hardwareMonitor = ServiceLocator.Get<IHardwareMonitor>();
                         if (hardwareMonitor == null || !hardwareMonitor.IsRunning) return;
 
-                        var eventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
-                        eventBroadcaster.Broadcast(StopProgressReportEvent("Stopping hardware monitor service ..."));
-
+                        Broadcast(StopProgressReportEvent("Stopping hardware monitor service ..."));
                         hardwareMonitor.StopMonitoring();
                     }
                     catch (Exception exception)
@@ -187,9 +192,7 @@ namespace Helix.Bot
                 {
                     try
                     {
-                        var eventBroadcaster = ServiceLocator.Get<IEventBroadcaster>();
-                        eventBroadcaster.Broadcast(StopProgressReportEvent("Waiting for background tasks to complete ..."));
-
+                        Broadcast(StopProgressReportEvent("Waiting for background tasks to complete ..."));
                         _brokenLinkCollectionWorkflow.Shutdown();
                     }
                     catch (Exception exception)
@@ -202,7 +205,7 @@ namespace Helix.Bot
                 {
                     try
                     {
-                        ServiceLocator.Get<IEventBroadcaster>().Broadcast(StopProgressReportEvent("Disposing services ..."));
+                        Broadcast(StopProgressReportEvent("Disposing services ..."));
                         ServiceLocator.DisposeServices();
                     }
                     catch (Exception exception)
