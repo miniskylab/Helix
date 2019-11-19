@@ -72,18 +72,19 @@ namespace Helix.Bot
             var (htmlRenderer, resource) = htmlRendererAndResource ?? throw new ArgumentNullException(nameof(htmlRendererAndResource));
             try
             {
-                var resourceSizeInMb = resource.Size / 1024f / 1024f;
-                if (resourceSizeInMb > 10)
-                    return ProcessUnsuccessfulRendering(
-                        $"Resource was not queued for rendering because it was too big ({resourceSizeInMb} MB): {resource.ToJson()}",
-                        LogLevel.Information
-                    );
+                if (!resource.StatusCode.IsWithinBrokenRange())
+                {
+                    var resourceSizeInMb = resource.Size / 1024f / 1024f;
+                    if (resourceSizeInMb > 10)
+                        return ProcessUnsuccessfulRendering(
+                            $"Resource was not queued for rendering because it was too big ({resourceSizeInMb} MB): {resource.ToJson()}",
+                            LogLevel.Information
+                        );
 
-                var resourceIsNotBroken = !resource.StatusCode.IsWithinBrokenRange();
-                var resourceTypeIsNotRenderable = !(ResourceType.Html | ResourceType.Unknown).HasFlag(resource.ResourceType);
-                var resourceShouldNotBeRendered = resourceIsNotBroken && resourceTypeIsNotRenderable;
-                if (!resource.IsInternal || !resource.IsExtractedFromHtmlDocument || resourceShouldNotBeRendered)
-                    return ProcessUnsuccessfulRendering(null, LogLevel.None);
+                    var resourceTypeIsNotRenderable = !(ResourceType.Html | ResourceType.Unknown).HasFlag(resource.ResourceType);
+                    if (!resource.IsInternal || !resource.IsExtractedFromHtmlDocument || resourceTypeIsNotRenderable)
+                        return ProcessUnsuccessfulRendering(null, LogLevel.None);
+                }
 
                 var oldStatusCode = resource.StatusCode;
                 var renderingFailed = !htmlRenderer.TryRender(
