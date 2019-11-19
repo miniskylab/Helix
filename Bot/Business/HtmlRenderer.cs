@@ -62,13 +62,12 @@ namespace Helix.Bot
                         if (!_uriBeingRenderedWasFoundInCapturedNetworkTraffic)
                         {
                             if (TryFollowRedirects()) return;
-                            if (UriBeingRenderedWasFoundInCapturedNetworkTraffic())
-                            {
-                                UpdateStatusCodeIfChanged();
-                                TakeScreenshotIfConfigured();
-                                _uriBeingRenderedWasFoundInCapturedNetworkTraffic = true;
-                                return;
-                            }
+                            if (!TryFindUriBeingRendered()) return;
+
+                            UpdateStatusCodeIfChanged();
+                            TakeScreenshotIfConfigured();
+                            _uriBeingRenderedWasFoundInCapturedNetworkTraffic = true;
+                            return;
                         }
 
                         if (_resourceBeingRendered.StatusCode.IsWithinBrokenRange()) return;
@@ -88,15 +87,8 @@ namespace Helix.Bot
 
                 #region Local Functions
 
-                bool TryFollowRedirects()
-                {
-                    if (response.StatusCode < 300 || 400 <= response.StatusCode) return false;
-                    if (!response.Headers.Headers.TryGetValue("Location", out var locationHeader)) return false;
-                    if (!Uri.TryCreate(locationHeader.Value, UriKind.RelativeOrAbsolute, out var redirectUri)) return false;
-                    _resourceBeingRendered.Uri = redirectUri.IsAbsoluteUri ? redirectUri : new Uri(_resourceBeingRendered.Uri, redirectUri);
-                    return true;
-                }
-                bool UriBeingRenderedWasFoundInCapturedNetworkTraffic()
+                bool TryFollowRedirects() { return 300 <= response.StatusCode && response.StatusCode < 400; }
+                bool TryFindUriBeingRendered()
                 {
                     var capturedUri = request.RequestUri;
                     var bothSchemesAreNotEqual = !capturedUri.Scheme.Equals(_resourceBeingRendered.Uri.Scheme);
