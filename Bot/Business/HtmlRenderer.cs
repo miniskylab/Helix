@@ -61,8 +61,8 @@ namespace Helix.Bot
                         if (request.Method.ToUpperInvariant() != "GET") return;
                         if (!_uriBeingRenderedWasFoundInCapturedNetworkTraffic)
                         {
-                            if (TryFollowRedirects()) return;
                             if (!TryFindUriBeingRendered()) return;
+                            if (TryFollowRedirects()) return;
 
                             UpdateStatusCodeIfChanged();
                             TakeScreenshotIfConfigured();
@@ -87,7 +87,14 @@ namespace Helix.Bot
 
                 #region Local Functions
 
-                bool TryFollowRedirects() { return 300 <= response.StatusCode && response.StatusCode < 400; }
+                bool TryFollowRedirects()
+                {
+                    if (response.StatusCode < 300 || 400 <= response.StatusCode) return false;
+                    if (!response.Headers.Headers.TryGetValue("Location", out var locationHeader)) return false;
+                    if (!Uri.TryCreate(locationHeader.Value, UriKind.RelativeOrAbsolute, out var redirectUri)) return false;
+                    _resourceBeingRendered.Uri = redirectUri.IsAbsoluteUri ? redirectUri : new Uri(_resourceBeingRendered.Uri, redirectUri);
+                    return true;
+                }
                 bool TryFindUriBeingRendered()
                 {
                     var capturedUri = request.RequestUri;
