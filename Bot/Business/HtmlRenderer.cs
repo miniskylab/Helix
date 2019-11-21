@@ -96,8 +96,8 @@ namespace Helix.Bot
                     if (bothSchemesAreNotEqual && !strictTransportSecurity) return false;
 
                     var uriBeingRendered = _resourceBeingRendered.Uri;
-                    var capturedUriWithoutScheme = capturedUri.Host + capturedUri.PathAndQuery + capturedUri.Fragment;
-                    var uriBeingRenderedWithoutScheme = uriBeingRendered.Host + uriBeingRendered.PathAndQuery + uriBeingRendered.Fragment;
+                    var capturedUriWithoutScheme = capturedUri.Authority + capturedUri.PathAndQuery;
+                    var uriBeingRenderedWithoutScheme = uriBeingRendered.Authority + uriBeingRendered.PathAndQuery;
                     return capturedUriWithoutScheme.Equals(uriBeingRenderedWithoutScheme);
                 }
                 void UpdateStatusCodeIfChanged()
