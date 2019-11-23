@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Reflection;
-using System.Runtime.CompilerServices;
 using Helix.Bot.Abstractions;
 using Newtonsoft.Json;
 
@@ -15,8 +13,6 @@ namespace Helix.Bot
                 : resource.OriginalUrl;
         }
 
-        public static bool IsCompilerGenerated(this Type type) => type.GetCustomAttribute(typeof(CompilerGeneratedAttribute), true) != null;
-
         public static bool IsWithinBrokenRange(this StatusCode statusCode) { return Math.Abs((int) statusCode) >= 400; }
 
         public static string ToJson(this object @object) { return JsonConvert.SerializeObject(@object); }
@@ -26,10 +22,11 @@ namespace Helix.Bot
             return new VerificationResult
             {
                 Id = resource.Id,
-                IsInternalResource = resource.IsInternal,
-                ParentUrl = resource.ParentUri?.AbsoluteUri,
                 StatusCode = resource.StatusCode,
                 VerifiedUrl = resource.GetAbsoluteUrl(),
+                IsInternalResource = resource.IsInternal,
+                ParentUrl = resource.ParentUri?.AbsoluteUri,
+                StatusMessage = Enum.GetName(typeof(StatusCode), resource.StatusCode),
                 ResourceType = Enum.GetName(typeof(ResourceType), resource.ResourceType)
             };
         }

@@ -1,6 +1,8 @@
+using Helix.Core;
+
 namespace Helix.Bot.Abstractions
 {
-    public interface IStatistics
+    public interface IStatistics : IService
     {
         void DecrementRemainingWorkload();
 

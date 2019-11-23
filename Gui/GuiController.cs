@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Helix.Bot;
 using Helix.Bot.Abstractions;
+using Helix.Core;
 using Helix.IPC;
 using Helix.IPC.Abstractions;
 using JetBrains.Annotations;
@@ -18,6 +19,7 @@ namespace Helix.Gui
     public static class GuiController
     {
         static BrokenLinkCollector _brokenLinkCollector;
+        static Configurations _configurations;
         static Task _elapsedTimeUpdateTask;
         static bool _isClosing;
         static Process _sqLiteProcess;
@@ -30,6 +32,8 @@ namespace Helix.Gui
 
         static GuiController()
         {
+            Log4NetModule.ConfigureLog4Net();
+
             Log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
             GuiProcess = new Process { StartInfo = { FileName = Configurations.PathToElectronJsExecutable } };
             ManualResetEvent = new ManualResetEvent(false);
@@ -107,9 +111,15 @@ namespace Helix.Gui
                 }
                 else
                 {
+                    if (_configurations == null)
+                    {
+                        Log.Error("Cannot preview the report because there is no configurations provided.");
+                        return;
+                    }
+
                     _sqLiteProcess = Process.Start(
                         Configurations.PathToSqLiteBrowserExecutable,
-                        $"-R -t DataTransferObjects {Configurations.PathToReportFile}" // TODO: Remove hard-coded [DataTransferObjects]
+                        $"-R -t DataTransferObjects {_configurations.PathToReportFile}" // TODO: Remove hard-coded [DataTransferObjects]
                     );
 
                     /* Wait for MainWindowHandle to be available.
@@ -129,50 +139,73 @@ namespace Helix.Gui
         [UsedImplicitly]
         static void Start(string configurationJsonString)
         {
-            _sqLiteProcess?.CloseMainWindow();
-            _sqLiteProcess?.Close();
+            var isFirstRun = _configurations == null;
+            _configurations = new Configurations(configurationJsonString);
 
-            _brokenLinkCollector = new BrokenLinkCollector();
-            _brokenLinkCollector.OnEventBroadcast += OnStartProgressUpdated;
-            _brokenLinkCollector.OnEventBroadcast += OnWorkflowActivated;
-            _brokenLinkCollector.OnEventBroadcast += OnResourceVerified;
-            _brokenLinkCollector.OnEventBroadcast += OnResourceRendered;
-            _brokenLinkCollector.OnEventBroadcast += OnResourceProcessed;
-            _brokenLinkCollector.OnEventBroadcast += OnWorkflowCompleted;
-
-            Redraw(new Frame
-            {
-                DisableMainButton = true,
-                DisableStopButton = true,
-                DisableCloseButton = true,
-                DisablePreviewButton = true,
-                DisableConfigurationPanel = true,
-                BorderColor = BorderColor.Normal,
-                MainButtonFunctionality = MainButtonFunctionality.Start
-            });
-
-            if (_brokenLinkCollector.TryStart(new Configurations(configurationJsonString)))
-            {
-                Redraw(new Frame
-                {
-                    DisableStopButton = false,
-                    DisableCloseButton = false,
-                    MainButtonFunctionality = MainButtonFunctionality.Pause
-                });
-                UpdateElapsedTimeOnGuiEvery(TimeSpan.FromSeconds(1));
-            }
-            else
-            {
-                Redraw(new Frame
-                {
-                    DisableMainButton = false,
-                    DisableCloseButton = false,
-                    MainButtonFunctionality = MainButtonFunctionality.Start
-                });
-            }
+            CreateNewLogFile();
+            CloseReportViewerIfOpen();
+            CreateAndConfigureBot();
+            DisableGui();
+            TryStartBot();
 
             #region Local Functions
 
+            void CreateNewLogFile()
+            {
+                Log4NetModule.CreateNewLogFile(_configurations.PathToLogFile);
+                if (!isFirstRun) Log.Info("==================================================");
+                Log.Info($"Accepted: {_configurations.StartUri}");
+            }
+            void CloseReportViewerIfOpen()
+            {
+                _sqLiteProcess?.CloseMainWindow();
+                _sqLiteProcess?.Close();
+            }
+            void CreateAndConfigureBot()
+            {
+                _brokenLinkCollector = new BrokenLinkCollector();
+                _brokenLinkCollector.OnEventBroadcast += OnStartProgressUpdated;
+                _brokenLinkCollector.OnEventBroadcast += OnWorkflowActivated;
+                _brokenLinkCollector.OnEventBroadcast += OnResourceVerified;
+                _brokenLinkCollector.OnEventBroadcast += OnResourceRendered;
+                _brokenLinkCollector.OnEventBroadcast += OnResourceProcessed;
+                _brokenLinkCollector.OnEventBroadcast += OnWorkflowCompleted;
+            }
+            void DisableGui()
+            {
+                Redraw(new Frame
+                {
+                    DisableMainButton = true,
+                    DisableStopButton = true,
+                    DisableCloseButton = true,
+                    DisablePreviewButton = true,
+                    DisableConfigurationPanel = true,
+                    BorderColor = BorderColor.Normal,
+                    MainButtonFunctionality = MainButtonFunctionality.Start
+                });
+            }
+            void TryStartBot()
+            {
+                if (_brokenLinkCollector.TryStart(_configurations))
+                {
+                    Redraw(new Frame
+                    {
+                        DisableStopButton = false,
+                        DisableCloseButton = false,
+                        MainButtonFunctionality = MainButtonFunctionality.Pause
+                    });
+                    UpdateElapsedTimeOnGuiEvery(TimeSpan.FromSeconds(1));
+                }
+                else
+                {
+                    Redraw(new Frame
+                    {
+                        DisableMainButton = false,
+                        DisableCloseButton = false,
+                        MainButtonFunctionality = MainButtonFunctionality.Start
+                    });
+                }
+            }
             void OnStartProgressUpdated(Event @event)
             {
                 if (@event is StartProgressReportEvent)

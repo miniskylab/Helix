@@ -19,6 +19,8 @@ namespace Helix.Bot.Abstractions
         [Required]
         public StatusCode StatusCode { [UsedImplicitly] get; set; }
 
+        public string StatusMessage { [UsedImplicitly] get; set; }
+
         [Required]
         public string VerifiedUrl { [UsedImplicitly] get; set; }
     }

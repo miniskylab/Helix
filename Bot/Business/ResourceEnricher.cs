@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Data;
 using Helix.Bot.Abstractions;
+using Helix.Core;
 
 namespace Helix.Bot
 {
@@ -20,6 +21,8 @@ namespace Helix.Bot
         {
             if (resource == null) throw new ArgumentNullException(nameof(resource));
             if (resource.StatusCode != default && resource.Uri == null) throw new InvalidConstraintException();
+            if (resource.StatusCode == default && resource.Uri != null) throw new InvalidConstraintException();
+            if (resource.Id != 0) return resource;
 
             resource.Id = _incrementalIdGenerator.GetNext();
             if (resource.StatusCode == default)
@@ -28,6 +31,7 @@ namespace Helix.Bot
                 else if (UriSchemeIsNotSupported()) resource.StatusCode = StatusCode.UriSchemeNotSupported;
                 else if (IsOrphanedUri()) resource.StatusCode = StatusCode.OrphanedUri;
                 else StripFragment();
+
                 resource.Uri = resource.OriginalUri;
             }
 
@@ -53,11 +57,7 @@ namespace Helix.Bot
                 // TODO: Investigate where those orphaned Uri-s came from.
                 return resource.ParentUri == null && !_resourceScope.IsStartUri(resource.OriginalUri);
             }
-            void StripFragment()
-            {
-                if (string.IsNullOrWhiteSpace(resource.OriginalUri.Fragment)) return;
-                resource.OriginalUri = new UriBuilder(resource.OriginalUri) { Fragment = string.Empty }.Uri;
-            }
+            void StripFragment() { resource.OriginalUri = resource.OriginalUri.StripFragment(); }
         }
     }
 }

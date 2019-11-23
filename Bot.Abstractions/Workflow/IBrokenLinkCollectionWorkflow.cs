@@ -1,8 +1,9 @@
 using System;
+using Helix.Core;
 
 namespace Helix.Bot.Abstractions
 {
-    public interface IBrokenLinkCollectionWorkflow
+    public interface IBrokenLinkCollectionWorkflow : IService
     {
         event Action<Event> OnEventBroadcast;
 

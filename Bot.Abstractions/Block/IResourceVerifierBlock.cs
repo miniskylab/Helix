@@ -1,8 +1,9 @@
 using System.Threading.Tasks.Dataflow;
+using Helix.Core;
 
 namespace Helix.Bot.Abstractions
 {
-    public interface IResourceVerifierBlock : IPropagatorBlock<Resource, Resource>, IReceivableSourceBlock<Resource>
+    public interface IResourceVerifierBlock : IPropagatorBlock<Resource, Resource>, IReceivableSourceBlock<Resource>, IService
     {
         BufferBlock<Resource> BrokenResources { get; }
 

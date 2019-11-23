@@ -41,7 +41,7 @@ namespace Helix.Bot
             {
                 hardwareMonitor.OnLowCpuAndMemoryUsage += (averageCpuUsage, memoryUsage) =>
                 {
-                    if (OutputCount > 0 || _counter.CreatedHtmlRenderCount == configurations.MaxHtmlRendererCount) return;
+                    if (OutputCount > 0 || _counter.CreatedHtmlRenderCount == Configurations.MaxHtmlRendererCount) return;
                     CreateHtmlRenderer();
 
                     log.Info(

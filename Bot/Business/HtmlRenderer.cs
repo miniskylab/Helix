@@ -3,9 +3,11 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Helix.Bot.Abstractions;
+using Helix.Core;
 using Helix.WebBrowser.Abstractions;
 using log4net;
 using Titanium.Web.Proxy.EventArguments;
@@ -28,6 +30,7 @@ namespace Helix.Bot
         {
             _log = log;
             _webBrowser = webBrowser;
+            _configurations = configurations;
             _webBrowser.BeforeRequest += EnsureInternal;
             _webBrowser.BeforeResponse += CaptureNetworkTraffic;
 
@@ -70,11 +73,11 @@ namespace Helix.Bot
                             return;
                         }
 
-                        if (_resourceBeingRendered.StatusCode.IsWithinBrokenRange()) return;
+                        if (_resourceBeingRendered.StatusCode.IsWithinBrokenRange() || IsRedirectResponse()) return;
                         _capturedResources.Add(new Resource
                         {
                             ParentUri = _resourceBeingRendered.Uri,
-                            Uri = request.RequestUri,
+                            Uri = request.RequestUri.StripFragment(),
                             OriginalUrl = request.Url,
                             OriginalUri = request.RequestUri,
                             Size = response.ContentLength,
@@ -89,23 +92,30 @@ namespace Helix.Bot
 
                 bool TryFollowRedirects()
                 {
-                    if (response.StatusCode < 300 || 400 <= response.StatusCode) return false;
-                    if (!response.Headers.Headers.TryGetValue("Location", out var locationHeader)) return false;
+                    if (!IsRedirectResponse()) return false;
+                    if (!response.Headers.Headers.TryGetValue("Location", out var locationHeader))
+                    {
+                        _log.Info(
+                            "Http redirect response without \"Location\" header detected in captured resources while rendering: " +
+                            $"{_resourceBeingRendered.ToJson()}"
+                        );
+                        return false;
+                    }
+
                     if (!Uri.TryCreate(locationHeader.Value, UriKind.RelativeOrAbsolute, out var redirectUri)) return false;
-                    _resourceBeingRendered.Uri = redirectUri.IsAbsoluteUri ? redirectUri : new Uri(_resourceBeingRendered.Uri, redirectUri);
+                    _resourceBeingRendered.Uri = redirectUri.IsAbsoluteUri
+                        ? redirectUri.StripFragment()
+                        : new Uri(_resourceBeingRendered.Uri, redirectUri).StripFragment();
+
                     return true;
                 }
                 bool TryFindUriBeingRendered()
                 {
-                    var capturedUri = request.RequestUri;
+                    var capturedUri = request.RequestUri.StripFragment();
                     var bothSchemesAreNotEqual = !capturedUri.Scheme.Equals(_resourceBeingRendered.Uri.Scheme);
                     var strictTransportSecurity = _resourceBeingRendered.Uri.Scheme == "http" && capturedUri.Scheme == "https";
                     if (bothSchemesAreNotEqual && !strictTransportSecurity) return false;
-
-                    var uriBeingRendered = _resourceBeingRendered.Uri;
-                    var capturedUriWithoutScheme = capturedUri.Authority + capturedUri.PathAndQuery;
-                    var uriBeingRenderedWithoutScheme = uriBeingRendered.Authority + uriBeingRendered.PathAndQuery;
-                    return capturedUriWithoutScheme.Equals(uriBeingRenderedWithoutScheme);
+                    return RemoveScheme(capturedUri).Equals(RemoveScheme(_resourceBeingRendered.Uri));
                 }
                 void UpdateStatusCodeIfChanged()
                 {
@@ -114,13 +124,15 @@ namespace Helix.Bot
                     if (newStatusCode == oldStatusCode) return;
 
                     _resourceBeingRendered.StatusCode = (StatusCode) newStatusCode;
-                    log.Info($"StatusCode changed from [{oldStatusCode}] to [{newStatusCode}] at [{_resourceBeingRendered.Uri}]");
+                    log.Debug($"StatusCode changed from [{oldStatusCode}] to [{newStatusCode}] at [{_resourceBeingRendered.Uri}]");
                 }
                 void TakeScreenshotIfConfigured()
                 {
                     if (_resourceBeingRendered.StatusCode.IsWithinBrokenRange() && configurations.TakeScreenshotEvidence)
                         _takeScreenshot = true;
                 }
+                bool IsRedirectResponse() { return 300 <= response.StatusCode && response.StatusCode < 400; }
+                string RemoveScheme(Uri uri) { return WebUtility.UrlDecode($"{uri.Host}:{uri.Port}{uri.PathAndQuery}"); }
 
                 #endregion
             }
@@ -154,7 +166,7 @@ namespace Helix.Bot
                 if (resource.StatusCode.IsWithinBrokenRange()) millisecondsPageLoadTime = null;
                 if (!_takeScreenshot) return renderingResult;
 
-                var pathToDirectoryContainsScreenshotFiles = Configurations.PathToDirectoryContainsScreenshotFiles;
+                var pathToDirectoryContainsScreenshotFiles = _configurations.PathToDirectoryContainsScreenshotFiles;
                 var pathToScreenshotFile = Path.Combine(pathToDirectoryContainsScreenshotFiles, $"{_resourceBeingRendered.Id}.png");
                 if (!_webBrowser.TryTakeScreenshot(pathToScreenshotFile))
                     _log.Error($"Failed to take screenshot at URL: {_resourceBeingRendered.GetAbsoluteUrl()}");
@@ -185,6 +197,7 @@ namespace Helix.Bot
 
         readonly ILog _log;
         readonly IWebBrowser _webBrowser;
+        readonly Configurations _configurations;
 
         #endregion
     }

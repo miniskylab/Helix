@@ -1,8 +1,9 @@
 ﻿using System;
+using Helix.Core;
 
 namespace Helix.Bot.Abstractions
 {
-    public interface IResourceScope
+    public interface IResourceScope : IService
     {
         bool IsInternalResource(Resource resource);
 

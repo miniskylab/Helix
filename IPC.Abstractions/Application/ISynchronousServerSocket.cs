@@ -1,8 +1,9 @@
 ﻿using System;
+using Helix.Core;
 
 namespace Helix.IPC.Abstractions
 {
-    public interface ISynchronousServerSocket : IDisposable
+    public interface ISynchronousServerSocket : IService, IDisposable
     {
         event Action<Message> OnReceived;
 

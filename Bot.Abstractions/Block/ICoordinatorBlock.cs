@@ -1,8 +1,9 @@
 using System.Threading.Tasks.Dataflow;
+using Helix.Core;
 
 namespace Helix.Bot.Abstractions
 {
-    public interface ICoordinatorBlock : IPropagatorBlock<ProcessingResult, Resource>, IReceivableSourceBlock<Resource>
+    public interface ICoordinatorBlock : IPropagatorBlock<ProcessingResult, Resource>, IReceivableSourceBlock<Resource>, IService
     {
         BufferBlock<Event> Events { get; }
 

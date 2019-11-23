@@ -1,8 +1,9 @@
 ﻿using System;
+using Helix.Core;
 
 namespace Helix.Bot.Abstractions
 {
-    public interface IHardwareMonitor
+    public interface IHardwareMonitor : IService
     {
         bool IsRunning { get; }
 

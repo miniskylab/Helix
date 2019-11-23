@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Threading;
+using Helix.Core;
 using Titanium.Web.Proxy.EventArguments;
 
 namespace Helix.WebBrowser.Abstractions
 {
-    public interface IWebBrowser : IDisposable
+    public interface IWebBrowser : IService, IDisposable
     {
         Uri CurrentUri { get; }
 

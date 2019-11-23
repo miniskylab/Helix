@@ -1,4 +1,5 @@
 using System;
+using System.Data;
 using System.IO;
 using System.Reflection;
 using Newtonsoft.Json.Linq;
@@ -7,24 +8,9 @@ namespace Helix.Bot.Abstractions
 {
     public class Configurations
     {
-        public static int GuiControllerPort { get; } = 18880;
+        readonly string _id;
 
-        public TimeSpan HttpRequestTimeout { get; } = TimeSpan.FromMinutes(3);
-
-        public int MaxHtmlRendererCount { get; } = 10;
-
-        public int MaxNetworkConnectionCount { get; } = 2500;
-
-        public static string PathToChromiumExecutable { get; } = Path.Combine(WorkingDirectory, "chromium/chrome.exe");
-
-        public static string PathToDirectoryContainsScreenshotFiles { get; } = Path.Combine(WorkingDirectory, "screenshots");
-
-        public static string PathToElectronJsExecutable { get; } = Path.Combine(WorkingDirectory, "ui/electron.exe");
-
-        public static string PathToReportFile { get; } = Path.Combine(WorkingDirectory, "report.sqlite3");
-
-        public static string PathToSqLiteBrowserExecutable { get; } =
-            Path.Combine(WorkingDirectory, "sqlite-browser/DB Browser for SQLite.exe");
+        public bool IncludeRedirectUrlsInReport { get; }
 
         public string RemoteHost { get; }
 
@@ -36,9 +22,29 @@ namespace Helix.Bot.Abstractions
 
         public bool UseIncognitoWebBrowser { get; } = true;
 
-        public static string PathToLogFile => Path.Combine(WorkingDirectory, $"logs\\{nameof(Helix)}.{DateTime.Now:yyyyMMdd-HHmmss}.log");
+        public static int GuiControllerPort => 18880;
+
+        public static TimeSpan HttpRequestTimeout => TimeSpan.FromMinutes(3);
+
+        public static int MaxHtmlRendererCount => 10;
+
+        public static int MaxNetworkConnectionCount => 300;
+
+        public static string PathToChromiumExecutable => Path.Combine(WorkingDirectory, "chromium/chrome.exe");
+
+        public string PathToDirectoryContainsScreenshotFiles => Path.Combine(OutputDirectory, $"{_id}/Screenshots");
+
+        public static string PathToElectronJsExecutable => Path.Combine(WorkingDirectory, "ui/electron.exe");
+
+        public string PathToLogFile => Path.Combine(OutputDirectory, $"{_id}/Helix.log");
+
+        public string PathToReportFile => Path.Combine(OutputDirectory, $"{_id}/Report.sqlite3");
+
+        public static string PathToSqLiteBrowserExecutable => Path.Combine(WorkingDirectory, "sqlite-browser/DB Browser for SQLite.exe");
 
         public static string WorkingDirectory => Path.GetDirectoryName(Assembly.GetEntryAssembly()?.Location);
+
+        static string OutputDirectory => Path.Combine(WorkingDirectory, "_outputs");
 
         public Configurations() { }
 
@@ -46,9 +52,16 @@ namespace Helix.Bot.Abstractions
         {
             var tokens = JObject.Parse(configurationJsonString);
             StartUri = ValidateStartUri((string) tokens.SelectToken(nameof(StartUri)) ?? string.Empty);
+            IncludeRedirectUrlsInReport = (bool) (tokens.SelectToken(nameof(IncludeRedirectUrlsInReport)) ?? false);
 
             RemoteHost = ((string) tokens.SelectToken(nameof(RemoteHost)) ?? string.Empty).ToLower();
             if (string.IsNullOrWhiteSpace(RemoteHost)) RemoteHost = "_";
+
+            _id = $"{StartUri.Host}-{StartUri.Port}-{DateTime.Now:yyyyMMdd-HHmmss}";
+
+            if (Directory.Exists(Path.Combine(OutputDirectory, $"{_id}")))
+                throw new InvalidConstraintException($"{nameof(Configurations)} ID collision detected.");
+            Directory.CreateDirectory(Path.Combine(OutputDirectory, $"{_id}"));
         }
 
         static Uri ValidateStartUri(string startUrl)

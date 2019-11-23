@@ -33,7 +33,7 @@ namespace Helix.Bot
         );
 
         public HtmlRendererBlock(Configurations configurations, IStatistics statistics, ILog log)
-            : base(maxDegreeOfParallelism: configurations.MaxHtmlRendererCount)
+            : base(maxDegreeOfParallelism: Configurations.MaxHtmlRendererCount)
         {
             _log = log;
             _statistics = statistics;

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Net;
 using System.Reflection;
 using System.Threading.Tasks;
 using Helix.Bot.Abstractions;
@@ -12,8 +11,6 @@ namespace Helix.Bot
 {
     public class BrokenLinkCollector : Application, IDisposable
     {
-        IBrokenLinkCollectionWorkflow _brokenLinkCollectionWorkflow;
-        readonly ILog _log;
         readonly StateMachine<BotState, BotCommand> _stateMachine;
 
         public BotState BotState => _stateMachine.CurrentState;
@@ -53,13 +50,6 @@ namespace Helix.Bot
             #endregion
         }
 
-        static BrokenLinkCollector()
-        {
-            // TODO: A workaround for .Net Core 2.x bug. Should be removed in the future.
-            AppContext.SetSwitch("System.Net.Http.UseSocketsHttpHandler", false);
-            ServicePointManager.DefaultConnectionLimit = int.MaxValue;
-        }
-
         public void Dispose() { _stateMachine?.Dispose(); }
 
         public void Stop() { Shutdown(BotCommand.MarkAsCancelled); }
@@ -71,7 +61,6 @@ namespace Helix.Bot
             {
                 try
                 {
-                    _log.Info("Starting ...");
                     SetupAndConfigureServices();
                     RecreateDirectoryContainingScreenshotFiles();
                     StartHardwareMonitorService();
@@ -117,9 +106,9 @@ namespace Helix.Bot
                 }
                 void RecreateDirectoryContainingScreenshotFiles()
                 {
-                    if (Directory.Exists(Configurations.PathToDirectoryContainsScreenshotFiles))
-                        Directory.Delete(Configurations.PathToDirectoryContainsScreenshotFiles, true);
-                    Directory.CreateDirectory(Configurations.PathToDirectoryContainsScreenshotFiles);
+                    if (Directory.Exists(configurations.PathToDirectoryContainsScreenshotFiles))
+                        Directory.Delete(configurations.PathToDirectoryContainsScreenshotFiles, true);
+                    Directory.CreateDirectory(configurations.PathToDirectoryContainsScreenshotFiles);
                 }
                 void ActivateWorkflow()
                 {
@@ -220,5 +209,12 @@ namespace Helix.Bot
             });
             if (!stateTransitionSucceeded) _log.StateTransitionFailureEvent(_stateMachine.CurrentState, BotCommand.Stop);
         }
+
+        #region Injected Services
+
+        readonly ILog _log;
+        IBrokenLinkCollectionWorkflow _brokenLinkCollectionWorkflow;
+
+        #endregion
     }
 }

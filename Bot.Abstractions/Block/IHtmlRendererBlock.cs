@@ -1,9 +1,10 @@
 using System;
 using System.Threading.Tasks.Dataflow;
+using Helix.Core;
 
 namespace Helix.Bot.Abstractions
 {
-    public interface IHtmlRendererBlock : IPropagatorBlock<Tuple<IHtmlRenderer, Resource>, RenderingResult>,
+    public interface IHtmlRendererBlock : IPropagatorBlock<Tuple<IHtmlRenderer, Resource>, RenderingResult>, IService,
                                           IReceivableSourceBlock<RenderingResult>
     {
         BufferBlock<Event> Events { get; }

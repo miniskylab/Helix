@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using Helix.Bot.Abstractions;
@@ -159,7 +158,10 @@ namespace Helix.Bot
                     {
                         var redirectHappened = !processedResource.OriginalUri.Equals(processedResource.Uri);
                         if (!redirectHappened && !_alreadyProcessedUrls.Contains(processedResource.GetAbsoluteUrl()))
-                            throw new InvalidConstraintException($"Processed resource was not registered by {nameof(CoordinatorBlock)}.");
+                        {
+                            _log.Error($"Processed resource was not registered by {nameof(CoordinatorBlock)}.");
+                            return;
+                        }
 
                         if (redirectHappened) _alreadyProcessedUrls.Add(processedResource.GetAbsoluteUrl());
                     }

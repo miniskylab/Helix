@@ -8,7 +8,7 @@ const titleBar = document.getElementById("title-bar");
 
 const txtStartUri = document.getElementById("txt-start-uri");
 const txtRemoteHost = document.getElementById("txt-remote-host");
-const ckbVerifyExternalUrls = document.getElementById("ckb-verify-external-urls");
+const ckbIncludeRedirects = document.getElementById("ckb-include-redirects");
 const ckbUseWebBrowsers = document.getElementById("ckb-use-web-browsers");
 
 const configurationPanel = document.getElementById("configuration-panel");
@@ -61,8 +61,8 @@ socket.connect(18880, "127.0.0.1", () => {
                         text: "Start",
                         payload: JSON.stringify({
                             StartUri: txtStartUri.value,
-                            HostName: txtRemoteHost.value,
-                            VerifyExternalUrls: ckbVerifyExternalUrls.checked,
+                            RemoteHost: txtRemoteHost.value,
+                            IncludeRedirectUrlsInReport: ckbIncludeRedirects.checked,
                             UseWebBrowsers: ckbUseWebBrowsers.checked
                         })
                     })

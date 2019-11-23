@@ -1,6 +1,8 @@
+using Helix.Core;
+
 namespace Helix.Persistence.Abstractions
 {
-    public interface ISqLitePersistence<TDataTransferObject> where TDataTransferObject : class
+    public interface ISqLitePersistence<TDataTransferObject> : IService where TDataTransferObject : class
     {
         TDataTransferObject GetByPrimaryKey(params object[] primaryKeyValues);
 
