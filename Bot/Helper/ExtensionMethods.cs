@@ -8,9 +8,10 @@ namespace Helix.Bot
     {
         public static string GetAbsoluteUrl(this Resource resource)
         {
-            return resource.Uri != null
-                ? resource.OriginalUrl.EndsWith("/") ? resource.Uri.AbsoluteUri : resource.Uri.AbsoluteUri.TrimEnd('/')
-                : resource.OriginalUrl;
+            if (resource.Uri == null) return resource.OriginalUrl;
+
+            var uriWithoutFragment = new UriBuilder(resource.Uri) { Fragment = string.Empty }.Uri;
+            return resource.OriginalUrl.EndsWith("/") ? uriWithoutFragment.AbsoluteUri : uriWithoutFragment.AbsoluteUri.TrimEnd('/');
         }
 
         public static bool IsWithinBrokenRange(this StatusCode statusCode) { return Math.Abs((int) statusCode) >= 400; }

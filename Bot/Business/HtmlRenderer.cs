@@ -7,7 +7,6 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Helix.Bot.Abstractions;
-using Helix.Core;
 using Helix.WebBrowser.Abstractions;
 using log4net;
 using Titanium.Web.Proxy.EventArguments;
@@ -73,11 +72,12 @@ namespace Helix.Bot
                             return;
                         }
 
-                        if (_resourceBeingRendered.StatusCode.IsWithinBrokenRange() || IsRedirectResponse()) return;
+                        if (_resourceBeingRendered.StatusCode.IsWithinBrokenRange()) return;
+                        if (!configurations.IncludeRedirectUrlsInReport && IsRedirectResponse()) return;
                         _capturedResources.Add(new Resource
                         {
                             ParentUri = _resourceBeingRendered.Uri,
-                            Uri = request.RequestUri.StripFragment(),
+                            Uri = request.RequestUri,
                             OriginalUrl = request.Url,
                             OriginalUri = request.RequestUri,
                             Size = response.ContentLength,
@@ -103,15 +103,13 @@ namespace Helix.Bot
                     }
 
                     if (!Uri.TryCreate(locationHeader.Value, UriKind.RelativeOrAbsolute, out var redirectUri)) return false;
-                    _resourceBeingRendered.Uri = redirectUri.IsAbsoluteUri
-                        ? redirectUri.StripFragment()
-                        : new Uri(_resourceBeingRendered.Uri, redirectUri).StripFragment();
+                    _resourceBeingRendered.Uri = redirectUri.IsAbsoluteUri ? redirectUri : new Uri(_resourceBeingRendered.Uri, redirectUri);
 
                     return true;
                 }
                 bool TryFindUriBeingRendered()
                 {
-                    var capturedUri = request.RequestUri.StripFragment();
+                    var capturedUri = request.RequestUri;
                     var bothSchemesAreNotEqual = !capturedUri.Scheme.Equals(_resourceBeingRendered.Uri.Scheme);
                     var strictTransportSecurity = _resourceBeingRendered.Uri.Scheme == "http" && capturedUri.Scheme == "https";
                     if (bothSchemesAreNotEqual && !strictTransportSecurity) return false;
@@ -132,7 +130,7 @@ namespace Helix.Bot
                         _takeScreenshot = true;
                 }
                 bool IsRedirectResponse() { return 300 <= response.StatusCode && response.StatusCode < 400; }
-                string RemoveScheme(Uri uri) { return WebUtility.UrlDecode($"{uri.Host}:{uri.Port}{uri.PathAndQuery}"); }
+                static string RemoveScheme(Uri uri) { return WebUtility.UrlDecode($"{uri.Host}:{uri.Port}{uri.PathAndQuery}"); }
 
                 #endregion
             }

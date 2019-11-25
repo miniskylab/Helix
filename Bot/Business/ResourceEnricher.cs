@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Data;
 using Helix.Bot.Abstractions;
-using Helix.Core;
 
 namespace Helix.Bot
 {
@@ -57,7 +56,11 @@ namespace Helix.Bot
                 // TODO: Investigate where those orphaned Uri-s came from.
                 return resource.ParentUri == null && !_resourceScope.IsStartUri(resource.OriginalUri);
             }
-            void StripFragment() { resource.OriginalUri = resource.OriginalUri.StripFragment(); }
+            void StripFragment()
+            {
+                if (string.IsNullOrWhiteSpace(resource.OriginalUri.Fragment)) return;
+                resource.OriginalUri = new UriBuilder(resource.OriginalUri) { Fragment = string.Empty }.Uri;
+            }
         }
     }
 }

@@ -44,10 +44,5 @@ namespace Helix.Core
         {
             log.Info($"Transition from state [{currentState}] via [{Enum.GetName(typeof(TCommand), command)}] command failed.");
         }
-
-        public static Uri StripFragment(this Uri uri)
-        {
-            return string.IsNullOrWhiteSpace(uri.Fragment) ? uri : new UriBuilder(uri) { Fragment = string.Empty }.Uri;
-        }
     }
 }
