@@ -10,6 +10,8 @@ namespace Helix.Bot.Abstractions
     {
         readonly string _id;
 
+        public bool IncludeNonHttpUrlsInReport { get; }
+
         public bool IncludeRedirectUrlsInReport { get; }
 
         public string RemoteHost { get; }
@@ -52,6 +54,7 @@ namespace Helix.Bot.Abstractions
         {
             var tokens = JObject.Parse(configurationJsonString);
             StartUri = ValidateStartUri((string) tokens.SelectToken(nameof(StartUri)) ?? string.Empty);
+            IncludeNonHttpUrlsInReport = (bool) (tokens.SelectToken(nameof(IncludeNonHttpUrlsInReport)) ?? false);
             IncludeRedirectUrlsInReport = (bool) (tokens.SelectToken(nameof(IncludeRedirectUrlsInReport)) ?? false);
 
             RemoteHost = ((string) tokens.SelectToken(nameof(RemoteHost)) ?? string.Empty).ToLower();

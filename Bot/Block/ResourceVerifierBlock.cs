@@ -12,6 +12,7 @@ namespace Helix.Bot
     internal class ResourceVerifierBlock : TransformBlock<Resource, Resource>, IResourceVerifierBlock, IDisposable
     {
         readonly CancellationTokenSource _cancellationTokenSource;
+        readonly Configurations _configurations;
         readonly ILog _log;
         readonly IResourceScope _resourceScope;
         readonly IResourceVerifier _resourceVerifier;
@@ -39,6 +40,7 @@ namespace Helix.Bot
             _log = log;
             _statistics = statistics;
             _resourceScope = resourceScope;
+            _configurations = configurations;
             _resourceVerifier = resourceVerifier;
             _cancellationTokenSource = new CancellationTokenSource();
 
@@ -80,6 +82,9 @@ namespace Helix.Bot
             {
                 if (resource == null)
                     throw new ArgumentNullException(nameof(resource));
+
+                if (resource.StatusCode == StatusCode.UriSchemeNotSupported && !_configurations.IncludeNonHttpUrlsInReport)
+                    return ProcessUnsuccessfulResourceVerification(null, LogLevel.None);
 
                 var verificationResult = resource.IsExtractedFromHtmlDocument
                     ? _resourceVerifier.Verify(resource, _cancellationTokenSource.Token).Result

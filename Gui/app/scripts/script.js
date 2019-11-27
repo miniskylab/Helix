@@ -9,7 +9,7 @@ const titleBar = document.getElementById("title-bar");
 const txtStartUri = document.getElementById("txt-start-uri");
 const txtRemoteHost = document.getElementById("txt-remote-host");
 const ckbIncludeRedirects = document.getElementById("ckb-include-redirects");
-const ckbUseWebBrowsers = document.getElementById("ckb-use-web-browsers");
+const ckbIncludeNonHttp = document.getElementById("ckb-include-non-http");
 
 const configurationPanel = document.getElementById("configuration-panel");
 const lblVerified = document.getElementById("lbl-verified");
@@ -63,7 +63,7 @@ socket.connect(18880, "127.0.0.1", () => {
                             StartUri: txtStartUri.value,
                             RemoteHost: txtRemoteHost.value,
                             IncludeRedirectUrlsInReport: ckbIncludeRedirects.checked,
-                            UseWebBrowsers: ckbUseWebBrowsers.checked
+                            IncludeNonHttpUrlsInReport: ckbIncludeNonHttp.checked
                         })
                     })
                 )
