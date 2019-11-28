@@ -10,7 +10,16 @@
     font-weight: bold;
 }
 
-html { overflow: hidden; }
+html { 
+    overflow: hidden;
+    user-select: none;
+}
+
+a { 
+    color: #6495ED;
+    font-size: 13px;
+    font-weight: normal;
+}
 
 .border {
     border: 2px solid #6495ED;

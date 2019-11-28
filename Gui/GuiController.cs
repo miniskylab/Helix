@@ -22,7 +22,8 @@ namespace Helix.Gui
         static Configurations _configurations;
         static Task _elapsedTimeUpdateTask;
         static bool _isClosing;
-        static Process _sqLiteProcess;
+        static Process _logViewerProcess;
+        static Process _reportViewerProcess;
         static readonly ISynchronousServerSocket CommunicationSocketToGui;
         static readonly Stopwatch ElapsedTimeStopwatch;
         static readonly Process GuiProcess;
@@ -53,8 +54,12 @@ namespace Helix.Gui
             GuiProcess.Start();
             ManualResetEvent.WaitOne();
 
-            _sqLiteProcess?.CloseMainWindow();
-            _sqLiteProcess?.Close();
+            _logViewerProcess?.CloseMainWindow();
+            _logViewerProcess?.Close();
+
+            _reportViewerProcess?.CloseMainWindow();
+            _reportViewerProcess?.Close();
+
             CommunicationSocketToGui.Dispose();
             GuiProcess.CloseMainWindow();
             GuiProcess.Close();
@@ -86,29 +91,7 @@ namespace Helix.Gui
             if (!Monitor.TryEnter(OperationLock)) return;
             try
             {
-                if (_sqLiteProcess != null)
-                {
-                    const int swRestore = 9;
-                    if (IsIconic(_sqLiteProcess.MainWindowHandle)) ShowWindow(_sqLiteProcess.MainWindowHandle, swRestore);
-
-                    /* Due to a limitation of WinAPI SetForegroundWindow() method,
-                     * an ALT keypress is required before calling that WinAPI in order for it to work properly.
-                     *
-                     * See more:
-                     * https://stackoverflow.com/questions/20444735/issue-with-setforegroundwindow-in-net
-                     * https://www.roelvanlisdonk.nl/2014/09/05/reliable-bring-external-process-window-to-foreground-without-c/
-                     * https://stackoverflow.com/questions/10740346/setforegroundwindow-only-working-while-visual-studio-is-open
-                     */
-                    const int altKey = 0xA4;
-                    const int extendedKey = 0x1;
-                    keybd_event(altKey, 0x45, extendedKey | 0, 0);
-
-                    SetForegroundWindow(_sqLiteProcess.MainWindowHandle);
-
-                    /* Release the ALT key */
-                    const int keyUp = 0x2;
-                    keybd_event(altKey, 0x45, extendedKey | keyUp, 0);
-                }
+                if (_reportViewerProcess != null) RestoreOrSetForegroundWindow(_reportViewerProcess);
                 else
                 {
                     if (_configurations == null)
@@ -117,7 +100,7 @@ namespace Helix.Gui
                         return;
                     }
 
-                    _sqLiteProcess = Process.Start(
+                    _reportViewerProcess = Process.Start(
                         Configurations.PathToSqLiteBrowserExecutable,
                         $"-R -t DataTransferObjects {_configurations.PathToReportFile}" // TODO: Remove hard-coded [DataTransferObjects]
                     );
@@ -128,8 +111,39 @@ namespace Helix.Gui
 
                     Task.Run(() =>
                     {
-                        _sqLiteProcess.WaitForExit();
-                        _sqLiteProcess = null;
+                        _reportViewerProcess.WaitForExit();
+                        _reportViewerProcess = null;
+                    });
+                }
+            }
+            finally { Monitor.Exit(OperationLock); }
+        }
+
+        [UsedImplicitly]
+        static void ViewLog()
+        {
+            if (!Monitor.TryEnter(OperationLock)) return;
+            try
+            {
+                if (_logViewerProcess != null) RestoreOrSetForegroundWindow(_logViewerProcess);
+                else
+                {
+                    if (_configurations == null)
+                    {
+                        Log.Error("Cannot view log because there is no configurations provided.");
+                        return;
+                    }
+
+                    _logViewerProcess = Process.Start("notepad.exe", _configurations.PathToLogFile);
+
+                    /* Wait for MainWindowHandle to be available.
+                     * TODO: Waiting for a fixed amount of time is not a good idea. Need to find another solution. */
+                    // Thread.Sleep(2000);
+
+                    Task.Run(() =>
+                    {
+                        _logViewerProcess.WaitForExit();
+                        _logViewerProcess = null;
                     });
                 }
             }
@@ -139,11 +153,11 @@ namespace Helix.Gui
         [UsedImplicitly]
         static void Start(string configurationJsonString)
         {
-            var isFirstRun = _configurations == null;
             _configurations = new Configurations(configurationJsonString);
 
             CreateNewLogFile();
             CloseReportViewerIfOpen();
+            CloseLogViewerIfOpen();
             CreateAndConfigureBot();
             DisableGui();
             TryStartBot();
@@ -153,13 +167,17 @@ namespace Helix.Gui
             void CreateNewLogFile()
             {
                 Log4NetModule.CreateNewLogFile(_configurations.PathToLogFile);
-                if (!isFirstRun) Log.Info("==================================================");
                 Log.Info($"Accepted: {_configurations.StartUri}");
             }
             void CloseReportViewerIfOpen()
             {
-                _sqLiteProcess?.CloseMainWindow();
-                _sqLiteProcess?.Close();
+                _reportViewerProcess?.CloseMainWindow();
+                _reportViewerProcess?.Close();
+            }
+            void CloseLogViewerIfOpen()
+            {
+                _logViewerProcess?.CloseMainWindow();
+                _logViewerProcess?.Close();
             }
             void CreateAndConfigureBot()
             {
@@ -260,7 +278,7 @@ namespace Helix.Gui
                     ElapsedTime = ElapsedTimeStopwatch.Elapsed.ToString("hh' : 'mm' : 'ss"),
                     StatusText = _brokenLinkCollector.BotState switch
                     {
-                        BotState.Faulted => "One or more errors occurred. Check the logs for more details.",
+                        BotState.Faulted => "One or more errors occurred. Check the <a href=# id='btn-view-log'>log</a> for more details.",
                         BotState.RanToCompletion => "The crawling task has completed.",
                         _ => $"{@event.Message}."
                     }
@@ -343,6 +361,30 @@ namespace Helix.Gui
             }
 
             #endregion
+        }
+
+        static void RestoreOrSetForegroundWindow(Process process)
+        {
+            const int swRestore = 9;
+            if (IsIconic(process.MainWindowHandle)) ShowWindow(process.MainWindowHandle, swRestore);
+
+            /* Due to a limitation of WinAPI SetForegroundWindow() method,
+             * an ALT keypress is required before calling that WinAPI in order for it to work properly.
+             *
+             * See more:
+             * https://stackoverflow.com/questions/20444735/issue-with-setforegroundwindow-in-net
+             * https://www.roelvanlisdonk.nl/2014/09/05/reliable-bring-external-process-window-to-foreground-without-c/
+             * https://stackoverflow.com/questions/10740346/setforegroundwindow-only-working-while-visual-studio-is-open
+             */
+            const int altKey = 0xA4;
+            const int extendedKey = 0x1;
+            keybd_event(altKey, 0x45, extendedKey | 0, 0);
+
+            SetForegroundWindow(process.MainWindowHandle);
+
+            /* Release the ALT key */
+            const int keyUp = 0x2;
+            keybd_event(altKey, 0x45, extendedKey | keyUp, 0);
         }
 
         #endregion

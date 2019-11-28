@@ -92,6 +92,11 @@ socket.connect(18880, "127.0.0.1", () => {
         socket.write(attachEndOfTransmissionCharacter(JSON.stringify({text: "Preview"})));
     });
 
+    document.addEventListener("click", e => {
+        if (e.target && e.target.id === "btn-view-log")
+            socket.write(attachEndOfTransmissionCharacter(JSON.stringify({text: "ViewLog"})));
+    });
+
     socket.on("data", byteStream => {
         const frame = reconstructFrame(byteStream);
         redraw(frame);
@@ -117,7 +122,7 @@ function redraw(frame) {
     if (notNullAndUndefined(frame.MillisecondsAveragePageLoadTime)) lblAveragePageLoadTime.textContent = frame.MillisecondsAveragePageLoadTime.toLocaleString("en-US", {maximumFractionDigits: 0});
     if (isNumeric(frame.MillisecondsAveragePageLoadTime)) lblAveragePageLoadTimeUnitOfMeasure.style.visibility = "visible";
     if (notNullAndUndefined(frame.ElapsedTime)) lblElapsedTime.textContent = frame.ElapsedTime;
-    if (notNullAndUndefined(frame.StatusText)) lblStatusText.textContent = frame.StatusText;
+    if (notNullAndUndefined(frame.StatusText)) lblStatusText.innerHTML = frame.StatusText;
 
     if (frame.ShowWaitingOverlay === true) showWaitingOverlay(120, () => { dialogOverlay.style.display = "block"; });
     else if (frame.ShowWaitingOverlay === false) {
