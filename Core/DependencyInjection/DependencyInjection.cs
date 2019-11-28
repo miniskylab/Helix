@@ -33,7 +33,9 @@ namespace Helix.Core
                 {
                     var matchingInterfaceType = type.GetInterface($"I{type.Name}");
                     if (matchingInterfaceType == null) continue;
-                    containerBuilder.RegisterType(type).As(matchingInterfaceType);
+
+                    if (type.IsGenericType) containerBuilder.RegisterGeneric(type).As(matchingInterfaceType);
+                    else containerBuilder.RegisterType(type).As(matchingInterfaceType);
                 }
             }
 
