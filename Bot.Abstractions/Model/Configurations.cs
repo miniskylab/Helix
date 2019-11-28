@@ -44,6 +44,8 @@ namespace Helix.Bot.Abstractions
 
         public static string PathToSqLiteBrowserExecutable => Path.Combine(WorkingDirectory, "sqlite-browser/DB Browser for SQLite.exe");
 
+        public static int RenderableResourceSizeInMb => 10;
+
         public static string WorkingDirectory => Path.GetDirectoryName(Assembly.GetEntryAssembly()?.Location);
 
         static string OutputDirectory => Path.Combine(WorkingDirectory, "_outputs");

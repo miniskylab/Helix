@@ -13,8 +13,6 @@ namespace Helix.Bot
                                      IHtmlRendererBlock, IDisposable
     {
         readonly CancellationTokenSource _cancellationTokenSource;
-        readonly ILog _log;
-        readonly IStatistics _statistics;
 
         public BufferBlock<Event> Events { get; }
 
@@ -32,8 +30,7 @@ namespace Helix.Bot
             FailedProcessingResults.Completion
         );
 
-        public HtmlRendererBlock(Configurations configurations, IStatistics statistics, ILog log)
-            : base(maxDegreeOfParallelism: Configurations.MaxHtmlRendererCount)
+        public HtmlRendererBlock(IStatistics statistics, ILog log) : base(maxDegreeOfParallelism: Configurations.MaxHtmlRendererCount)
         {
             _log = log;
             _statistics = statistics;
@@ -75,7 +72,7 @@ namespace Helix.Bot
                 if (!resource.StatusCode.IsWithinBrokenRange())
                 {
                     var resourceSizeInMb = resource.Size / 1024f / 1024f;
-                    if (resourceSizeInMb > 10)
+                    if (resourceSizeInMb > Configurations.RenderableResourceSizeInMb)
                         return ProcessUnsuccessfulRendering(
                             $"Resource was not queued for rendering because it was too big ({resourceSizeInMb} MB): {resource.ToJson()}",
                             LogLevel.Information
@@ -199,5 +196,12 @@ namespace Helix.Bot
 
             #endregion
         }
+
+        #region Injected Services
+
+        readonly ILog _log;
+        readonly IStatistics _statistics;
+
+        #endregion
     }
 }

@@ -55,12 +55,23 @@ namespace Helix.Bot
             {
                 var request = networkTraffic.HttpClient.Request;
                 var response = networkTraffic.HttpClient.Response;
+                var originalResponseStatusCode = response.StatusCode;
                 return Task.Run(() =>
                 {
                     Interlocked.Increment(ref _activeHttpTrafficCount);
                     try
                     {
                         if (request.Method.ToUpperInvariant() != "GET") return;
+
+                        var resourceSize = response.ContentLength;
+                        var resourceType = httpContentTypeToResourceTypeDictionary[response.ContentType];
+                        var resourceSizeIsTooBig = resourceSize / 1024f / 1024f > Configurations.RenderableResourceSizeInMb;
+                        var resourceTypeIsNotRenderable = !(ResourceType.Html | ResourceType.Unknown).HasFlag(resourceType);
+                        var responseStatusCodeIsOk = originalResponseStatusCode == (int) StatusCode.Ok;
+
+                        if (responseStatusCodeIsOk && (resourceSizeIsTooBig || resourceTypeIsNotRenderable))
+                            response.StatusCode = (int) StatusCode.NoContent;
+
                         if (!_uriBeingRenderedWasFoundInCapturedNetworkTraffic)
                         {
                             if (!TryFindUriBeingRendered()) return;
@@ -80,9 +91,9 @@ namespace Helix.Bot
                             Uri = request.RequestUri,
                             OriginalUrl = request.Url,
                             OriginalUri = request.RequestUri,
-                            Size = response.ContentLength,
-                            StatusCode = (StatusCode) response.StatusCode,
-                            ResourceType = httpContentTypeToResourceTypeDictionary[response.ContentType]
+                            Size = resourceSize,
+                            StatusCode = (StatusCode) originalResponseStatusCode,
+                            ResourceType = resourceType
                         });
                     }
                     finally { Interlocked.Decrement(ref _activeHttpTrafficCount); }
@@ -117,7 +128,7 @@ namespace Helix.Bot
                 }
                 void UpdateStatusCodeIfChanged()
                 {
-                    var newStatusCode = response.StatusCode;
+                    var newStatusCode = originalResponseStatusCode;
                     var oldStatusCode = (int) _resourceBeingRendered.StatusCode;
                     if (newStatusCode == oldStatusCode) return;
 
@@ -129,7 +140,7 @@ namespace Helix.Bot
                     if (_resourceBeingRendered.StatusCode.IsWithinBrokenRange() && configurations.TakeScreenshotEvidence)
                         _takeScreenshot = true;
                 }
-                bool IsRedirectResponse() { return 300 <= response.StatusCode && response.StatusCode < 400; }
+                bool IsRedirectResponse() { return 300 <= originalResponseStatusCode && originalResponseStatusCode < 400; }
                 static string RemoveScheme(Uri uri) { return WebUtility.UrlDecode($"{uri.Host}:{uri.Port}{uri.PathAndQuery}"); }
 
                 #endregion
@@ -176,7 +187,6 @@ namespace Helix.Bot
             {
                 capturedResources = _capturedResources.ToList();
                 _capturedResources.Dispose();
-                _capturedResources = null;
             }
 
             #region Local Functions

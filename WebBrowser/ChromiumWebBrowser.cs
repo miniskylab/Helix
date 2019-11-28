@@ -233,150 +233,148 @@ namespace Helix.WebBrowser
 
         public bool TryRender(Uri uri, out string html, out long? millisecondsPageLoadTime, CancellationToken cancellationToken)
         {
-            string renderingHtml = null;
-            long? renderingTime = null;
-            var renderingResult = false;
+            html = null;
+            millisecondsPageLoadTime = null;
 
-            var stateTransitionSucceeded = _stateMachine.TryTransitNext(WebBrowserCommand.TryRender, () =>
+            var stateTransitionSucceeded = _stateMachine.TryTransitNext(WebBrowserCommand.TryRender);
+            if (!stateTransitionSucceeded)
             {
-                Task cancellationTask = null;
-                var renderingFinishedCts = new CancellationTokenSource();
-                var renderingFinishedOrCancelledCancellationToken = CancellationTokenSource.CreateLinkedTokenSource(
-                    cancellationToken,
-                    renderingFinishedCts.Token
-                ).Token;
+                _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WebBrowserCommand.TryRender);
+                return false;
+            }
 
+            Task cancellationTask = null;
+            var renderingFinishedCts = new CancellationTokenSource();
+            var renderingFinishedOrCancelledCancellationToken = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                renderingFinishedCts.Token
+            ).Token;
+
+            try
+            {
+                CurrentUri = uri ?? throw new ArgumentNullException(nameof(uri));
+
+                EnsureCancellable();
+                if (!TryGoToUri()) return false;
+                if (!TryGetPageSource(out html)) return false;
+
+                millisecondsPageLoadTime = _pageLoadTimeStopwatch.ElapsedMilliseconds;
+                return true;
+            }
+            finally
+            {
                 try
                 {
-                    CurrentUri = uri ?? throw new ArgumentNullException(nameof(uri));
+                    _pageLoadTimeStopwatch.Reset();
+                    renderingFinishedCts.Cancel();
+                    renderingFinishedCts.Dispose();
+                    cancellationTask?.Wait(renderingFinishedOrCancelledCancellationToken);
+                    cancellationTask?.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    if (!exception.IsAcknowledgingOperationCancelledException(renderingFinishedOrCancelledCancellationToken))
+                        _log.Error("One or more errors occurred while doing post render cleanup.", exception);
+                }
 
-                    EnsureCancellable();
-                    if (!TryGoToUri()) return;
-                    if (!TryGetPageSource(out renderingHtml)) return;
+                var webBrowserIsNotIdle = _stateMachine.CurrentState != WebBrowserState.Idle;
+                var cannotTransitToIdleState = !_stateMachine.TryTransitNext(WebBrowserCommand.TransitToIdleState);
+                if (webBrowserIsNotIdle && cannotTransitToIdleState)
+                    _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WebBrowserCommand.TransitToIdleState);
+            }
 
-                    renderingTime = _pageLoadTimeStopwatch.ElapsedMilliseconds;
-                    renderingResult = true;
+            #region Local Functions
+
+            void EnsureCancellable()
+            {
+                cancellationTask = Task.Run(() =>
+                {
+                    while (true)
+                    {
+                        if (renderingFinishedCts.IsCancellationRequested) break;
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            RestartWebBrowser(true);
+                            break;
+                        }
+                        Thread.Sleep(1000);
+                    }
+                }, renderingFinishedOrCancelledCancellationToken);
+            }
+            bool TryGoToUri()
+            {
+                try
+                {
+                    _httpProxyServer.BeforeResponse += BeforeResponse;
+                    _httpProxyServer.BeforeRequest += BeforeRequest;
+                    _pageLoadTimeStopwatch.Restart();
+                    _chromeDriver.Navigate().GoToUrl(uri);
+                    return true;
+                }
+                catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
+                {
+                    RestartWebBrowser(true);
+                    _log.Info($"Chromium web browser waited too long for a response while rendering URI: {uri}");
+                    return false;
+                }
+                catch (WebDriverException webDriverException) when (WebBrowserUnreachable(webDriverException))
+                {
+                    _log.Info($"Chromium web browser was forcibly closed while rendering URI: {uri}");
+                    return false;
+                }
+                catch (Exception exception)
+                {
+                    _log.Info($"One or more errors occurred while rendering URI: {uri}\r\n{exception}");
+                    return false;
                 }
                 finally
                 {
-                    try
-                    {
-                        _pageLoadTimeStopwatch.Reset();
-                        renderingFinishedCts.Cancel();
-                        renderingFinishedCts.Dispose();
-                        cancellationTask?.Wait(renderingFinishedOrCancelledCancellationToken);
-                        cancellationTask?.Dispose();
-                    }
-                    catch (Exception exception)
-                    {
-                        if (!exception.IsAcknowledgingOperationCancelledException(renderingFinishedOrCancelledCancellationToken))
-                            _log.Error("One or more errors occurred while doing post render cleanup.", exception);
-                    }
-
-                    var webBrowserIsNotIdle = _stateMachine.CurrentState != WebBrowserState.Idle;
-                    var cannotTransitToIdleState = !_stateMachine.TryTransitNext(WebBrowserCommand.TransitToIdleState);
-                    if (webBrowserIsNotIdle && cannotTransitToIdleState)
-                        _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WebBrowserCommand.TransitToIdleState);
+                    _pageLoadTimeStopwatch.Stop();
+                    _httpProxyServer.BeforeRequest -= BeforeRequest;
+                    _httpProxyServer.BeforeResponse -= BeforeResponse;
                 }
 
                 #region Local Functions
 
-                void EnsureCancellable()
+                Task BeforeRequest(object sender, SessionEventArgs networkTraffic)
                 {
-                    cancellationTask = Task.Run(() =>
-                    {
-                        while (true)
-                        {
-                            if (renderingFinishedCts.IsCancellationRequested) break;
-                            if (cancellationToken.IsCancellationRequested)
-                            {
-                                RestartWebBrowser(true);
-                                break;
-                            }
-                            Thread.Sleep(1000);
-                        }
-                    }, renderingFinishedOrCancelledCancellationToken);
+                    return this.BeforeRequest?.Invoke(sender, networkTraffic);
                 }
-                bool TryGoToUri()
+                Task BeforeResponse(object sender, SessionEventArgs networkTraffic)
                 {
-                    try
-                    {
-                        _httpProxyServer.BeforeResponse += BeforeResponse;
-                        _httpProxyServer.BeforeRequest += BeforeRequest;
-                        _pageLoadTimeStopwatch.Restart();
-                        _chromeDriver.Navigate().GoToUrl(uri);
-                        return true;
-                    }
-                    catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
-                    {
-                        RestartWebBrowser(true);
-                        _log.Info($"Chromium web browser waited too long for a response while rendering URI: {uri}");
-                        return false;
-                    }
-                    catch (WebDriverException webDriverException) when (WebBrowserUnreachable(webDriverException))
-                    {
-                        _log.Info($"Chromium web browser was forcibly closed while rendering URI: {uri}");
-                        return false;
-                    }
-                    catch (Exception exception)
-                    {
-                        _log.Info($"One or more errors occurred while rendering URI: {uri}\r\n{exception}");
-                        return false;
-                    }
-                    finally
-                    {
-                        _pageLoadTimeStopwatch.Stop();
-                        _httpProxyServer.BeforeRequest -= BeforeRequest;
-                        _httpProxyServer.BeforeResponse -= BeforeResponse;
-                    }
-
-                    #region Local Functions
-
-                    Task BeforeRequest(object sender, SessionEventArgs networkTraffic)
-                    {
-                        return this.BeforeRequest?.Invoke(sender, networkTraffic);
-                    }
-                    Task BeforeResponse(object sender, SessionEventArgs networkTraffic)
-                    {
-                        return this.BeforeResponse?.Invoke(sender, networkTraffic);
-                    }
-
-                    #endregion
-                }
-                bool TryGetPageSource(out string pageSource)
-                {
-                    try
-                    {
-                        pageSource = _chromeDriver.PageSource;
-                        return true;
-                    }
-                    catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
-                    {
-                        pageSource = null;
-                        _log.Info($"Chromium web browser waited too long for a response while obtaining HTML of URI: {uri}");
-                        return false;
-                    }
-                    catch (WebDriverException webDriverException) when (WebBrowserUnreachable(webDriverException))
-                    {
-                        pageSource = null;
-                        _log.Info($"Chromium web browser was forcibly closed while obtaining HTML of URI: {uri}");
-                        return false;
-                    }
-                    catch (Exception exception)
-                    {
-                        pageSource = null;
-                        _log.Info($"One or more errors occurred while obtaining HTML of URI: {uri}\r\n{exception}");
-                        return false;
-                    }
+                    return this.BeforeResponse?.Invoke(sender, networkTraffic);
                 }
 
                 #endregion
-            });
-            if (!stateTransitionSucceeded) _log.StateTransitionFailureEvent(_stateMachine.CurrentState, WebBrowserCommand.TryRender);
+            }
+            bool TryGetPageSource(out string pageSource)
+            {
+                try
+                {
+                    pageSource = _chromeDriver.PageSource;
+                    return true;
+                }
+                catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
+                {
+                    pageSource = null;
+                    _log.Info($"Chromium web browser waited too long for a response while obtaining HTML of URI: {uri}");
+                    return false;
+                }
+                catch (WebDriverException webDriverException) when (WebBrowserUnreachable(webDriverException))
+                {
+                    pageSource = null;
+                    _log.Info($"Chromium web browser was forcibly closed while obtaining HTML of URI: {uri}");
+                    return false;
+                }
+                catch (Exception exception)
+                {
+                    pageSource = null;
+                    _log.Info($"One or more errors occurred while obtaining HTML of URI: {uri}\r\n{exception}");
+                    return false;
+                }
+            }
 
-            html = renderingHtml;
-            millisecondsPageLoadTime = renderingTime;
-            return renderingResult;
+            #endregion
         }
 
         public bool TryTakeScreenshot(string pathToScreenshotFile)
