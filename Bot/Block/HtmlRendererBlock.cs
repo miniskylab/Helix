@@ -137,6 +137,10 @@ namespace Helix.Bot
                     var statisticsSnapshot = _statistics.TakeSnapshot();
                     var resourceRenderedEvent = new ResourceRenderedEvent
                     {
+                        ValidUrlCount = statisticsSnapshot.ValidUrlCount,
+                        BrokenUrlCount = statisticsSnapshot.BrokenUrlCount,
+                        VerifiedUrlCount = statisticsSnapshot.VerifiedUrlCount,
+                        Message = $"{resource.StatusCode:D} - {resource.GetAbsoluteUrl()}",
                         MillisecondsAveragePageLoadTime = statisticsSnapshot.MillisecondsAveragePageLoadTime
                     };
                     if (!Events.Post(resourceRenderedEvent) && !Events.Completion.IsCompleted)

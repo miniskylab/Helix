@@ -254,7 +254,14 @@ namespace Helix.Gui
             static void OnResourceRendered(Event @event)
             {
                 if (!(@event is ResourceRenderedEvent resourceRenderedEvent)) return;
-                Redraw(new Frame { MillisecondsAveragePageLoadTime = resourceRenderedEvent.MillisecondsAveragePageLoadTime });
+                Redraw(new Frame
+                {
+                    StatusText = resourceRenderedEvent.Message,
+                    ValidUrlCount = resourceRenderedEvent.ValidUrlCount,
+                    BrokenUrlCount = resourceRenderedEvent.BrokenUrlCount,
+                    VerifiedUrlCount = resourceRenderedEvent.VerifiedUrlCount,
+                    MillisecondsAveragePageLoadTime = resourceRenderedEvent.MillisecondsAveragePageLoadTime
+                });
             }
             static void OnResourceProcessed(Event @event)
             {
