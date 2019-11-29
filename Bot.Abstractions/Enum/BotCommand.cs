@@ -8,8 +8,6 @@ namespace Helix.Bot.Abstractions
         Abort,
         MarkAsRanToCompletion,
         MarkAsCancelled,
-        MarkAsFaulted,
-        Pause,
-        Resume
+        MarkAsFaulted
     }
 }

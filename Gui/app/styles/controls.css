@@ -71,15 +71,6 @@
     right: 0;
 }
 
-.controls__main-button--amber { border-color: #FFBF47; }
-
-.controls__main-button--amber:hover {
-    border-color: #FFBF47;
-    background-color: rgba(255, 191, 71, 0.1);
-}
-
-.controls__main-button--amber:active { background-color: #FFBF47; }
-
 .controls__main-button[disabled] {
     pointer-events: none;
     filter: grayscale(85%);
@@ -119,17 +110,6 @@
 .controls__button:active .controls__play-icon,
 .controls__button:hover .controls__play-icon {
     border-left-color: #FFFFFF;
-}
-
-.controls__pause-icon {
-    height: 36px;
-    border: double #9B9B9B;
-    border-width: 0 0 0 30px;
-}
-
-.controls__button:active .controls__pause-icon,
-.controls__button:hover .controls__pause-icon {
-    border-color: #FFFFFF;
 }
 
 .controls__stop-icon {

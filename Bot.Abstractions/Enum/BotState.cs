@@ -14,7 +14,6 @@ namespace Helix.Bot.Abstractions
         RanToCompletion = 1 << 4,
         Cancelled = 1 << 5,
         Faulted = 1 << 6,
-        Paused = 1 << 7,
         Completed = RanToCompletion | Cancelled | Faulted
     }
 }

@@ -34,11 +34,9 @@ namespace Helix.Bot
                     { Transition(BotState.WaitingToRun, BotCommand.Abort), BotState.WaitingForStop },
                     { Transition(BotState.WaitingForStop, BotCommand.Stop), BotState.Completed },
                     { Transition(BotState.Running, BotCommand.Stop), BotState.Completed },
-                    { Transition(BotState.Running, BotCommand.Pause), BotState.Paused },
                     { Transition(BotState.Completed, BotCommand.MarkAsRanToCompletion), BotState.RanToCompletion },
                     { Transition(BotState.Completed, BotCommand.MarkAsCancelled), BotState.Cancelled },
-                    { Transition(BotState.Completed, BotCommand.MarkAsFaulted), BotState.Faulted },
-                    { Transition(BotState.Paused, BotCommand.Resume), BotState.Running }
+                    { Transition(BotState.Completed, BotCommand.MarkAsFaulted), BotState.Faulted }
                 };
 
                 Transition<BotState, BotCommand> Transition(BotState fromState, BotCommand command)

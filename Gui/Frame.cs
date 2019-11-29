@@ -23,9 +23,6 @@ namespace Helix.Gui
 
         public string ElapsedTime { get; set; }
 
-        [JsonConverter(typeof(StringEnumConverter))]
-        public MainButtonFunctionality? MainButtonFunctionality { get; set; }
-
         public double? MillisecondsAveragePageLoadTime { get; set; }
 
         public int? RemainingWorkload { get; set; }
@@ -39,12 +36,6 @@ namespace Helix.Gui
         public int? VerifiedUrlCount { get; set; }
 
         public string WaitingOverlayProgressText { get; set; }
-    }
-
-    public enum MainButtonFunctionality
-    {
-        Start,
-        Pause
     }
 
     public enum BorderColor

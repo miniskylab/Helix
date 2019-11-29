@@ -198,8 +198,7 @@ namespace Helix.Gui
                     DisableCloseButton = true,
                     DisablePreviewButton = true,
                     DisableConfigurationPanel = true,
-                    BorderColor = BorderColor.Normal,
-                    MainButtonFunctionality = MainButtonFunctionality.Start
+                    BorderColor = BorderColor.Normal
                 });
             }
             void TryStartBot()
@@ -209,8 +208,7 @@ namespace Helix.Gui
                     Redraw(new Frame
                     {
                         DisableStopButton = false,
-                        DisableCloseButton = false,
-                        MainButtonFunctionality = MainButtonFunctionality.Pause
+                        DisableCloseButton = false
                     });
                     UpdateElapsedTimeOnGuiEvery(TimeSpan.FromSeconds(1));
                 }
@@ -219,8 +217,7 @@ namespace Helix.Gui
                     Redraw(new Frame
                     {
                         DisableMainButton = false,
-                        DisableCloseButton = false,
-                        MainButtonFunctionality = MainButtonFunctionality.Start
+                        DisableCloseButton = false
                     });
                 }
             }
@@ -278,7 +275,6 @@ namespace Helix.Gui
                     DisableStopButton = true,
                     DisableMainButton = false,
                     DisableConfigurationPanel = false,
-                    MainButtonFunctionality = MainButtonFunctionality.Start,
                     DisableCloseButton = _isClosing,
                     ShowWaitingOverlay = _isClosing,
                     BorderColor = _brokenLinkCollector.BotState == BotState.Faulted ? BorderColor.Error : BorderColor.Normal,

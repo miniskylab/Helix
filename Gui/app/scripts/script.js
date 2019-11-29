@@ -147,18 +147,6 @@ function redraw(frame) {
     if (frame.DisableMainButton === true && !btnMain.hasAttribute("disabled")) btnMain.setAttribute("disabled", "");
     else if (frame.DisableMainButton === false && btnMain.hasAttribute("disabled")) btnMain.removeAttribute("disabled");
 
-    switch (frame.MainButtonFunctionality) {
-        case "Start":
-            if (mainButtonIsStartButton()) break;
-            btnMain.firstElementChild.className = "controls__play-icon";
-            if (btnMain.classList.contains("controls__main-button--amber")) btnMain.classList.remove("controls__main-button--amber");
-            break;
-        case "Pause":
-            if (mainButtonIsPauseButton()) break;
-            btnMain.firstElementChild.className = "controls__pause-icon";
-            if (!btnMain.classList.contains("controls__main-button--amber")) btnMain.classList.add("controls__main-button--amber");
-    }
-
     switch (frame.BorderColor) {
         case "Normal":
             htmlElement.className = "border";
@@ -175,8 +163,6 @@ function redraw(frame) {
 }
 
 function mainButtonIsStartButton() { return btnMain.firstElementChild.className === "controls__play-icon"; }
-
-function mainButtonIsPauseButton() { return btnMain.firstElementChild.className === "controls__pause-icon"; }
 
 function showWaitingOverlay(waitingTimeInSecond = 0, onTimeup = () => {}) {
     if (waitingCountdownTimer) return;
