@@ -65,13 +65,6 @@ namespace Helix.Bot
 
                         var resourceSize = response.ContentLength;
                         var resourceType = httpContentTypeToResourceTypeDictionary[response.ContentType];
-                        var resourceSizeIsTooBig = resourceSize / 1024f / 1024f > Configurations.RenderableResourceSizeInMb;
-                        var resourceTypeIsNotRenderable = !(ResourceType.Html | ResourceType.Unknown).HasFlag(resourceType);
-                        var responseStatusCodeIsOk = originalResponseStatusCode == (int) StatusCode.Ok;
-
-                        if (responseStatusCodeIsOk && (resourceSizeIsTooBig || resourceTypeIsNotRenderable))
-                            response.StatusCode = (int) StatusCode.NoContent;
-
                         if (!_uriBeingRenderedWasFoundInCapturedNetworkTraffic)
                         {
                             if (!TryFindUriBeingRendered()) return;
@@ -80,6 +73,13 @@ namespace Helix.Bot
                             UpdateStatusCodeIfChanged();
                             TakeScreenshotIfConfigured();
                             _uriBeingRenderedWasFoundInCapturedNetworkTraffic = true;
+
+                            var resourceSizeIsTooBig = resourceSize / 1024f / 1024f > Configurations.RenderableResourceSizeInMb;
+                            var resourceTypeIsNotRenderable = !(ResourceType.Html | ResourceType.Unknown).HasFlag(resourceType);
+                            var responseStatusCodeIsOk = originalResponseStatusCode == (int) StatusCode.Ok;
+                            if (responseStatusCodeIsOk && (resourceSizeIsTooBig || resourceTypeIsNotRenderable))
+                                response.StatusCode = (int) StatusCode.NoContent;
+
                             return;
                         }
 
