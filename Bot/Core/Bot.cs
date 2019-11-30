@@ -2,6 +2,7 @@ using System.Data;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using Autofac;
+using Bot.Business;
 using Helix.Bot.Abstractions;
 using Helix.Core;
 using Helix.Persistence;
@@ -11,7 +12,7 @@ using Helix.WebBrowser.Abstractions;
 
 namespace Helix.Bot
 {
-    public abstract class Application
+    public abstract class Bot
     {
         protected static class ServiceLocator
         {
@@ -61,11 +62,12 @@ namespace Helix.Bot
                 {
                     containerBuilder.RegisterInstance(configurations).AsSelf();
 
-                    containerBuilder.RegisterType<IncrementalIdGenerator>().As<IIncrementalIdGenerator>().SingleInstance();
                     containerBuilder.RegisterType<Statistics>().As<IStatistics>().SingleInstance();
                     containerBuilder.RegisterType<ReportWriter>().As<IReportWriter>().SingleInstance();
-                    containerBuilder.RegisterType<ResourceVerifier>().As<IResourceVerifier>().SingleInstance();
                     containerBuilder.RegisterType<HardwareMonitor>().As<IHardwareMonitor>().SingleInstance();
+                    containerBuilder.RegisterType<ResourceVerifier>().As<IResourceVerifier>().SingleInstance();
+                    containerBuilder.RegisterType<ProcessedUrlRegister>().As<IProcessedUrlRegister>().SingleInstance();
+                    containerBuilder.RegisterType<IncrementalIdGenerator>().As<IIncrementalIdGenerator>().SingleInstance();
                     containerBuilder.RegisterType<BrokenLinkCollectionWorkflow>().As<IBrokenLinkCollectionWorkflow>().SingleInstance();
 
                     containerBuilder.Register(_ => CreateAndConfigureHttpClient()).SingleInstance();

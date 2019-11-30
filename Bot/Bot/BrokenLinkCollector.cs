@@ -9,7 +9,7 @@ using log4net;
 
 namespace Helix.Bot
 {
-    public class BrokenLinkCollector : Application, IDisposable
+    public class BrokenLinkCollector : Bot, IDisposable
     {
         readonly StateMachine<BotState, BotCommand> _stateMachine;
 
