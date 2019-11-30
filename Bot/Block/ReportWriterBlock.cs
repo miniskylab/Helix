@@ -5,7 +5,7 @@ using Newtonsoft.Json;
 
 namespace Helix.Bot
 {
-    public class ReportWriterBlock : ActionBlock<VerificationResult>, IReportWriterBlock, IDisposable
+    public class ReportWriterBlock : ActionBlock<VerificationResult>, IReportWriterBlock
     {
         readonly ILog _log;
         readonly IReportWriter _reportWriter;
@@ -15,8 +15,6 @@ namespace Helix.Bot
             _log = log;
             _reportWriter = reportWriter;
         }
-
-        public void Dispose() { _reportWriter?.Dispose(); }
 
         protected override void Act(VerificationResult verificationResult)
         {

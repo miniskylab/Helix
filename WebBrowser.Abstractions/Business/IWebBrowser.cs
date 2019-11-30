@@ -7,9 +7,8 @@ namespace Helix.WebBrowser.Abstractions
 {
     public interface IWebBrowser : IService, IDisposable
     {
-        Uri CurrentUri { get; }
-
         event AsyncEventHandler<SessionEventArgs> BeforeRequest;
+
         event AsyncEventHandler<SessionEventArgs> BeforeResponse;
 
         string GetUserAgentString();

@@ -176,9 +176,9 @@ namespace Helix.Bot
                 if (!_takeScreenshot) return renderingResult;
 
                 var pathToDirectoryContainsScreenshotFiles = _configurations.PathToDirectoryContainsScreenshotFiles;
-                var pathToScreenshotFile = Path.Combine(pathToDirectoryContainsScreenshotFiles, $"{_resourceBeingRendered.Id}.png");
+                var pathToScreenshotFile = Path.Combine(pathToDirectoryContainsScreenshotFiles, $"{resource.Id}.png");
                 if (!_webBrowser.TryTakeScreenshot(pathToScreenshotFile))
-                    _log.Error($"Failed to take screenshot at URL: {_resourceBeingRendered.GetAbsoluteUrl()}");
+                    _log.Error($"Failed to take screenshot at URL: {resource.GetAbsoluteUrl()}");
 
                 _takeScreenshot = false;
                 return renderingResult;

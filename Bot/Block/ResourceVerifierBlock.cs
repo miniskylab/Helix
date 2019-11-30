@@ -12,11 +12,6 @@ namespace Helix.Bot
     internal class ResourceVerifierBlock : TransformBlock<Resource, Resource>, IResourceVerifierBlock, IDisposable
     {
         readonly CancellationTokenSource _cancellationTokenSource;
-        readonly Configurations _configurations;
-        readonly ILog _log;
-        readonly IResourceScope _resourceScope;
-        readonly IResourceVerifier _resourceVerifier;
-        readonly IStatistics _statistics;
 
         public BufferBlock<Resource> BrokenResources { get; }
 
@@ -35,13 +30,15 @@ namespace Helix.Bot
         );
 
         public ResourceVerifierBlock(Configurations configurations, IResourceVerifier resourceVerifier, IStatistics statistics, ILog log,
-            IResourceScope resourceScope) : base(maxDegreeOfParallelism: Configurations.MaxNetworkConnectionCount)
+            IResourceScope resourceScope, IProcessedUrlRegister processedUrlRegister)
+            : base(maxDegreeOfParallelism: Configurations.MaxNetworkConnectionCount)
         {
             _log = log;
             _statistics = statistics;
             _resourceScope = resourceScope;
             _configurations = configurations;
             _resourceVerifier = resourceVerifier;
+            _processedUrlRegister = processedUrlRegister;
             _cancellationTokenSource = new CancellationTokenSource();
 
             BrokenResources = new BufferBlock<Resource>();
@@ -91,11 +88,17 @@ namespace Helix.Bot
                     : resource.ToVerificationResult();
 
                 var redirectHappened = !resource.OriginalUri.Equals(resource.Uri);
-                if (_resourceScope.IsStartUri(resource.OriginalUri) && redirectHappened)
-                    return ProcessUnsuccessfulResourceVerification(
-                        $"Redirect happened. Please provide a start url without any redirect. Or use this url: {resource.GetAbsoluteUrl()}",
-                        LogLevel.Error
-                    );
+                if (redirectHappened)
+                {
+                    if (_resourceScope.IsStartUri(resource.OriginalUri))
+                        return ProcessUnsuccessfulResourceVerification(
+                            $"Redirect happened. Please provide a start url without any redirect. Or use this url: {resource.GetAbsoluteUrl()}",
+                            LogLevel.Error
+                        );
+
+                    if (!_processedUrlRegister.TryRegister(resource.GetAbsoluteUrl()))
+                        return ProcessUnsuccessfulResourceVerification($"Resource discarded: {resource.ToJson()}", LogLevel.Warning);
+                }
 
                 UpdateStatistics();
                 SendOutVerificationResult();
@@ -185,5 +188,16 @@ namespace Helix.Bot
 
             #endregion
         }
+
+        #region Injected Services
+
+        readonly ILog _log;
+        readonly IStatistics _statistics;
+        readonly IResourceScope _resourceScope;
+        readonly Configurations _configurations;
+        readonly IResourceVerifier _resourceVerifier;
+        readonly IProcessedUrlRegister _processedUrlRegister;
+
+        #endregion
     }
 }

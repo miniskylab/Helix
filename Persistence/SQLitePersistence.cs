@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using Helix.Persistence.Abstractions;
 using JetBrains.Annotations;
 using Microsoft.Data.Sqlite;
@@ -22,17 +25,24 @@ namespace Helix.Persistence
             }
         }
 
-        public TDataTransferObject GetByPrimaryKey(params object[] primaryKeyValues)
+        public void Delete(params TDataTransferObject[] dataTransferObjects)
         {
             using var sqLiteDbContext = new SqLiteDbContext(_pathToDatabaseFile);
-            return sqLiteDbContext.DataTransferObjects.Find(primaryKeyValues);
+            sqLiteDbContext.DataTransferObjects.RemoveRange(dataTransferObjects);
+            sqLiteDbContext.SaveChanges();
         }
 
-        public void Save(params TDataTransferObject[] dataTransferObjects)
+        public void Insert(params TDataTransferObject[] dataTransferObjects)
         {
             using var sqLiteDbContext = new SqLiteDbContext(_pathToDatabaseFile);
             sqLiteDbContext.DataTransferObjects.AddRange(dataTransferObjects);
             sqLiteDbContext.SaveChanges();
+        }
+
+        public List<TDataTransferObject> Select(Func<TDataTransferObject, bool> whereClause)
+        {
+            using var sqLiteDbContext = new SqLiteDbContext(_pathToDatabaseFile);
+            return sqLiteDbContext.DataTransferObjects.AsNoTracking().AsEnumerable().Where(whereClause).ToList();
         }
 
         public void Update(params TDataTransferObject[] dataTransferObjects)

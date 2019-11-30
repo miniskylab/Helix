@@ -116,10 +116,9 @@ namespace Helix.Bot
 
         public void Shutdown()
         {
-            ShutdownResourceVerifierBlock();
-            ShutdownHtmlRendererBlocks();
-            ShutdownRendererPoolBlock();
+            ShutdownRendererPoolBlockAndResourceVerifierBlock();
             ShutdownJoinBlocks();
+            ShutdownHtmlRendererBlocks();
             ShutdownProcessingResultGeneratorBlock();
             ShutdownReportWriterBlock();
             ShutdownCoordinatorBlock();
@@ -127,17 +126,23 @@ namespace Helix.Bot
 
             #region Local Functions
 
-            void ShutdownResourceVerifierBlock()
+            void ShutdownRendererPoolBlockAndResourceVerifierBlock()
             {
                 try
                 {
+                    _rendererPoolBlock.Complete();
                     _resourceVerifierBlock.Complete();
+
+                    _rendererPoolBlock.Completion.Wait();
                     _resourceVerifierBlock.Completion.Wait();
                 }
                 catch (Exception exception)
                 {
                     if (exception.IsAcknowledgingOperationCancelledException(CancellationToken.None)) return;
-                    _log.Error($"One or more errors occurred while completing {nameof(ResourceVerifierBlock)}.", exception);
+                    _log.Error(
+                        $"One or more errors occurred while shutting down {nameof(RendererPoolBlock)} and {nameof(ResourceVerifierBlock)}.",
+                        exception
+                    );
                 }
             }
             void ShutdownHtmlRendererBlocks()
@@ -153,20 +158,7 @@ namespace Helix.Bot
                 catch (Exception exception)
                 {
                     if (exception.IsAcknowledgingOperationCancelledException(CancellationToken.None)) return;
-                    _log.Error($"One or more errors occurred while completing {nameof(HtmlRendererBlock)}.", exception);
-                }
-            }
-            void ShutdownRendererPoolBlock()
-            {
-                try
-                {
-                    _rendererPoolBlock.Complete();
-                    _rendererPoolBlock.Completion.Wait();
-                }
-                catch (Exception exception)
-                {
-                    if (exception.IsAcknowledgingOperationCancelledException(CancellationToken.None)) return;
-                    _log.Error($"One or more errors occurred while completing {nameof(RendererPoolBlock)}.", exception);
+                    _log.Error($"One or more errors occurred while shutting down {nameof(HtmlRendererBlock)}.", exception);
                 }
             }
             void ShutdownJoinBlocks()
@@ -182,7 +174,7 @@ namespace Helix.Bot
                 catch (Exception exception)
                 {
                     if (exception.IsAcknowledgingOperationCancelledException(CancellationToken.None)) return;
-                    _log.Error($"One or more errors occurred while completing {nameof(JoinBlock<IHtmlRenderer, Resource>)}.", exception);
+                    _log.Error($"One or more errors occurred while shutting down {nameof(JoinBlock<IHtmlRenderer, Resource>)}.", exception);
                 }
             }
             void ShutdownProcessingResultGeneratorBlock()
@@ -195,7 +187,7 @@ namespace Helix.Bot
                 catch (Exception exception)
                 {
                     if (exception.IsAcknowledgingOperationCancelledException(CancellationToken.None)) return;
-                    _log.Error($"One or more errors occurred while completing {nameof(ProcessingResultGeneratorBlock)}.", exception);
+                    _log.Error($"One or more errors occurred while shutting down {nameof(ProcessingResultGeneratorBlock)}.", exception);
                 }
             }
             void ShutdownReportWriterBlock()
@@ -208,7 +200,7 @@ namespace Helix.Bot
                 catch (Exception exception)
                 {
                     if (exception.IsAcknowledgingOperationCancelledException(CancellationToken.None)) return;
-                    _log.Error($"One or more errors occurred while completing {nameof(ReportWriterBlock)}.", exception);
+                    _log.Error($"One or more errors occurred while shutting down {nameof(ReportWriterBlock)}.", exception);
                 }
             }
             void ShutdownCoordinatorBlock()
@@ -221,7 +213,7 @@ namespace Helix.Bot
                 catch (Exception exception)
                 {
                     if (exception.IsAcknowledgingOperationCancelledException(CancellationToken.None)) return;
-                    _log.Error($"One or more errors occurred while completing {nameof(CoordinatorBlock)}.", exception);
+                    _log.Error($"One or more errors occurred while shutting down {nameof(CoordinatorBlock)}.", exception);
                 }
             }
             void ShutdownEventBroadcasterBlock()
@@ -234,13 +226,19 @@ namespace Helix.Bot
                 catch (Exception exception)
                 {
                     if (exception.IsAcknowledgingOperationCancelledException(CancellationToken.None)) return;
-                    _log.Error($"One or more errors occurred while completing {nameof(EventBroadcasterBlock)}.", exception);
+                    _log.Error($"One or more errors occurred while shutting down {nameof(EventBroadcasterBlock)}.", exception);
                 }
             }
 
             #endregion
         }
 
-        public bool TryActivate(string startUrl) { return _coordinatorBlock.TryActivateWorkflow(startUrl); }
+        public bool TryActivate(string startUrl)
+        {
+            var activationSucceeded = _coordinatorBlock.TryActivateWorkflow(startUrl);
+            if (activationSucceeded) _rendererPoolBlock.Activate();
+
+            return activationSucceeded;
+        }
     }
 }

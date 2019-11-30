@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
 using Helix.Bot.Abstractions;
@@ -11,43 +12,45 @@ namespace Helix.Bot
 {
     public class CoordinatorBlock : TransformManyBlock<ProcessingResult, Resource>, ICoordinatorBlock, IDisposable
     {
-        readonly HashSet<string> _alreadyProcessedUrls;
-        readonly ILog _log;
-        readonly object _memorizationLock;
-        readonly IResourceEnricher _resourceEnricher;
-        readonly IResourceScope _resourceScope;
         readonly StateMachine<WorkflowState, WorkflowCommand> _stateMachine;
-        readonly IStatistics _statistics;
 
         public BufferBlock<Event> Events { get; }
 
         public override Task Completion => Task.WhenAll(base.Completion, Events.Completion);
 
-        public CoordinatorBlock(IResourceEnricher resourceEnricher, IStatistics statistics, IResourceScope resourceScope, ILog log)
+        public CoordinatorBlock(IResourceEnricher resourceEnricher, IStatistics statistics, IResourceScope resourceScope, ILog log,
+            IProcessedUrlRegister processedUrlRegister)
         {
             _log = log;
             _statistics = statistics;
             _resourceScope = resourceScope;
-            _memorizationLock = new object();
             _resourceEnricher = resourceEnricher;
-            _alreadyProcessedUrls = new HashSet<string>();
+            _processedUrlRegister = processedUrlRegister;
 
-            _stateMachine = new StateMachine<WorkflowState, WorkflowCommand>(
-                new Dictionary<Transition<WorkflowState, WorkflowCommand>, WorkflowState>
-                {
-                    { Transition(WorkflowState.WaitingForActivation, WorkflowCommand.Activate), WorkflowState.Activated },
-                    { Transition(WorkflowState.Activated, WorkflowCommand.Deactivate), WorkflowState.WaitingForActivation }
-                },
-                WorkflowState.WaitingForActivation
-            );
-
+            _stateMachine = NewStateMachine();
             Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true });
 
             #region Local Functions
 
-            Transition<WorkflowState, WorkflowCommand> Transition(WorkflowState fromState, WorkflowCommand command)
+            StateMachine<WorkflowState, WorkflowCommand> NewStateMachine()
             {
-                return new Transition<WorkflowState, WorkflowCommand>(fromState, command);
+                return new StateMachine<WorkflowState, WorkflowCommand>(
+                    new Dictionary<Transition<WorkflowState, WorkflowCommand>, WorkflowState>
+                    {
+                        { Transition(WorkflowState.WaitingForActivation, WorkflowCommand.Activate), WorkflowState.Activated },
+                        { Transition(WorkflowState.Activated, WorkflowCommand.Deactivate), WorkflowState.WaitingForActivation }
+                    },
+                    WorkflowState.WaitingForActivation
+                );
+
+                #region Local Functions
+
+                Transition<WorkflowState, WorkflowCommand> Transition(WorkflowState fromState, WorkflowCommand command)
+                {
+                    return new Transition<WorkflowState, WorkflowCommand>(fromState, command);
+                }
+
+                #endregion
             }
 
             #endregion
@@ -120,7 +123,8 @@ namespace Helix.Bot
                         return null;
                     }
 
-                    CheckIfProcessedResourceWasRegistered();
+                    if (!_processedUrlRegister.IsRegistered(processedResource.GetAbsoluteUrl()))
+                        _log.Error($"Processed resource was not registered by {nameof(CoordinatorBlock)}.");
                 }
 
                 var newlyDiscoveredResources = DiscoverNewResources();
@@ -138,33 +142,12 @@ namespace Helix.Bot
                 List<Resource> DiscoverNewResources()
                 {
                     if (!(processingResult is SuccessfulProcessingResult successfulProcessingResult)) return new List<Resource>();
-
-                    var newResources = new List<Resource>();
-                    foreach (var discoveredResource in successfulProcessingResult.NewResources)
+                    return successfulProcessingResult.NewResources.Where(newResource =>
                     {
-                        lock (_memorizationLock)
-                        {
-                            if (_alreadyProcessedUrls.Contains(discoveredResource.GetAbsoluteUrl())) continue;
-                            _alreadyProcessedUrls.Add(discoveredResource.GetAbsoluteUrl());
-                        }
-                        newResources.Add(discoveredResource);
-                        _statistics.IncrementRemainingWorkload();
-                    }
-                    return newResources;
-                }
-                void CheckIfProcessedResourceWasRegistered()
-                {
-                    lock (_memorizationLock)
-                    {
-                        var redirectHappened = !processedResource.OriginalUri.Equals(processedResource.Uri);
-                        if (!redirectHappened && !_alreadyProcessedUrls.Contains(processedResource.GetAbsoluteUrl()))
-                        {
-                            _log.Error($"Processed resource was not registered by {nameof(CoordinatorBlock)}.");
-                            return;
-                        }
-
-                        if (redirectHappened) _alreadyProcessedUrls.Add(processedResource.GetAbsoluteUrl());
-                    }
+                        var resourceWasNotProcessed = _processedUrlRegister.TryRegister(newResource.GetAbsoluteUrl());
+                        if (resourceWasNotProcessed) _statistics.IncrementRemainingWorkload();
+                        return resourceWasNotProcessed;
+                    }).ToList();
                 }
                 void SendOut(Event @event)
                 {
@@ -180,5 +163,15 @@ namespace Helix.Bot
                 return null;
             }
         }
+
+        #region Injected Services
+
+        readonly ILog _log;
+        readonly IStatistics _statistics;
+        readonly IResourceScope _resourceScope;
+        readonly IResourceEnricher _resourceEnricher;
+        readonly IProcessedUrlRegister _processedUrlRegister;
+
+        #endregion
     }
 }

@@ -30,10 +30,12 @@ namespace Helix.Bot
             FailedProcessingResults.Completion
         );
 
-        public HtmlRendererBlock(IStatistics statistics, ILog log) : base(maxDegreeOfParallelism: Configurations.MaxHtmlRendererCount)
+        public HtmlRendererBlock(IStatistics statistics, IProcessedUrlRegister processedUrlRegister, ILog log)
+            : base(maxDegreeOfParallelism: Configurations.MaxHtmlRendererCount)
         {
             _log = log;
             _statistics = statistics;
+            _processedUrlRegister = processedUrlRegister;
             _cancellationTokenSource = new CancellationTokenSource();
 
             HtmlRenderers = new BufferBlock<IHtmlRenderer>();
@@ -98,8 +100,11 @@ namespace Helix.Bot
                         LogLevel.Information
                     );
 
+                var redirectHappened = !resource.OriginalUri.Equals(resource.Uri);
+                if (redirectHappened) _processedUrlRegister.TryRegister(resource.GetAbsoluteUrl());
+
                 DoStatistics();
-                UpdateStatusCodeIfChanged();
+                UpdateVerificationResultIfChanged();
                 SendOutResourceRenderedEvent();
 
                 if (resource.StatusCode.IsWithinBrokenRange())
@@ -125,10 +130,12 @@ namespace Helix.Bot
                     else if (!oldStatusCode.IsWithinBrokenRange() && newStatusCode.IsWithinBrokenRange())
                         _statistics.DecrementValidUrlCountAndIncrementBrokenUrlCount();
                 }
-                void UpdateStatusCodeIfChanged()
+                void UpdateVerificationResultIfChanged()
                 {
                     var newStatusCode = resource.StatusCode;
-                    if (oldStatusCode == newStatusCode) return;
+                    var statusCodeChanged = newStatusCode != oldStatusCode;
+
+                    if (!statusCodeChanged && !redirectHappened) return;
                     if (!VerificationResults.Post(resource.ToVerificationResult()) && !VerificationResults.Completion.IsCompleted)
                         _log.Error($"Failed to post data to buffer block named [{nameof(VerificationResults)}].");
                 }
@@ -205,6 +212,7 @@ namespace Helix.Bot
 
         readonly ILog _log;
         readonly IStatistics _statistics;
+        readonly IProcessedUrlRegister _processedUrlRegister;
 
         #endregion
     }

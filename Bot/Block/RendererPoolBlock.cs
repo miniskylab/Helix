@@ -11,18 +11,17 @@ namespace Helix.Bot
     public class RendererPoolBlock : TransformBlock<IHtmlRenderer, IHtmlRenderer>, IRendererPoolBlock
     {
         readonly Counter _counter;
-        readonly ILog _log;
 
         public BufferBlock<Event> Events { get; }
 
         public override Task Completion => Task.WhenAll(base.Completion, Events.Completion);
 
-        public RendererPoolBlock(Configurations configurations, IHardwareMonitor hardwareMonitor, Func<IHtmlRenderer> getHtmlRenderer,
-            ILog log)
+        public RendererPoolBlock(IHardwareMonitor hardwareMonitor, Func<IHtmlRenderer> getHtmlRenderer, ILog log)
         {
             _log = log;
-            _counter = new Counter();
+            _hardwareMonitor = hardwareMonitor;
 
+            _counter = new Counter();
             Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true });
 
             CreateHtmlRenderer();
@@ -79,8 +78,11 @@ namespace Helix.Bot
             #endregion
         }
 
+        public void Activate() { _hardwareMonitor.StartMonitoring(); }
+
         public override void Complete()
         {
+            _hardwareMonitor.StopMonitoring();
             DisposeHtmlRenderers();
             CheckMemoryLeak();
 
@@ -136,5 +138,12 @@ namespace Helix.Bot
 
             public int DisposedHtmlRendererCount;
         }
+
+        #region Injected Services
+
+        readonly ILog _log;
+        readonly IHardwareMonitor _hardwareMonitor;
+
+        #endregion
     }
 }

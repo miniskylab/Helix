@@ -33,12 +33,11 @@ namespace Helix.WebBrowser
         readonly string _pathToChromeDriverExecutable;
         readonly string _pathToChromiumExecutable;
         StateMachine<WebBrowserState, WebBrowserCommand> _stateMachine;
+        Uri _uriBeingRendered;
         readonly bool _useHeadlessWebBrowser;
         readonly bool _useIncognitoWebBrowser;
         static string _userAgentString;
         bool _waitingForDisposal;
-
-        public Uri CurrentUri { get; private set; }
 
         IEnumerable<string> StartArguments
         {
@@ -141,6 +140,7 @@ namespace Helix.WebBrowser
         }
 
         public event AsyncEventHandler<SessionEventArgs> BeforeRequest;
+
         public event AsyncEventHandler<SessionEventArgs> BeforeResponse;
 
         public ChromiumWebBrowser(string pathToChromiumExecutable, string pathToChromeDriverExecutable, double commandTimeoutInSecond = 60,
@@ -252,7 +252,7 @@ namespace Helix.WebBrowser
 
             try
             {
-                CurrentUri = uri ?? throw new ArgumentNullException(nameof(uri));
+                _uriBeingRendered = uri ?? throw new ArgumentNullException(nameof(uri));
 
                 EnsureCancellable();
                 if (!TryGoToUri()) return false;
@@ -384,7 +384,7 @@ namespace Helix.WebBrowser
             {
                 try
                 {
-                    if (CurrentUri == null) throw new InvalidOperationException();
+                    if (_uriBeingRendered == null) throw new InvalidOperationException();
                     var pathToDirectoryContainsScreenshotFile = Directory.GetParent(pathToScreenshotFile);
                     if (!pathToDirectoryContainsScreenshotFile.Exists) pathToDirectoryContainsScreenshotFile.Create();
 
@@ -395,15 +395,15 @@ namespace Helix.WebBrowser
                 catch (WebDriverException webDriverException) when (TimeoutExceptionOccurred(webDriverException))
                 {
                     RestartWebBrowser(true);
-                    _log.Info($"Chromium web browser waited too long for a response while taking screenshot of URI: {CurrentUri}");
+                    _log.Info($"Chromium web browser waited too long for a response while taking screenshot of URI: {_uriBeingRendered}");
                 }
                 catch (WebDriverException webDriverException) when (WebBrowserUnreachable(webDriverException))
                 {
-                    _log.Info($"Chromium web browser was forcibly closed while taking screenshot of URI: {CurrentUri}");
+                    _log.Info($"Chromium web browser was forcibly closed while taking screenshot of URI: {_uriBeingRendered}");
                 }
                 catch (Exception exception)
                 {
-                    _log.Info($"One or more errors occurred while taking screenshot of URI: {CurrentUri}\r\n{exception}");
+                    _log.Error($"One or more errors occurred while taking screenshot of URI: {_uriBeingRendered}", exception);
                 }
                 finally
                 {

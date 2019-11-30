@@ -59,9 +59,8 @@ namespace Helix.Bot
             {
                 try
                 {
-                    SetupAndConfigureServices();
+                    Initialize();
                     RecreateDirectoryContainingScreenshotFiles();
-                    StartHardwareMonitorService();
                     ActivateWorkflow();
 
                     if (!_stateMachine.TryTransitNext(BotCommand.Run))
@@ -82,12 +81,12 @@ namespace Helix.Bot
 
                 #region Local Functions
 
-                void SetupAndConfigureServices()
+                void Initialize()
                 {
-                    Broadcast(new StartProgressReportEvent { Message = "Setting up and configuring services ..." });
-                    ServiceLocator.SetupAndConfigureServices(configurations);
+                    Broadcast(new StartProgressReportEvent { Message = "Initializing ..." });
+                    SetupServiceContainer(configurations);
 
-                    _brokenLinkCollectionWorkflow = ServiceLocator.Get<IBrokenLinkCollectionWorkflow>();
+                    _brokenLinkCollectionWorkflow = GetWorkflow<IBrokenLinkCollectionWorkflow>();
                     _brokenLinkCollectionWorkflow.OnEventBroadcast += @event =>
                     {
                         Broadcast(@event);
@@ -116,12 +115,6 @@ namespace Helix.Bot
 
                     Broadcast(new WorkflowActivatedEvent());
                 }
-                void StartHardwareMonitorService()
-                {
-                    Broadcast(StartProgressReportEvent("Starting hardware monitor service ..."));
-                    ServiceLocator.Get<IHardwareMonitor>().StartMonitoring();
-                }
-                Event StartProgressReportEvent(string message) { return new StartProgressReportEvent { Message = message }; }
 
                 #endregion
             });
@@ -142,7 +135,6 @@ namespace Helix.Bot
             {
                 try
                 {
-                    StopHardwareMonitorService();
                     ShutdownWorkflow();
                     ReleaseResources();
 
@@ -159,22 +151,6 @@ namespace Helix.Bot
 
                 #region Local Functions
 
-                void StopHardwareMonitorService()
-                {
-                    try
-                    {
-                        var hardwareMonitor = ServiceLocator.Get<IHardwareMonitor>();
-                        if (hardwareMonitor == null || !hardwareMonitor.IsRunning) return;
-
-                        Broadcast(StopProgressReportEvent("Stopping hardware monitor service ..."));
-                        hardwareMonitor.StopMonitoring();
-                    }
-                    catch (Exception exception)
-                    {
-                        botCommand = BotCommand.MarkAsFaulted;
-                        _log.Error("One or more errors occurred when stopping hardware monitor service.", exception);
-                    }
-                }
                 void ShutdownWorkflow()
                 {
                     try
@@ -193,7 +169,7 @@ namespace Helix.Bot
                     try
                     {
                         Broadcast(StopProgressReportEvent("Disposing services ..."));
-                        ServiceLocator.DisposeServices();
+                        DisposeServiceContainer();
                     }
                     catch (Exception exception)
                     {
