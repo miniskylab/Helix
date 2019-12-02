@@ -102,7 +102,7 @@ namespace Helix.Gui
 
                     _reportViewerProcess = Process.Start(
                         Configurations.PathToSqLiteBrowserExecutable,
-                        $"-R -t DataTransferObjects {_configurations.PathToReportFile}" // TODO: Remove hard-coded [DataTransferObjects]
+                        $"-R -t VerificationResults {_configurations.PathToReportFile}" // TODO: Remove hard-coded [VerificationResults]
                     );
 
                     /* Wait for MainWindowHandle to be available.

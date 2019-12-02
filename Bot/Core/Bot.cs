@@ -5,8 +5,6 @@ using Autofac;
 using Bot.Business;
 using Helix.Bot.Abstractions;
 using Helix.Core;
-using Helix.Persistence;
-using Helix.Persistence.Abstractions;
 using Helix.WebBrowser;
 using Helix.WebBrowser.Abstractions;
 
@@ -38,7 +36,6 @@ namespace Helix.Bot
             void RegisterTransientServicesRequiringConfigurations()
             {
                 containerBuilder.Register(_ => CreateAndConfigureWebBrowser()).As<IWebBrowser>();
-                containerBuilder.Register(_ => CreateAndConfigureSqLitePersistence()).As<ISqLitePersistence<VerificationResult>>();
 
                 IWebBrowser CreateAndConfigureWebBrowser()
                 {
@@ -50,10 +47,6 @@ namespace Helix.Bot
                         configurations.UseHeadlessWebBrowsers,
                         (1920, 1080)
                     );
-                }
-                ISqLitePersistence<VerificationResult> CreateAndConfigureSqLitePersistence()
-                {
-                    return new SqLitePersistence<VerificationResult>(configurations.PathToReportFile);
                 }
             }
             void RegisterSingletonServices()
@@ -70,7 +63,7 @@ namespace Helix.Bot
 
                 containerBuilder.Register(_ => CreateAndConfigureHttpClient()).SingleInstance();
 
-                HttpClient CreateAndConfigureHttpClient()
+                static HttpClient CreateAndConfigureHttpClient()
                 {
                     IWebBrowser webBrowser = new ChromiumWebBrowser(
                         Configurations.PathToChromiumExecutable,
