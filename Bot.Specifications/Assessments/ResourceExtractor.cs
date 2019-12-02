@@ -28,7 +28,7 @@ namespace Helix.Bot.Specifications
 
                 for (var index = 0; index < expectedOutputResources.Count; index++)
                 {
-                    Assert.Equal(expectedOutputResources[index].OriginalUrl, extractedResources[index].OriginalUrl);
+                    Assert.Equal(expectedOutputResources[index].OriginalUri, extractedResources[index].OriginalUri);
                     Assert.StrictEqual(expectedOutputResources[index].ParentUri, extractedResources[index].ParentUri);
                     Assert.Equal(
                         expectedOutputResources[index].IsExtractedFromHtmlDocument,

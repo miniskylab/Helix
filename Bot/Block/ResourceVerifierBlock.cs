@@ -92,11 +92,11 @@ namespace Helix.Bot
                 {
                     if (_resourceScope.IsStartUri(resource.OriginalUri))
                         return ProcessUnsuccessfulResourceVerification(
-                            $"Redirect happened. Please provide a start url without any redirect. Or use this url: {resource.GetAbsoluteUrl()}",
+                            $"Redirect happened. Please provide a start url without any redirect. Or use this url: {resource.Uri.AbsoluteUri}",
                             LogLevel.Error
                         );
 
-                    if (!_processedUrlRegister.TryRegister(resource.GetAbsoluteUrl()))
+                    if (!_processedUrlRegister.TryRegister(resource.Uri.AbsoluteUri))
                         return ProcessUnsuccessfulResourceVerification($"Resource discarded: {resource.ToJson()}", LogLevel.Warning);
                 }
 
@@ -127,7 +127,7 @@ namespace Helix.Bot
                         ValidUrlCount = statisticsSnapshot.ValidUrlCount,
                         BrokenUrlCount = statisticsSnapshot.BrokenUrlCount,
                         VerifiedUrlCount = statisticsSnapshot.VerifiedUrlCount,
-                        Message = $"{verificationResult.StatusCode:D} - {resource.GetAbsoluteUrl()}"
+                        Message = $"{verificationResult.StatusCode:D} - {resource.Uri.AbsoluteUri}"
                     };
                     if (!Events.Post(resourceVerifiedEvent) && !Events.Completion.IsCompleted)
                         _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");

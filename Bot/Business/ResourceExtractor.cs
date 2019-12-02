@@ -9,7 +9,7 @@ namespace Helix.Bot
     public class ResourceExtractor : IResourceExtractor
     {
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public ResourceExtractor() { }
+        public ResourceExtractor(IIncrementalIdGenerator incrementalIdGenerator) { _incrementalIdGenerator = incrementalIdGenerator; }
 
         public ReadOnlyCollection<Resource> ExtractResourcesFrom(HtmlDocument htmlDocument)
         {
@@ -26,14 +26,7 @@ namespace Helix.Bot
             {
                 var extractedUrl = anchorTag.Attributes["href"].Value;
                 if (IsNullOrWhiteSpace() || IsJavaScriptCode()) continue;
-                extractedResources.Add(
-                    new Resource
-                    {
-                        ParentUri = htmlDocument.Uri,
-                        OriginalUrl = extractedUrl,
-                        IsExtractedFromHtmlDocument = true
-                    }
-                );
+                extractedResources.Add(new Resource(_incrementalIdGenerator.GetNext(), extractedUrl, htmlDocument.Uri, true));
 
                 #region Local Functions
 
@@ -45,5 +38,11 @@ namespace Helix.Bot
 
             return new ReadOnlyCollection<Resource>(extractedResources);
         }
+
+        #region Injected Services
+
+        readonly IIncrementalIdGenerator _incrementalIdGenerator;
+
+        #endregion
     }
 }

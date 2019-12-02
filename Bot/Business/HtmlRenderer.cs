@@ -24,8 +24,8 @@ namespace Helix.Bot
         bool _uriBeingRenderedWasFoundInCapturedNetworkTraffic;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public HtmlRenderer(Configurations configurations, IResourceScope resourceScope, ILog log, IWebBrowser webBrowser,
-            IHttpContentTypeToResourceTypeDictionary httpContentTypeToResourceTypeDictionary)
+        public HtmlRenderer(Configurations configurations, IResourceScope resourceScope, IIncrementalIdGenerator incrementalIdGenerator,
+            IHttpContentTypeToResourceTypeDictionary httpContentTypeToResourceTypeDictionary, ILog log, IWebBrowser webBrowser)
         {
             _log = log;
             _webBrowser = webBrowser;
@@ -85,16 +85,21 @@ namespace Helix.Bot
 
                         if (_resourceBeingRendered.StatusCode.IsWithinBrokenRange()) return;
                         if (!configurations.IncludeRedirectUrlsInReport && IsRedirectResponse()) return;
-                        _capturedResources.Add(new Resource
-                        {
-                            ParentUri = _resourceBeingRendered.Uri,
-                            Uri = request.RequestUri,
-                            OriginalUrl = request.Url,
-                            OriginalUri = request.RequestUri,
-                            Size = resourceSize,
-                            StatusCode = (StatusCode) originalResponseStatusCode,
-                            ResourceType = resourceType
-                        });
+                        _capturedResources.Add(
+                            new Resource
+                            (
+                                incrementalIdGenerator.GetNext(),
+                                request.Url,
+                                _resourceBeingRendered.Uri,
+                                false
+                            )
+                            {
+                                Size = resourceSize,
+                                Uri = request.RequestUri,
+                                ResourceType = resourceType,
+                                StatusCode = (StatusCode) originalResponseStatusCode
+                            }
+                        );
                     }
                     finally { Interlocked.Decrement(ref _activeHttpTrafficCount); }
                 }, _networkTrafficCts.Token);
@@ -178,7 +183,7 @@ namespace Helix.Bot
                 var pathToDirectoryContainsScreenshotFiles = _configurations.PathToDirectoryContainsScreenshotFiles;
                 var pathToScreenshotFile = Path.Combine(pathToDirectoryContainsScreenshotFiles, $"{resource.Id}.png");
                 if (!_webBrowser.TryTakeScreenshot(pathToScreenshotFile))
-                    _log.Error($"Failed to take screenshot at URL: {resource.GetAbsoluteUrl()}");
+                    _log.Error($"Failed to take screenshot at URL: {resource.Uri.AbsoluteUri}");
 
                 _takeScreenshot = false;
                 return renderingResult;

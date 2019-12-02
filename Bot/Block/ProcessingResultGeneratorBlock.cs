@@ -9,14 +9,10 @@ namespace Helix.Bot
 {
     public class ProcessingResultGeneratorBlock : TransformBlock<RenderingResult, ProcessingResult>, IProcessingResultGeneratorBlock
     {
-        readonly ILog _log;
-        readonly IResourceEnricher _resourceEnricher;
-        readonly IResourceExtractor _resourceExtractor;
-
-        public ProcessingResultGeneratorBlock(IResourceExtractor resourceExtractor, IResourceEnricher resourceEnricher, ILog log)
+        public ProcessingResultGeneratorBlock(IResourceExtractor resourceExtractor, IResourceScope resourceScope, ILog log)
         {
             _log = log;
-            _resourceEnricher = resourceEnricher;
+            _resourceScope = resourceScope;
             _resourceExtractor = resourceExtractor;
         }
 
@@ -34,7 +30,22 @@ namespace Helix.Bot
                 return new SuccessfulProcessingResult
                 {
                     ProcessedResource = renderingResult.RenderedResource,
-                    NewResources = newResources.Select(_resourceEnricher.Enrich).ToList()
+                    NewResources = newResources.Select(newResource =>
+                    {
+                        if (newResource.StatusCode == default && IsOrphanedUri()) newResource.StatusCode = StatusCode.OrphanedUri;
+                        if (newResource.Uri != null) newResource.IsInternal = _resourceScope.IsInternalResource(newResource);
+                        return newResource;
+
+                        #region Local Functions
+
+                        bool IsOrphanedUri()
+                        {
+                            // TODO: Investigate where those orphaned Uri-s came from.
+                            return newResource.ParentUri == null && !_resourceScope.IsStartUri(newResource.OriginalUri);
+                        }
+
+                        #endregion
+                    }).ToList()
                 };
             }
             catch (Exception exception)
@@ -43,5 +54,13 @@ namespace Helix.Bot
                 return new FailedProcessingResult { ProcessedResource = renderingResult?.RenderedResource };
             }
         }
+
+        #region Local Functions
+
+        readonly ILog _log;
+        readonly IResourceScope _resourceScope;
+        readonly IResourceExtractor _resourceExtractor;
+
+        #endregion
     }
 }

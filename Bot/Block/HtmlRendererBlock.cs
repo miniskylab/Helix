@@ -101,7 +101,7 @@ namespace Helix.Bot
                     );
 
                 var redirectHappened = !resource.OriginalUri.Equals(resource.Uri);
-                if (redirectHappened) _processedUrlRegister.TryRegister(resource.GetAbsoluteUrl());
+                if (redirectHappened) _processedUrlRegister.TryRegister(resource.Uri.AbsoluteUri);
 
                 DoStatistics();
                 UpdateVerificationResultIfChanged();
@@ -147,7 +147,7 @@ namespace Helix.Bot
                         ValidUrlCount = statisticsSnapshot.ValidUrlCount,
                         BrokenUrlCount = statisticsSnapshot.BrokenUrlCount,
                         VerifiedUrlCount = statisticsSnapshot.VerifiedUrlCount,
-                        Message = $"{resource.StatusCode:D} - {resource.GetAbsoluteUrl()}",
+                        Message = $"{resource.StatusCode:D} - {resource.Uri.AbsoluteUri}",
                         MillisecondsAveragePageLoadTime = statisticsSnapshot.MillisecondsAveragePageLoadTime
                     };
                     if (!Events.Post(resourceRenderedEvent) && !Events.Completion.IsCompleted)

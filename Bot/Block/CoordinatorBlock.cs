@@ -18,14 +18,14 @@ namespace Helix.Bot
 
         public override Task Completion => Task.WhenAll(base.Completion, Events.Completion);
 
-        public CoordinatorBlock(IResourceEnricher resourceEnricher, IStatistics statistics, IResourceScope resourceScope, ILog log,
-            IProcessedUrlRegister processedUrlRegister)
+        public CoordinatorBlock(IProcessedUrlRegister processedUrlRegister, IStatistics statistics, IResourceScope resourceScope, ILog log,
+            IIncrementalIdGenerator incrementalIdGenerator)
         {
             _log = log;
             _statistics = statistics;
             _resourceScope = resourceScope;
-            _resourceEnricher = resourceEnricher;
             _processedUrlRegister = processedUrlRegister;
+            _incrementalIdGenerator = incrementalIdGenerator;
 
             _stateMachine = NewStateMachine();
             Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true });
@@ -79,13 +79,10 @@ namespace Helix.Bot
                     {
                         NewResources = new List<Resource>
                         {
-                            _resourceEnricher.Enrich(new Resource
+                            new Resource(_incrementalIdGenerator.GetNext(), startUrl, null, true)
                             {
-                                ParentUri = null,
-                                IsInternal = true,
-                                OriginalUrl = startUrl,
-                                IsExtractedFromHtmlDocument = true
-                            })
+                                IsInternal = true
+                            }
                         }
                     });
 
@@ -119,11 +116,11 @@ namespace Helix.Bot
                     var redirectHappened = !processedResource.OriginalUri.Equals(processedResource.Uri);
                     if (_resourceScope.IsStartUri(processedResource.OriginalUri) && redirectHappened)
                     {
-                        SendOut(new RedirectHappenedAtStartUrlEvent { FinalUrlAfterRedirects = processedResource.GetAbsoluteUrl() });
+                        SendOut(new RedirectHappenedAtStartUrlEvent { FinalUrlAfterRedirects = processedResource.Uri.AbsoluteUri });
                         return null;
                     }
 
-                    if (!_processedUrlRegister.IsRegistered(processedResource.GetAbsoluteUrl()))
+                    if (!_processedUrlRegister.IsRegistered(processedResource.Uri.AbsoluteUri))
                         _log.Error($"Processed resource was not registered by {nameof(CoordinatorBlock)}.");
                 }
 
@@ -144,7 +141,7 @@ namespace Helix.Bot
                     if (!(processingResult is SuccessfulProcessingResult successfulProcessingResult)) return new List<Resource>();
                     return successfulProcessingResult.NewResources.Where(newResource =>
                     {
-                        var resourceWasNotProcessed = _processedUrlRegister.TryRegister(newResource.GetAbsoluteUrl());
+                        var resourceWasNotProcessed = _processedUrlRegister.TryRegister(newResource.Uri.AbsoluteUri);
                         if (resourceWasNotProcessed) _statistics.IncrementRemainingWorkload();
                         return resourceWasNotProcessed;
                     }).ToList();
@@ -169,8 +166,8 @@ namespace Helix.Bot
         readonly ILog _log;
         readonly IStatistics _statistics;
         readonly IResourceScope _resourceScope;
-        readonly IResourceEnricher _resourceEnricher;
         readonly IProcessedUrlRegister _processedUrlRegister;
+        readonly IIncrementalIdGenerator _incrementalIdGenerator;
 
         #endregion
     }

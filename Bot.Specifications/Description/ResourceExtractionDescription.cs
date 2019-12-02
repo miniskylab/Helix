@@ -48,15 +48,11 @@ namespace Helix.Bot.Specifications
                 }
             );
 
-            Resource Resource(string originalUrl)
-            {
-                return new Resource
-                {
-                    ParentUri = new Uri("http://www.helix.com"),
-                    OriginalUrl = originalUrl,
-                    IsExtractedFromHtmlDocument = true
-                };
-            }
+            #region Local Functions
+
+            static Resource Resource(string originalUrl) => new Resource(0, originalUrl, new Uri("http://www.helix.com"), true);
+
+            #endregion
         }
 
         void IgnoreAnchorTagsWithHrefAttributeContainingEmptyOrWhiteSpaceCharactersOnly()
