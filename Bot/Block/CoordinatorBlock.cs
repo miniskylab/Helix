@@ -121,7 +121,7 @@ namespace Helix.Bot
                     }
 
                     if (!_processedUrlRegister.IsRegistered(processedResource.Uri.AbsoluteUri))
-                        _log.Error($"Processed resource was not registered by {nameof(CoordinatorBlock)}.");
+                        _log.Error($"Processed resource was not registered by {nameof(CoordinatorBlock)}: {processedResource.ToJson()}");
                 }
 
                 var newlyDiscoveredResources = DiscoverNewResources();
