@@ -20,13 +20,13 @@ namespace Helix.Bot
 
         public BufferBlock<IHtmlRenderer> HtmlRenderers { get; }
 
-        public BufferBlock<VerificationResult> VerificationResults { get; }
+        public BufferBlock<(ReportWritingAction, VerificationResult)> ReportWritingMessages { get; }
 
         public override Task Completion => Task.WhenAll(
             base.Completion,
             Events.Completion,
             HtmlRenderers.Completion,
-            VerificationResults.Completion,
+            ReportWritingMessages.Completion,
             FailedProcessingResults.Completion
         );
 
@@ -39,7 +39,7 @@ namespace Helix.Bot
             _cancellationTokenSource = new CancellationTokenSource();
 
             HtmlRenderers = new BufferBlock<IHtmlRenderer>();
-            VerificationResults = new BufferBlock<VerificationResult>();
+            ReportWritingMessages = new BufferBlock<(ReportWritingAction, VerificationResult)>();
             FailedProcessingResults = new BufferBlock<FailedProcessingResult>();
             Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true });
         }
@@ -54,7 +54,7 @@ namespace Helix.Bot
                 base.Completion.Wait();
                 Events.Complete();
                 HtmlRenderers.Complete();
-                VerificationResults.Complete();
+                ReportWritingMessages.Complete();
                 FailedProcessingResults.Complete();
             }
             catch (Exception exception)
@@ -77,7 +77,7 @@ namespace Helix.Bot
                     if (resourceSizeInMb > Configurations.RenderableResourceSizeInMb)
                         return ProcessUnsuccessfulRendering(
                             $"Resource was not queued for rendering because it was too big ({resourceSizeInMb} MB): {resource.ToJson()}",
-                            LogLevel.Information
+                            LogLevel.Debug
                         );
 
                     var resourceTypeIsNotRenderable = !(ResourceType.Html | ResourceType.Unknown).HasFlag(resource.ResourceType);
@@ -85,6 +85,7 @@ namespace Helix.Bot
                         return ProcessUnsuccessfulRendering(null, LogLevel.None);
                 }
 
+                var oldUri = resource.Uri;
                 var oldStatusCode = resource.StatusCode;
                 var renderingFailed = !htmlRenderer.TryRender(
                     resource,
@@ -100,11 +101,22 @@ namespace Helix.Bot
                         LogLevel.Information
                     );
 
-                var redirectHappened = !resource.OriginalUri.Equals(resource.Uri);
-                if (redirectHappened) _processedUrlRegister.TryRegister(resource.Uri.AbsoluteUri);
+                var redirectHappened = resource.Uri != oldUri;
+                if (redirectHappened)
+                {
+                    if (oldStatusCode == StatusCode.Ok)
+                        _log.Info($"Redirect happened on valid resource: {resource.ToJson()}");
+
+                    var verificationResult = resource.ToVerificationResult();
+                    SendOutReportWritingMessage(
+                        _processedUrlRegister.TryRegister(verificationResult.VerifiedUrl)
+                            ? (ReportWritingAction.Update, verificationResult)
+                            : (ReportWritingAction.RemoveAndUpdate, verificationResult)
+                    );
+                }
 
                 DoStatistics();
-                UpdateVerificationResultIfChanged();
+                UpdateStatusCodeIfNecessary();
                 SendOutResourceRenderedEvent();
 
                 if (resource.StatusCode.IsWithinBrokenRange())
@@ -130,14 +142,12 @@ namespace Helix.Bot
                     else if (!oldStatusCode.IsWithinBrokenRange() && newStatusCode.IsWithinBrokenRange())
                         _statistics.DecrementValidUrlCountAndIncrementBrokenUrlCount();
                 }
-                void UpdateVerificationResultIfChanged()
+                void UpdateStatusCodeIfNecessary()
                 {
                     var newStatusCode = resource.StatusCode;
-                    var statusCodeChanged = newStatusCode != oldStatusCode;
+                    if (redirectHappened || newStatusCode == oldStatusCode) return;
 
-                    if (!statusCodeChanged && !redirectHappened) return;
-                    if (!VerificationResults.Post(resource.ToVerificationResult()) && !VerificationResults.Completion.IsCompleted)
-                        _log.Error($"Failed to post data to buffer block named [{nameof(VerificationResults)}].");
+                    SendOutReportWritingMessage((ReportWritingAction.Update, resource.ToVerificationResult()));
                 }
                 void SendOutResourceRenderedEvent()
                 {
@@ -152,6 +162,11 @@ namespace Helix.Bot
                     };
                     if (!Events.Post(resourceRenderedEvent) && !Events.Completion.IsCompleted)
                         _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
+                }
+                void SendOutReportWritingMessage((ReportWritingAction, VerificationResult) reportWritingMessage)
+                {
+                    if (!ReportWritingMessages.Post(reportWritingMessage) && !ReportWritingMessages.Completion.IsCompleted)
+                        _log.Error($"Failed to post data to buffer block named [{nameof(ReportWritingMessages)}].");
                 }
 
                 #endregion

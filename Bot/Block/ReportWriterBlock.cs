@@ -5,23 +5,34 @@ using Newtonsoft.Json;
 
 namespace Helix.Bot
 {
-    public class ReportWriterBlock : ActionBlock<VerificationResult>, IReportWriterBlock
+    public class ReportWriterBlock : ActionBlock<(ReportWritingAction, VerificationResult)>, IReportWriterBlock
     {
-        readonly ILog _log;
-        readonly IReportWriter _reportWriter;
-
-        public ReportWriterBlock(IReportWriter reportWriter, ILog log)
+        public ReportWriterBlock(IReportWriter reportWriter, ILog log) : base(true)
         {
             _log = log;
             _reportWriter = reportWriter;
         }
 
-        protected override void Act(VerificationResult verificationResult)
+        protected override void Act((ReportWritingAction, VerificationResult) _)
         {
+            var (reportWritingAction, verificationResult) = _;
             try
             {
                 if (verificationResult == null) throw new ArgumentNullException(nameof(verificationResult));
-                _reportWriter.WriteReport(verificationResult);
+                switch (reportWritingAction)
+                {
+                    case ReportWritingAction.AddNew:
+                        _reportWriter.AddNew(verificationResult);
+                        break;
+                    case ReportWritingAction.Update:
+                        _reportWriter.Update(verificationResult);
+                        break;
+                    case ReportWritingAction.RemoveAndUpdate:
+                        _reportWriter.RemoveAndUpdate(verificationResult);
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(reportWritingAction));
+                }
             }
             catch (Exception exception)
             {
@@ -31,5 +42,12 @@ namespace Helix.Bot
                 );
             }
         }
+
+        #region Injected Services
+
+        readonly ILog _log;
+        readonly IReportWriter _reportWriter;
+
+        #endregion
     }
 }

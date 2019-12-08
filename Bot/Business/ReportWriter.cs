@@ -1,68 +1,119 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Helix.Bot.Abstractions;
 using JetBrains.Annotations;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using OpenQA.Selenium;
 
 namespace Helix.Bot
 {
     public sealed class ReportWriter : IReportWriter
     {
-        SqLiteDbContext _reportDatabaseContext;
-        int _writingReportRequestCount;
+        readonly Configurations _configurations;
+        List<VerificationResult> _memoryBuffer;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public ReportWriter(Configurations configurations)
         {
-            _writingReportRequestCount = 0;
+            _configurations = configurations;
+            _memoryBuffer = new List<VerificationResult>();
 
-            _reportDatabaseContext = new SqLiteDbContext(configurations.PathToReportFile);
-            _reportDatabaseContext.Database.EnsureDeleted();
-            _reportDatabaseContext.Database.EnsureCreated();
+            using var reportDatabaseContext = new SqLiteDbContext(configurations.PathToReportFile);
+            reportDatabaseContext.Database.EnsureDeleted();
+            reportDatabaseContext.Database.EnsureCreated();
         }
 
-        public void Dispose()
+        public void AddNew(params VerificationResult[] toBeAddedVerificationResults)
         {
-            _reportDatabaseContext?.SaveChanges();
-            _reportDatabaseContext?.Dispose();
-            _reportDatabaseContext = null;
+            if (_memoryBuffer.Count >= 300) FlushMemoryBufferToDisk();
+            _memoryBuffer.AddRange(toBeAddedVerificationResults);
         }
 
-        public void WriteReport(VerificationResult verificationResult)
+        public void Dispose() { FlushMemoryBufferToDisk(); }
+
+        public void RemoveAndUpdate(params VerificationResult[] toBeUpdatedVerificationResults)
         {
-            try
+            using var reportDatabaseContext = new SqLiteDbContext(_configurations.PathToReportFile);
+            reportDatabaseContext.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
+
+            foreach (var toBeUpdatedVerificationResult in toBeUpdatedVerificationResults)
             {
-                _writingReportRequestCount++;
+                Remove();
+                Update();
 
-                var verificationResultStoredInDatabase = _reportDatabaseContext.VerificationResults
-                    .SingleOrDefault(dbRecord => dbRecord.VerifiedUrl == verificationResult.VerifiedUrl);
+                #region Local Functions
 
-                var duplicateUrlDetected = verificationResultStoredInDatabase != null;
-                if (duplicateUrlDetected) _reportDatabaseContext.Remove(verificationResultStoredInDatabase);
-
-                verificationResultStoredInDatabase = _reportDatabaseContext.VerificationResults
-                    .SingleOrDefault(dbRecord => dbRecord.Id == verificationResult.Id);
-
-                var duplicateIdDetected = verificationResultStoredInDatabase != null;
-                if (duplicateIdDetected)
+                void Remove()
                 {
-                    _reportDatabaseContext.Entry(verificationResultStoredInDatabase).State = EntityState.Detached;
-                    _reportDatabaseContext.Update(verificationResult);
-                    // TODO: Update Statistics
-                    return;
+                    /* TODO: At this point, the VerifiedUrl we want to remove from db might have not been saved to db yet.
+                     * We need to implement "wait & retry" logic here. */
+
+                    var trackedVerificationResult = _memoryBuffer.SingleOrDefault(WhereVerifiedUrlMatch);
+                    if (trackedVerificationResult != null) _memoryBuffer.Remove(trackedVerificationResult);
+                    else
+                    {
+                        trackedVerificationResult = reportDatabaseContext.VerificationResults.SingleOrDefault(WhereVerifiedUrlMatch);
+                        if (trackedVerificationResult != null) reportDatabaseContext.VerificationResults.Remove(trackedVerificationResult);
+                        else
+                        {
+                            var errorMessage = $"Cannot find any {nameof(VerificationResult)} " +
+                                               $"sharing {nameof(VerificationResult.VerifiedUrl)} " +
+                                               $"with: {toBeUpdatedVerificationResult.ToJson()}";
+                            throw new NotFoundException(errorMessage);
+                        }
+                    }
+
+                    #region Local Functions
+
+                    bool WhereVerifiedUrlMatch(VerificationResult v) => v.VerifiedUrl == toBeUpdatedVerificationResult.VerifiedUrl;
+
+                    #endregion
+                }
+                void Update()
+                {
+                    var bufferedVerificationResult = _memoryBuffer.SingleOrDefault(v => v.Id == toBeUpdatedVerificationResult.Id);
+                    if (bufferedVerificationResult != null)
+                    {
+                        _memoryBuffer.Remove(bufferedVerificationResult);
+                        _memoryBuffer.Add(toBeUpdatedVerificationResult);
+                    }
+                    else
+                        reportDatabaseContext.VerificationResults.Update(toBeUpdatedVerificationResult);
                 }
 
-                _reportDatabaseContext.Add(verificationResult);
+                #endregion
             }
-            finally
+            reportDatabaseContext.SaveChanges();
+        }
+
+        public void Update(params VerificationResult[] toBeUpdatedVerificationResults)
+        {
+            foreach (var toBeUpdatedVerificationResult in toBeUpdatedVerificationResults)
             {
-                if (_writingReportRequestCount >= 300)
+                var bufferedVerificationResult = _memoryBuffer.SingleOrDefault(v => v.Id == toBeUpdatedVerificationResult.Id);
+                if (bufferedVerificationResult != null)
                 {
-                    _reportDatabaseContext.SaveChanges();
-                    _writingReportRequestCount = 0;
+                    _memoryBuffer.Remove(bufferedVerificationResult);
+                    _memoryBuffer.Add(toBeUpdatedVerificationResult);
+                    continue;
                 }
+
+                using var reportDatabaseContext = new SqLiteDbContext(_configurations.PathToReportFile);
+                reportDatabaseContext.VerificationResults.Update(toBeUpdatedVerificationResult);
+                reportDatabaseContext.SaveChanges();
             }
+        }
+
+        void FlushMemoryBufferToDisk()
+        {
+            var memoryBuffer = _memoryBuffer;
+            _memoryBuffer = new List<VerificationResult>();
+
+            using var reportDatabaseContext = new SqLiteDbContext(_configurations.PathToReportFile);
+            reportDatabaseContext.VerificationResults.AddRange(memoryBuffer);
+            reportDatabaseContext.SaveChanges();
         }
 
         class SqLiteDbContext : DbContext

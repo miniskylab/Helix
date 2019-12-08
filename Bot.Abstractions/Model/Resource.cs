@@ -1,4 +1,5 @@
 using System;
+using Helix.Core;
 
 namespace Helix.Bot.Abstractions
 {
@@ -33,8 +34,8 @@ namespace Helix.Bot.Abstractions
 
             if (Uri.TryCreate(originalUrl, UriKind.RelativeOrAbsolute, out var relativeOrAbsoluteUri))
             {
-                if (relativeOrAbsoluteUri.IsAbsoluteUri) OriginalUri = relativeOrAbsoluteUri;
-                else if (Uri.TryCreate(parentUri, originalUrl, out var absoluteUri)) OriginalUri = absoluteUri;
+                if (relativeOrAbsoluteUri.IsAbsoluteUri) OriginalUri = relativeOrAbsoluteUri.StripFragment();
+                else if (Uri.TryCreate(parentUri, originalUrl, out var absoluteUri)) OriginalUri = absoluteUri.StripFragment();
                 else StatusCode = StatusCode.MalformedUri;
             }
             else StatusCode = StatusCode.MalformedUri;
@@ -42,7 +43,6 @@ namespace Helix.Bot.Abstractions
             if (StatusCode == default && UriSchemeIsNotSupported())
                 StatusCode = StatusCode.UriSchemeNotSupported;
 
-            if (!string.IsNullOrWhiteSpace(OriginalUri.Fragment)) OriginalUri = new UriBuilder(OriginalUri) { Fragment = string.Empty }.Uri;
             Uri = OriginalUri;
 
             #region Local Functions

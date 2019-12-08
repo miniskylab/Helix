@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Helix.Bot.Abstractions;
+using Helix.Core;
 using log4net;
 
 namespace Helix.Bot
@@ -41,7 +42,7 @@ namespace Helix.Bot
                 }
 
                 var httpContentType = httpResponseMessage.Content.Headers.ContentType?.ToString();
-                resource.Uri = httpResponseMessage.RequestMessage.RequestUri;
+                resource.Uri = httpResponseMessage.RequestMessage.RequestUri.StripFragment();
                 resource.StatusCode = (StatusCode) httpResponseMessage.StatusCode;
                 resource.Size = httpResponseMessage.Content.Headers.ContentLength;
                 resource.ResourceType = _httpContentTypeToResourceTypeDictionary[httpContentType];

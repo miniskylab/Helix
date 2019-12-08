@@ -7,6 +7,7 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Helix.Bot.Abstractions;
+using Helix.Core;
 using Helix.WebBrowser.Abstractions;
 using log4net;
 using Titanium.Web.Proxy.EventArguments;
@@ -119,7 +120,9 @@ namespace Helix.Bot
                     }
 
                     if (!Uri.TryCreate(locationHeader.Value, UriKind.RelativeOrAbsolute, out var redirectUri)) return false;
-                    _resourceBeingRendered.Uri = redirectUri.IsAbsoluteUri ? redirectUri : new Uri(_resourceBeingRendered.Uri, redirectUri);
+                    _resourceBeingRendered.Uri = redirectUri.IsAbsoluteUri
+                        ? redirectUri.StripFragment()
+                        : new Uri(_resourceBeingRendered.Uri, redirectUri).StripFragment();
 
                     return true;
                 }

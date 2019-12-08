@@ -58,7 +58,7 @@ namespace Helix.Bot
                 _resourceVerifierBlock.LinkTo(_htmlRendererAndValidResourceJoinBlock.Target2);
                 _resourceVerifierBlock.BrokenResources.LinkTo(_htmlRendererAndBrokenResourceJoinBlock.Target2);
                 _resourceVerifierBlock.Events.LinkTo(_eventBroadcasterBlock);
-                _resourceVerifierBlock.VerificationResults.LinkTo(_reportWriterBlock);
+                _resourceVerifierBlock.ReportWritingMessages.LinkTo(_reportWriterBlock);
                 _resourceVerifierBlock.FailedProcessingResults.LinkTo(_coordinatorBlock);
 
                 _rendererPoolBlock.LinkTo(_htmlRendererAndBrokenResourceJoinBlock.Target1);
@@ -70,14 +70,14 @@ namespace Helix.Bot
 
                 _htmlRendererBlockForBrokenResources.LinkTo(NullTarget<RenderingResult>(), PropagateNullObjectsOnly<RenderingResult>());
                 _htmlRendererBlockForBrokenResources.LinkTo(_processingResultGeneratorBlock);
-                _htmlRendererBlockForBrokenResources.VerificationResults.LinkTo(_reportWriterBlock);
+                _htmlRendererBlockForBrokenResources.ReportWritingMessages.LinkTo(_reportWriterBlock);
                 _htmlRendererBlockForBrokenResources.FailedProcessingResults.LinkTo(_coordinatorBlock);
                 _htmlRendererBlockForBrokenResources.Events.LinkTo(_eventBroadcasterBlock);
                 _htmlRendererBlockForBrokenResources.HtmlRenderers.LinkTo(_rendererPoolBlock);
 
                 _htmlRendererBlockForValidResources.LinkTo(NullTarget<RenderingResult>(), PropagateNullObjectsOnly<RenderingResult>());
                 _htmlRendererBlockForValidResources.LinkTo(_processingResultGeneratorBlock);
-                _htmlRendererBlockForValidResources.VerificationResults.LinkTo(_reportWriterBlock);
+                _htmlRendererBlockForValidResources.ReportWritingMessages.LinkTo(_reportWriterBlock);
                 _htmlRendererBlockForValidResources.FailedProcessingResults.LinkTo(_coordinatorBlock);
                 _htmlRendererBlockForValidResources.Events.LinkTo(_eventBroadcasterBlock);
                 _htmlRendererBlockForValidResources.HtmlRenderers.LinkTo(_rendererPoolBlock);

@@ -19,13 +19,13 @@ namespace Helix.Bot
 
         public BufferBlock<FailedProcessingResult> FailedProcessingResults { get; }
 
-        public BufferBlock<VerificationResult> VerificationResults { get; }
+        public BufferBlock<(ReportWritingAction, VerificationResult)> ReportWritingMessages { get; }
 
         public override Task Completion => Task.WhenAll(
             base.Completion,
             Events.Completion,
             BrokenResources.Completion,
-            VerificationResults.Completion,
+            ReportWritingMessages.Completion,
             FailedProcessingResults.Completion
         );
 
@@ -42,7 +42,7 @@ namespace Helix.Bot
             _cancellationTokenSource = new CancellationTokenSource();
 
             BrokenResources = new BufferBlock<Resource>();
-            VerificationResults = new BufferBlock<VerificationResult>();
+            ReportWritingMessages = new BufferBlock<(ReportWritingAction, VerificationResult)>();
             FailedProcessingResults = new BufferBlock<FailedProcessingResult>();
             Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true });
         }
@@ -61,7 +61,7 @@ namespace Helix.Bot
                 base.Completion.Wait();
 
                 Events.Complete();
-                VerificationResults.Complete();
+                ReportWritingMessages.Complete();
                 FailedProcessingResults.Complete();
             }
             catch (Exception exception)
@@ -83,11 +83,12 @@ namespace Helix.Bot
                 if (resource.StatusCode == StatusCode.UriSchemeNotSupported && !_configurations.IncludeNonHttpUrlsInReport)
                     return ProcessUnsuccessfulResourceVerification(null, LogLevel.None);
 
+                var oldUri = resource.Uri;
                 var verificationResult = resource.IsExtractedFromHtmlDocument
                     ? _resourceVerifier.Verify(resource, _cancellationTokenSource.Token).Result
                     : resource.ToVerificationResult();
 
-                var redirectHappened = !resource.OriginalUri.Equals(resource.Uri);
+                var redirectHappened = resource.Uri != oldUri;
                 if (redirectHappened)
                 {
                     if (_resourceScope.IsStartUri(resource.OriginalUri))
@@ -97,11 +98,14 @@ namespace Helix.Bot
                         );
 
                     if (!_processedUrlRegister.TryRegister(resource.Uri.AbsoluteUri))
-                        return ProcessUnsuccessfulResourceVerification($"Resource discarded: {resource.ToJson()}", LogLevel.Warning);
+                        return ProcessUnsuccessfulResourceVerification(
+                            $"Resource discarded because it is already processed: {resource.ToJson()}",
+                            LogLevel.Debug
+                        );
                 }
 
                 UpdateStatistics();
-                SendOutVerificationResult();
+                SendOutReportWritingMessage();
                 SendOutResourceVerifiedEvent();
 
                 if (!resource.IsInternal) return ProcessUnsuccessfulResourceVerification(null, LogLevel.None);
@@ -114,10 +118,11 @@ namespace Helix.Bot
                     if (verificationResult.StatusCode.IsWithinBrokenRange()) _statistics.IncrementBrokenUrlCount();
                     else _statistics.IncrementValidUrlCount();
                 }
-                void SendOutVerificationResult()
+                void SendOutReportWritingMessage()
                 {
-                    if (!VerificationResults.Post(verificationResult) && !VerificationResults.Completion.IsCompleted)
-                        _log.Error($"Failed to post data to buffer block named [{nameof(VerificationResults)}].");
+                    var reportWritingMessage = (ReportWritingAction.AddNew, verificationResult);
+                    if (!ReportWritingMessages.Post(reportWritingMessage) && !ReportWritingMessages.Completion.IsCompleted)
+                        _log.Error($"Failed to post data to buffer block named [{nameof(ReportWritingMessages)}].");
                 }
                 void SendOutResourceVerifiedEvent()
                 {

@@ -5,6 +5,10 @@ namespace Helix.Bot.Abstractions
 {
     public interface IReportWriter : IService, IDisposable
     {
-        void WriteReport(VerificationResult verificationResult);
+        void AddNew(params VerificationResult[] toBeAddedVerificationResults);
+
+        void Update(params VerificationResult[] toBeUpdatedVerificationResults);
+
+        void RemoveAndUpdate(params VerificationResult[] toBeUpdatedVerificationResults);
     }
 }
