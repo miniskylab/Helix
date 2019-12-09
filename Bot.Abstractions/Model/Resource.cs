@@ -1,10 +1,11 @@
 using System;
-using Helix.Core;
 
 namespace Helix.Bot.Abstractions
 {
     public class Resource
     {
+        Uri _uri;
+
         public int Id { get; }
 
         public bool IsExtractedFromHtmlDocument { get; }
@@ -24,7 +25,11 @@ namespace Helix.Bot.Abstractions
 
         public StatusCode StatusCode { get; set; }
 
-        public Uri Uri { get; set; }
+        public Uri Uri
+        {
+            get => _uri;
+            set => _uri = StripFragment(value);
+        }
 
         public Resource(int id, string originalUrl, Uri parentUri, bool isExtractedFromHtmlDocument)
         {
@@ -34,8 +39,8 @@ namespace Helix.Bot.Abstractions
 
             if (Uri.TryCreate(originalUrl, UriKind.RelativeOrAbsolute, out var relativeOrAbsoluteUri))
             {
-                if (relativeOrAbsoluteUri.IsAbsoluteUri) OriginalUri = relativeOrAbsoluteUri.StripFragment();
-                else if (Uri.TryCreate(parentUri, originalUrl, out var absoluteUri)) OriginalUri = absoluteUri.StripFragment();
+                if (relativeOrAbsoluteUri.IsAbsoluteUri) OriginalUri = StripFragment(relativeOrAbsoluteUri);
+                else if (Uri.TryCreate(parentUri, originalUrl, out var absoluteUri)) OriginalUri = StripFragment(absoluteUri);
                 else StatusCode = StatusCode.MalformedUri;
             }
             else StatusCode = StatusCode.MalformedUri;
@@ -43,13 +48,18 @@ namespace Helix.Bot.Abstractions
             if (StatusCode == default && UriSchemeIsNotSupported())
                 StatusCode = StatusCode.UriSchemeNotSupported;
 
-            Uri = OriginalUri;
+            _uri = OriginalUri;
 
             #region Local Functions
 
             bool UriSchemeIsNotSupported() { return OriginalUri.Scheme != "http" && OriginalUri.Scheme != "https"; }
 
             #endregion
+        }
+
+        static Uri StripFragment(Uri uri)
+        {
+            return string.IsNullOrWhiteSpace(uri.Fragment) ? uri : new UriBuilder(uri) { Fragment = string.Empty }.Uri;
         }
     }
 }
