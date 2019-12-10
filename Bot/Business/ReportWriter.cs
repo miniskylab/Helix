@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using Helix.Bot.Abstractions;
 using JetBrains.Annotations;
 using Microsoft.Data.Sqlite;
@@ -11,13 +12,13 @@ namespace Helix.Bot
 {
     public sealed class ReportWriter : IReportWriter
     {
-        readonly Configurations _configurations;
         List<VerificationResult> _memoryBuffer;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
-        public ReportWriter(Configurations configurations)
+        public ReportWriter(Configurations configurations, IProcessedUrlRegister processedUrlRegister)
         {
             _configurations = configurations;
+            _processedUrlRegister = processedUrlRegister;
             _memoryBuffer = new List<VerificationResult>();
 
             using var reportDatabaseContext = new SqLiteDbContext(configurations.PathToReportFile);
@@ -28,7 +29,11 @@ namespace Helix.Bot
         public void AddNew(params VerificationResult[] toBeAddedVerificationResults)
         {
             if (_memoryBuffer.Count >= 300) FlushMemoryBufferToDisk();
-            _memoryBuffer.AddRange(toBeAddedVerificationResults);
+            foreach (var toBeAddedVerificationResult in toBeAddedVerificationResults)
+            {
+                _processedUrlRegister.MarkAsSavedToReportFile(toBeAddedVerificationResult.VerifiedUrl);
+                _memoryBuffer.Add(toBeAddedVerificationResult);
+            }
         }
 
         public void Dispose() { FlushMemoryBufferToDisk(); }
@@ -47,8 +52,8 @@ namespace Helix.Bot
 
                 void Remove()
                 {
-                    /* TODO: At this point, the VerifiedUrl we want to remove from db might have not been saved to db yet.
-                     * We need to implement "wait & retry" logic here. */
+                    while (!_processedUrlRegister.IsSavedToReportFile(toBeUpdatedVerificationResult.VerifiedUrl))
+                        Thread.Sleep(500);
 
                     var trackedVerificationResult = _memoryBuffer.SingleOrDefault(WhereVerifiedUrlMatch);
                     if (trackedVerificationResult != null) _memoryBuffer.Remove(trackedVerificationResult);
@@ -134,5 +139,12 @@ namespace Helix.Bot
                 builder.Entity<VerificationResult>().HasIndex(u => u.VerifiedUrl).IsUnique();
             }
         }
+
+        #region Injected Services
+
+        readonly Configurations _configurations;
+        readonly IProcessedUrlRegister _processedUrlRegister;
+
+        #endregion
     }
 }

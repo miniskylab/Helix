@@ -177,6 +177,9 @@ namespace Helix.Bot
                 _uriBeingRenderedWasFoundInCapturedNetworkTraffic = false;
 
                 var renderingResult = _webBrowser.TryRender(resource.Uri, out html, out millisecondsPageLoadTime, cancellationToken);
+                if (!_uriBeingRenderedWasFoundInCapturedNetworkTraffic)
+                    _log.Error($"Uri being rendered was not found in captured network traffic while rendering: {resource.ToJson()}");
+
                 if (resource.StatusCode.IsWithinBrokenRange()) millisecondsPageLoadTime = null;
                 if (!_takeScreenshot) return renderingResult;
 

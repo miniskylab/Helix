@@ -6,6 +6,10 @@ namespace Helix.Bot.Abstractions
     {
         bool IsRegistered(string url);
 
+        bool IsSavedToReportFile(string url);
+
+        void MarkAsSavedToReportFile(string url);
+
         bool TryRegister(string url);
     }
 }
