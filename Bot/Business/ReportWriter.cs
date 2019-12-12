@@ -52,8 +52,15 @@ namespace Helix.Bot
 
                 void Remove()
                 {
+                    var retryAttemptCount = 0;
                     while (!_processedUrlRegister.IsSavedToReportFile(toBeUpdatedVerificationResult.VerifiedUrl))
+                    {
                         Thread.Sleep(500);
+                        retryAttemptCount++;
+
+                        if (retryAttemptCount >= 30)
+                            break;
+                    }
 
                     var trackedVerificationResult = _memoryBuffer.SingleOrDefault(WhereVerifiedUrlMatch);
                     if (trackedVerificationResult != null) _memoryBuffer.Remove(trackedVerificationResult);
@@ -62,12 +69,11 @@ namespace Helix.Bot
                         trackedVerificationResult = reportDatabaseContext.VerificationResults.SingleOrDefault(WhereVerifiedUrlMatch);
                         if (trackedVerificationResult != null) reportDatabaseContext.VerificationResults.Remove(trackedVerificationResult);
                         else
-                        {
-                            var errorMessage = $"Cannot find any {nameof(VerificationResult)} " +
-                                               $"sharing {nameof(VerificationResult.VerifiedUrl)} " +
-                                               $"with: {toBeUpdatedVerificationResult.ToJson()}";
-                            throw new NotFoundException(errorMessage);
-                        }
+                            throw new NotFoundException(
+                                $"Cannot find any {nameof(VerificationResult)} " +
+                                $"sharing {nameof(VerificationResult.VerifiedUrl)} " +
+                                $"with: {toBeUpdatedVerificationResult.ToJson()}"
+                            );
                     }
 
                     #region Local Functions
