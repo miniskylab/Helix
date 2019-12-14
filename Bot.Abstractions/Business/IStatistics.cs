@@ -6,8 +6,6 @@ namespace Helix.Bot.Abstractions
     {
         void DecrementRemainingWorkload();
 
-        void DecrementValidUrlCountAndIncrementBrokenUrlCount();
-
         void IncrementBrokenUrlCount();
 
         void IncrementRemainingWorkload();
@@ -15,8 +13,6 @@ namespace Helix.Bot.Abstractions
         void IncrementSuccessfullyRenderedPageCount(double millisecondsPageLoadTime);
 
         void IncrementValidUrlCount();
-
-        void IncrementValidUrlCountAndDecrementBrokenUrlCount();
 
         StatisticsSnapshot TakeSnapshot();
     }

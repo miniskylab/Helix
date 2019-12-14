@@ -19,15 +19,6 @@ namespace Helix.Bot
             lock (_remainingWorkloadCalculationLock) _remainingWorkload--;
         }
 
-        public void DecrementValidUrlCountAndIncrementBrokenUrlCount()
-        {
-            lock (_urlCountLock)
-            {
-                _validUrlCount--;
-                _brokenUrlCount++;
-            }
-        }
-
         public void IncrementBrokenUrlCount()
         {
             lock (_urlCountLock) _brokenUrlCount++;
@@ -50,15 +41,6 @@ namespace Helix.Bot
         public void IncrementValidUrlCount()
         {
             lock (_urlCountLock) _validUrlCount++;
-        }
-
-        public void IncrementValidUrlCountAndDecrementBrokenUrlCount()
-        {
-            lock (_urlCountLock)
-            {
-                _validUrlCount++;
-                _brokenUrlCount--;
-            }
         }
 
         public StatisticsSnapshot TakeSnapshot()

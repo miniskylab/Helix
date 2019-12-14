@@ -5,7 +5,7 @@ using Newtonsoft.Json;
 
 namespace Helix.Bot
 {
-    public class ReportWriterBlock : ActionBlock<(ReportWritingAction, VerificationResult)>, IReportWriterBlock
+    public class ReportWriterBlock : ActionBlock<VerificationResult>, IReportWriterBlock
     {
         public ReportWriterBlock(IReportWriter reportWriter, ILog log) : base(true)
         {
@@ -13,27 +13,9 @@ namespace Helix.Bot
             _reportWriter = reportWriter;
         }
 
-        protected override void Act((ReportWritingAction, VerificationResult) _)
+        protected override void Act(VerificationResult verificationResult)
         {
-            var (reportWritingAction, verificationResult) = _;
-            try
-            {
-                if (verificationResult == null) throw new ArgumentNullException(nameof(verificationResult));
-                switch (reportWritingAction)
-                {
-                    case ReportWritingAction.AddNew:
-                        _reportWriter.AddNew(verificationResult);
-                        break;
-                    case ReportWritingAction.Update:
-                        _reportWriter.Update(verificationResult);
-                        break;
-                    case ReportWritingAction.RemoveAndUpdate:
-                        _reportWriter.RemoveAndUpdate(verificationResult);
-                        break;
-                    default:
-                        throw new ArgumentOutOfRangeException(nameof(reportWritingAction));
-                }
-            }
+            try { _reportWriter.WriteReport(verificationResult); }
             catch (Exception exception)
             {
                 _log.Error(

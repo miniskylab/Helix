@@ -7,8 +7,6 @@ namespace Helix.Bot.Abstractions
     public interface IHtmlRendererBlock : IPropagatorBlock<Tuple<IHtmlRenderer, Resource>, RenderingResult>, IService,
                                           IReceivableSourceBlock<RenderingResult>
     {
-        BufferBlock<Event> Events { get; }
-
         BufferBlock<FailedProcessingResult> FailedProcessingResults { get; }
 
         BufferBlock<IHtmlRenderer> HtmlRenderers { get; }
@@ -16,7 +14,5 @@ namespace Helix.Bot.Abstractions
         int InputCount { get; }
 
         int OutputCount { get; }
-
-        BufferBlock<(ReportWritingAction, VerificationResult)> ReportWritingMessages { get; }
     }
 }

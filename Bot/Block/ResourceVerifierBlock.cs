@@ -13,38 +13,22 @@ namespace Helix.Bot
     {
         readonly CancellationTokenSource _cancellationTokenSource;
 
-        public BufferBlock<Resource> BrokenResources { get; }
-
-        public BufferBlock<Event> Events { get; }
-
         public BufferBlock<FailedProcessingResult> FailedProcessingResults { get; }
-
-        public BufferBlock<(ReportWritingAction, VerificationResult)> ReportWritingMessages { get; }
 
         public override Task Completion => Task.WhenAll(
             base.Completion,
-            Events.Completion,
-            BrokenResources.Completion,
-            ReportWritingMessages.Completion,
             FailedProcessingResults.Completion
         );
 
-        public ResourceVerifierBlock(Configurations configurations, IResourceVerifier resourceVerifier, IStatistics statistics, ILog log,
-            IResourceScope resourceScope, IProcessedUrlRegister processedUrlRegister)
+        public ResourceVerifierBlock(Configurations configurations, IResourceVerifier resourceVerifier, ILog log)
             : base(maxDegreeOfParallelism: Configurations.MaxNetworkConnectionCount)
         {
             _log = log;
-            _statistics = statistics;
-            _resourceScope = resourceScope;
             _configurations = configurations;
             _resourceVerifier = resourceVerifier;
-            _processedUrlRegister = processedUrlRegister;
             _cancellationTokenSource = new CancellationTokenSource();
 
-            BrokenResources = new BufferBlock<Resource>();
-            ReportWritingMessages = new BufferBlock<(ReportWritingAction, VerificationResult)>();
             FailedProcessingResults = new BufferBlock<FailedProcessingResult>();
-            Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true });
         }
 
         public override void Complete()
@@ -54,14 +38,9 @@ namespace Helix.Bot
                 base.Complete();
                 TryReceiveAll(out _);
 
-                BrokenResources.Complete();
-                BrokenResources.TryReceiveAll(out _);
-
                 _cancellationTokenSource.Cancel();
                 base.Completion.Wait();
 
-                Events.Complete();
-                ReportWritingMessages.Complete();
                 FailedProcessingResults.Complete();
             }
             catch (Exception exception)
@@ -81,75 +60,20 @@ namespace Helix.Bot
                     throw new ArgumentNullException(nameof(resource));
 
                 if (resource.StatusCode == StatusCode.UriSchemeNotSupported && !_configurations.IncludeNonHttpUrlsInReport)
-                    return ProcessUnsuccessfulResourceVerification(null, LogLevel.None);
+                    return FailedProcessingResult(null, LogLevel.None);
 
                 var oldUri = resource.Uri;
-                var verificationResult = resource.IsExtractedFromHtmlDocument
-                    ? _resourceVerifier.Verify(resource, _cancellationTokenSource.Token).Result
-                    : resource.ToVerificationResult();
+                if (resource.IsExtractedFromHtmlDocument)
+                    _resourceVerifier.Verify(resource, _cancellationTokenSource.Token).Wait();
 
                 var redirectHappened = resource.Uri != oldUri;
-                if (redirectHappened)
-                {
-                    if (_resourceScope.IsStartUri(resource.OriginalUri))
-                        return ProcessUnsuccessfulResourceVerification(
-                            $"Redirect happened. Please provide a start url without any redirect. Or use this url: {resource.Uri.AbsoluteUri}",
-                            LogLevel.Error
-                        );
+                if (redirectHappened) return FailedProcessingResult(null, LogLevel.None);
 
-                    if (!_processedUrlRegister.TryRegister(resource.Uri.AbsoluteUri))
-                        return ProcessUnsuccessfulResourceVerification(
-                            $"Resource discarded because it is already processed: {resource.ToJson()}",
-                            LogLevel.Debug
-                        );
-                }
-
-                UpdateStatistics();
-                SendOutReportWritingMessage();
-                SendOutResourceVerifiedEvent();
-
-                if (!resource.IsInternal) return ProcessUnsuccessfulResourceVerification(null, LogLevel.None);
-                return resource.StatusCode.IsWithinBrokenRange() ? BrokenResource() : resource;
-
-                #region Local Functions
-
-                void UpdateStatistics()
-                {
-                    if (verificationResult.StatusCode.IsWithinBrokenRange()) _statistics.IncrementBrokenUrlCount();
-                    else _statistics.IncrementValidUrlCount();
-                }
-                void SendOutReportWritingMessage()
-                {
-                    var reportWritingMessage = (ReportWritingAction.AddNew, verificationResult);
-                    if (!ReportWritingMessages.Post(reportWritingMessage) && !ReportWritingMessages.Completion.IsCompleted)
-                        _log.Error($"Failed to post data to buffer block named [{nameof(ReportWritingMessages)}].");
-                }
-                void SendOutResourceVerifiedEvent()
-                {
-                    var statisticsSnapshot = _statistics.TakeSnapshot();
-                    var resourceVerifiedEvent = new ResourceVerifiedEvent
-                    {
-                        ValidUrlCount = statisticsSnapshot.ValidUrlCount,
-                        BrokenUrlCount = statisticsSnapshot.BrokenUrlCount,
-                        VerifiedUrlCount = statisticsSnapshot.VerifiedUrlCount,
-                        Message = $"{verificationResult.StatusCode:D} - {resource.Uri.AbsoluteUri}"
-                    };
-                    if (!Events.Post(resourceVerifiedEvent) && !Events.Completion.IsCompleted)
-                        _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
-                }
-                Resource BrokenResource()
-                {
-                    if (!BrokenResources.Post(resource) && !BrokenResources.Completion.IsCompleted)
-                        _log.Error($"Failed to post data to buffer block named [{nameof(BrokenResources)}].");
-
-                    return null;
-                }
-
-                #endregion
+                return resource.IsInternal ? resource : FailedProcessingResult(null, LogLevel.None);
             }
             catch (Exception exception)
             {
-                return ProcessUnsuccessfulResourceVerification(
+                return FailedProcessingResult(
                     $"One or more errors occurred while verifying: {resource.ToJson()}.",
                     LogLevel.Error,
                     exception
@@ -158,7 +82,7 @@ namespace Helix.Bot
 
             #region Local Functions
 
-            Resource ProcessUnsuccessfulResourceVerification(string logMessage, LogLevel logLevel, Exception exception = null)
+            Resource FailedProcessingResult(string logMessage, LogLevel logLevel, Exception exception = null)
             {
                 var failedProcessingResult = new FailedProcessingResult { ProcessedResource = resource };
                 if (!FailedProcessingResults.Post(failedProcessingResult) && !FailedProcessingResults.Completion.IsCompleted)
@@ -197,11 +121,8 @@ namespace Helix.Bot
         #region Injected Services
 
         readonly ILog _log;
-        readonly IStatistics _statistics;
-        readonly IResourceScope _resourceScope;
         readonly Configurations _configurations;
         readonly IResourceVerifier _resourceVerifier;
-        readonly IProcessedUrlRegister _processedUrlRegister;
 
         #endregion
     }

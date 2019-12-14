@@ -13,35 +13,25 @@ namespace Helix.Bot
                                      IHtmlRendererBlock, IDisposable
     {
         readonly CancellationTokenSource _cancellationTokenSource;
-
-        public BufferBlock<Event> Events { get; }
+        readonly ILog _log;
 
         public BufferBlock<FailedProcessingResult> FailedProcessingResults { get; }
 
         public BufferBlock<IHtmlRenderer> HtmlRenderers { get; }
 
-        public BufferBlock<(ReportWritingAction, VerificationResult)> ReportWritingMessages { get; }
-
         public override Task Completion => Task.WhenAll(
             base.Completion,
-            Events.Completion,
             HtmlRenderers.Completion,
-            ReportWritingMessages.Completion,
             FailedProcessingResults.Completion
         );
 
-        public HtmlRendererBlock(IStatistics statistics, IProcessedUrlRegister processedUrlRegister, ILog log)
-            : base(maxDegreeOfParallelism: Configurations.MaxHtmlRendererCount)
+        public HtmlRendererBlock(ILog log) : base(maxDegreeOfParallelism: Configurations.MaxHtmlRendererCount)
         {
             _log = log;
-            _statistics = statistics;
-            _processedUrlRegister = processedUrlRegister;
             _cancellationTokenSource = new CancellationTokenSource();
 
             HtmlRenderers = new BufferBlock<IHtmlRenderer>();
-            ReportWritingMessages = new BufferBlock<(ReportWritingAction, VerificationResult)>();
             FailedProcessingResults = new BufferBlock<FailedProcessingResult>();
-            Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true });
         }
 
         public override void Complete()
@@ -52,9 +42,7 @@ namespace Helix.Bot
                 _cancellationTokenSource.Cancel();
 
                 base.Completion.Wait();
-                Events.Complete();
                 HtmlRenderers.Complete();
-                ReportWritingMessages.Complete();
                 FailedProcessingResults.Complete();
             }
             catch (Exception exception)
@@ -75,18 +63,16 @@ namespace Helix.Bot
                 {
                     var resourceSizeInMb = resource.Size / 1024f / 1024f;
                     if (resourceSizeInMb > Configurations.RenderableResourceSizeInMb)
-                        return ProcessUnsuccessfulRendering(
+                        return FailedProcessingResult(
                             $"Resource was not queued for rendering because it was too big ({resourceSizeInMb} MB): {resource.ToJson()}",
                             LogLevel.Debug
                         );
 
                     var resourceTypeIsNotRenderable = !(ResourceType.Html | ResourceType.Unknown).HasFlag(resource.ResourceType);
                     if (!resource.IsInternal || !resource.IsExtractedFromHtmlDocument || resourceTypeIsNotRenderable)
-                        return ProcessUnsuccessfulRendering(null, LogLevel.None);
+                        return FailedProcessingResult(null, LogLevel.None);
                 }
 
-                var oldUri = resource.Uri;
-                var oldStatusCode = resource.StatusCode;
                 var renderingFailed = !htmlRenderer.TryRender(
                     resource,
                     out var htmlText,
@@ -96,84 +82,25 @@ namespace Helix.Bot
                 );
 
                 if (renderingFailed)
-                    return ProcessUnsuccessfulRendering(
+                    return FailedProcessingResult(
                         $"Failed to render {nameof(Resource)} was discarded: {resource.ToJson()}",
                         LogLevel.Information
                     );
 
-                var redirectHappened = resource.Uri != oldUri;
-                if (redirectHappened)
-                {
-                    if (oldStatusCode == StatusCode.Ok)
-                        _log.Info($"Redirect happened on valid resource: {resource.ToJson()}");
-
-                    var verificationResult = resource.ToVerificationResult();
-                    SendOutReportWritingMessage(
-                        _processedUrlRegister.TryRegister(verificationResult.VerifiedUrl)
-                            ? (ReportWritingAction.Update, verificationResult)
-                            : (ReportWritingAction.RemoveAndUpdate, verificationResult)
-                    );
-                }
-
-                DoStatistics();
-                UpdateStatusCodeIfNecessary();
-                SendOutResourceRenderedEvent();
-
                 if (resource.StatusCode.IsWithinBrokenRange())
-                    return ProcessUnsuccessfulRendering(null, LogLevel.None);
+                    return FailedProcessingResult(null, LogLevel.None);
 
                 return new RenderingResult
                 {
                     RenderedResource = resource,
                     CapturedResources = capturedResources,
+                    MillisecondsPageLoadTime = millisecondsPageLoadTime,
                     HtmlDocument = new HtmlDocument { Uri = resource.Uri, HtmlText = htmlText }
                 };
-
-                #region Local Functions
-
-                void DoStatistics()
-                {
-                    if (millisecondsPageLoadTime.HasValue)
-                        _statistics.IncrementSuccessfullyRenderedPageCount(millisecondsPageLoadTime.Value);
-
-                    var newStatusCode = resource.StatusCode;
-                    if (oldStatusCode.IsWithinBrokenRange() && !newStatusCode.IsWithinBrokenRange())
-                        _statistics.IncrementValidUrlCountAndDecrementBrokenUrlCount();
-                    else if (!oldStatusCode.IsWithinBrokenRange() && newStatusCode.IsWithinBrokenRange())
-                        _statistics.DecrementValidUrlCountAndIncrementBrokenUrlCount();
-                }
-                void UpdateStatusCodeIfNecessary()
-                {
-                    var newStatusCode = resource.StatusCode;
-                    if (redirectHappened || newStatusCode == oldStatusCode) return;
-
-                    SendOutReportWritingMessage((ReportWritingAction.Update, resource.ToVerificationResult()));
-                }
-                void SendOutResourceRenderedEvent()
-                {
-                    var statisticsSnapshot = _statistics.TakeSnapshot();
-                    var resourceRenderedEvent = new ResourceRenderedEvent
-                    {
-                        ValidUrlCount = statisticsSnapshot.ValidUrlCount,
-                        BrokenUrlCount = statisticsSnapshot.BrokenUrlCount,
-                        VerifiedUrlCount = statisticsSnapshot.VerifiedUrlCount,
-                        Message = $"{resource.StatusCode:D} - {resource.Uri.AbsoluteUri}",
-                        MillisecondsAveragePageLoadTime = statisticsSnapshot.MillisecondsAveragePageLoadTime
-                    };
-                    if (!Events.Post(resourceRenderedEvent) && !Events.Completion.IsCompleted)
-                        _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
-                }
-                void SendOutReportWritingMessage((ReportWritingAction, VerificationResult) reportWritingMessage)
-                {
-                    if (!ReportWritingMessages.Post(reportWritingMessage) && !ReportWritingMessages.Completion.IsCompleted)
-                        _log.Error($"Failed to post data to buffer block named [{nameof(ReportWritingMessages)}].");
-                }
-
-                #endregion
             }
             catch (Exception exception) when (!exception.IsAcknowledgingOperationCancelledException(_cancellationTokenSource.Token))
             {
-                return ProcessUnsuccessfulRendering(
+                return FailedProcessingResult(
                     $"One or more errors occurred while rendering: {resource.ToJson()}.",
                     LogLevel.Error,
                     exception
@@ -187,7 +114,7 @@ namespace Helix.Bot
 
             #region Local Functions
 
-            RenderingResult ProcessUnsuccessfulRendering(string logMessage, LogLevel logLevel, Exception exception = null)
+            RenderingResult FailedProcessingResult(string logMessage, LogLevel logLevel, Exception exception = null)
             {
                 var failedProcessingResult = new FailedProcessingResult { ProcessedResource = resource };
                 if (!FailedProcessingResults.Post(failedProcessingResult) && !FailedProcessingResults.Completion.IsCompleted)
@@ -222,13 +149,5 @@ namespace Helix.Bot
 
             #endregion
         }
-
-        #region Injected Services
-
-        readonly ILog _log;
-        readonly IStatistics _statistics;
-        readonly IProcessedUrlRegister _processedUrlRegister;
-
-        #endregion
     }
 }

@@ -184,8 +184,6 @@ namespace Helix.Gui
                 _brokenLinkCollector = new BrokenLinkCollector();
                 _brokenLinkCollector.OnEventBroadcast += OnStartProgressUpdated;
                 _brokenLinkCollector.OnEventBroadcast += OnWorkflowActivated;
-                _brokenLinkCollector.OnEventBroadcast += OnResourceVerified;
-                _brokenLinkCollector.OnEventBroadcast += OnResourceRendered;
                 _brokenLinkCollector.OnEventBroadcast += OnResourceProcessed;
                 _brokenLinkCollector.OnEventBroadcast += OnWorkflowCompleted;
             }
@@ -237,33 +235,18 @@ namespace Helix.Gui
                 _brokenLinkCollector.OnEventBroadcast -= OnWorkflowActivated;
                 Redraw(new Frame { DisablePreviewButton = false });
             }
-            static void OnResourceVerified(Event @event)
-            {
-                if (!(@event is ResourceVerifiedEvent resourceVerifiedEvent)) return;
-                Redraw(new Frame
-                {
-                    StatusText = resourceVerifiedEvent.Message,
-                    ValidUrlCount = resourceVerifiedEvent.ValidUrlCount,
-                    BrokenUrlCount = resourceVerifiedEvent.BrokenUrlCount,
-                    VerifiedUrlCount = resourceVerifiedEvent.VerifiedUrlCount
-                });
-            }
-            static void OnResourceRendered(Event @event)
-            {
-                if (!(@event is ResourceRenderedEvent resourceRenderedEvent)) return;
-                Redraw(new Frame
-                {
-                    StatusText = resourceRenderedEvent.Message,
-                    ValidUrlCount = resourceRenderedEvent.ValidUrlCount,
-                    BrokenUrlCount = resourceRenderedEvent.BrokenUrlCount,
-                    VerifiedUrlCount = resourceRenderedEvent.VerifiedUrlCount,
-                    MillisecondsAveragePageLoadTime = resourceRenderedEvent.MillisecondsAveragePageLoadTime
-                });
-            }
             static void OnResourceProcessed(Event @event)
             {
                 if (!(@event is ResourceProcessedEvent resourceProcessedEvent)) return;
-                Redraw(new Frame { RemainingWorkload = resourceProcessedEvent.RemainingWorkload });
+                Redraw(new Frame
+                {
+                    StatusText = resourceProcessedEvent.Message,
+                    ValidUrlCount = resourceProcessedEvent.ValidUrlCount,
+                    BrokenUrlCount = resourceProcessedEvent.BrokenUrlCount,
+                    VerifiedUrlCount = resourceProcessedEvent.VerifiedUrlCount,
+                    RemainingWorkload = resourceProcessedEvent.RemainingWorkload,
+                    MillisecondsAveragePageLoadTime = resourceProcessedEvent.MillisecondsAveragePageLoadTime
+                });
             }
             static void OnWorkflowCompleted(Event @event)
             {

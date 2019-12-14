@@ -11,12 +11,10 @@ namespace Helix.Bot
     {
         readonly ICoordinatorBlock _coordinatorBlock;
         readonly IEventBroadcasterBlock _eventBroadcasterBlock;
-        readonly JoinBlock<IHtmlRenderer, Resource> _htmlRendererAndBrokenResourceJoinBlock;
-        readonly JoinBlock<IHtmlRenderer, Resource> _htmlRendererAndValidResourceJoinBlock;
-        readonly IHtmlRendererBlock _htmlRendererBlockForBrokenResources;
-        readonly IHtmlRendererBlock _htmlRendererBlockForValidResources;
+        readonly JoinBlock<IHtmlRenderer, Resource> _htmlRendererAndResourceJoinBlock;
+        readonly IHtmlRendererBlock _htmlRendererBlock;
         readonly ILog _log;
-        readonly IProcessingResultGeneratorBlock _processingResultGeneratorBlock;
+        readonly IPostProcessorBlock _postProcessorBlock;
         readonly IRendererPoolBlock _rendererPoolBlock;
         readonly IReportWriterBlock _reportWriterBlock;
         readonly IResourceVerifierBlock _resourceVerifierBlock;
@@ -25,8 +23,7 @@ namespace Helix.Bot
 
         public BrokenLinkCollectionWorkflow(IEventBroadcasterBlock eventBroadcasterBlock, IResourceVerifierBlock resourceVerifierBlock,
             ICoordinatorBlock coordinatorBlock, IReportWriterBlock reportWriterBlock, IRendererPoolBlock rendererPoolBlock, ILog log,
-            IHtmlRendererBlock htmlRendererBlockForBrokenResources, IHtmlRendererBlock htmlRendererBlockForValidResources,
-            IProcessingResultGeneratorBlock processingResultGeneratorBlock)
+            IHtmlRendererBlock htmlRendererBlock, IPostProcessorBlock postProcessorBlock)
         {
             _log = log;
             _coordinatorBlock = coordinatorBlock;
@@ -34,14 +31,10 @@ namespace Helix.Bot
             _rendererPoolBlock = rendererPoolBlock;
             _eventBroadcasterBlock = eventBroadcasterBlock;
             _resourceVerifierBlock = resourceVerifierBlock;
-            _processingResultGeneratorBlock = processingResultGeneratorBlock;
-            _htmlRendererBlockForValidResources = htmlRendererBlockForValidResources;
-            _htmlRendererBlockForBrokenResources = htmlRendererBlockForBrokenResources;
+            _postProcessorBlock = postProcessorBlock;
+            _htmlRendererBlock = htmlRendererBlock;
 
-            var groupingDataflowBlockOptions = new GroupingDataflowBlockOptions { Greedy = false };
-            _htmlRendererAndValidResourceJoinBlock = new JoinBlock<IHtmlRenderer, Resource>(groupingDataflowBlockOptions);
-            _htmlRendererAndBrokenResourceJoinBlock = new JoinBlock<IHtmlRenderer, Resource>(groupingDataflowBlockOptions);
-
+            _htmlRendererAndResourceJoinBlock = new JoinBlock<IHtmlRenderer, Resource>(new GroupingDataflowBlockOptions { Greedy = false });
             _eventBroadcasterBlock.AsObservable().Subscribe(this);
 
             WireUpBlocks();
@@ -53,37 +46,24 @@ namespace Helix.Bot
                 _coordinatorBlock.LinkTo(NullTarget<Resource>(), PropagateNullObjectsOnly<Resource>());
                 _coordinatorBlock.LinkTo(_resourceVerifierBlock);
                 _coordinatorBlock.Events.LinkTo(_eventBroadcasterBlock);
+                _coordinatorBlock.VerificationResults.LinkTo(_reportWriterBlock);
 
                 _resourceVerifierBlock.LinkTo(NullTarget<Resource>(), PropagateNullObjectsOnly<Resource>());
-                _resourceVerifierBlock.LinkTo(_htmlRendererAndValidResourceJoinBlock.Target2);
-                _resourceVerifierBlock.BrokenResources.LinkTo(_htmlRendererAndBrokenResourceJoinBlock.Target2);
-                _resourceVerifierBlock.Events.LinkTo(_eventBroadcasterBlock);
-                _resourceVerifierBlock.ReportWritingMessages.LinkTo(_reportWriterBlock);
+                _resourceVerifierBlock.LinkTo(_htmlRendererAndResourceJoinBlock.Target2);
                 _resourceVerifierBlock.FailedProcessingResults.LinkTo(_coordinatorBlock);
 
-                _rendererPoolBlock.LinkTo(_htmlRendererAndBrokenResourceJoinBlock.Target1);
-                _rendererPoolBlock.LinkTo(_htmlRendererAndValidResourceJoinBlock.Target1);
+                _rendererPoolBlock.LinkTo(_htmlRendererAndResourceJoinBlock.Target1);
                 _rendererPoolBlock.Events.LinkTo(_eventBroadcasterBlock);
 
-                _htmlRendererAndBrokenResourceJoinBlock.LinkTo(_htmlRendererBlockForBrokenResources);
-                _htmlRendererAndValidResourceJoinBlock.LinkTo(_htmlRendererBlockForValidResources);
+                _htmlRendererAndResourceJoinBlock.LinkTo(_htmlRendererBlock);
 
-                _htmlRendererBlockForBrokenResources.LinkTo(NullTarget<RenderingResult>(), PropagateNullObjectsOnly<RenderingResult>());
-                _htmlRendererBlockForBrokenResources.LinkTo(_processingResultGeneratorBlock);
-                _htmlRendererBlockForBrokenResources.ReportWritingMessages.LinkTo(_reportWriterBlock);
-                _htmlRendererBlockForBrokenResources.FailedProcessingResults.LinkTo(_coordinatorBlock);
-                _htmlRendererBlockForBrokenResources.Events.LinkTo(_eventBroadcasterBlock);
-                _htmlRendererBlockForBrokenResources.HtmlRenderers.LinkTo(_rendererPoolBlock);
+                _htmlRendererBlock.LinkTo(NullTarget<RenderingResult>(), PropagateNullObjectsOnly<RenderingResult>());
+                _htmlRendererBlock.LinkTo(_postProcessorBlock);
+                _htmlRendererBlock.FailedProcessingResults.LinkTo(_coordinatorBlock);
+                _htmlRendererBlock.HtmlRenderers.LinkTo(_rendererPoolBlock);
 
-                _htmlRendererBlockForValidResources.LinkTo(NullTarget<RenderingResult>(), PropagateNullObjectsOnly<RenderingResult>());
-                _htmlRendererBlockForValidResources.LinkTo(_processingResultGeneratorBlock);
-                _htmlRendererBlockForValidResources.ReportWritingMessages.LinkTo(_reportWriterBlock);
-                _htmlRendererBlockForValidResources.FailedProcessingResults.LinkTo(_coordinatorBlock);
-                _htmlRendererBlockForValidResources.Events.LinkTo(_eventBroadcasterBlock);
-                _htmlRendererBlockForValidResources.HtmlRenderers.LinkTo(_rendererPoolBlock);
-
-                _processingResultGeneratorBlock.LinkTo(NullTarget<ProcessingResult>(), PropagateNullObjectsOnly<ProcessingResult>());
-                _processingResultGeneratorBlock.LinkTo(_coordinatorBlock);
+                _postProcessorBlock.LinkTo(NullTarget<ProcessingResult>(), PropagateNullObjectsOnly<ProcessingResult>());
+                _postProcessorBlock.LinkTo(_coordinatorBlock);
 
                 _eventBroadcasterBlock.LinkTo(NullTarget<Event>(), PropagateNullObjectsOnly<Event>());
 
@@ -116,60 +96,36 @@ namespace Helix.Bot
 
         public void Shutdown()
         {
-            ShutdownRendererPoolBlockAndResourceVerifierBlock();
-            ShutdownJoinBlocks();
-            ShutdownHtmlRendererBlocks();
-            ShutdownProcessingResultGeneratorBlock();
+            ShutdownResourceVerifierBlock();
+            ShutdownJoinBlock();
+            ShutdownHtmlRendererBlock();
+            ShutdownRendererPoolBlock();
+            ShutdownPostProcessorBlock();
             ShutdownReportWriterBlock();
             ShutdownCoordinatorBlock();
             ShutdownEventBroadcasterBlock();
 
             #region Local Functions
 
-            void ShutdownRendererPoolBlockAndResourceVerifierBlock()
+            void ShutdownResourceVerifierBlock()
             {
                 try
                 {
-                    _rendererPoolBlock.Complete();
                     _resourceVerifierBlock.Complete();
-
-                    _rendererPoolBlock.Completion.Wait();
                     _resourceVerifierBlock.Completion.Wait();
                 }
                 catch (Exception exception)
                 {
                     if (exception.IsAcknowledgingOperationCancelledException(CancellationToken.None)) return;
-                    _log.Error(
-                        $"One or more errors occurred while shutting down {nameof(RendererPoolBlock)} and {nameof(ResourceVerifierBlock)}.",
-                        exception
-                    );
+                    _log.Error($"One or more errors occurred while shutting down {nameof(ResourceVerifierBlock)}.", exception);
                 }
             }
-            void ShutdownHtmlRendererBlocks()
+            void ShutdownJoinBlock()
             {
                 try
                 {
-                    _htmlRendererBlockForBrokenResources.Complete();
-                    _htmlRendererBlockForValidResources.Complete();
-
-                    _htmlRendererBlockForBrokenResources.Completion.Wait();
-                    _htmlRendererBlockForValidResources.Completion.Wait();
-                }
-                catch (Exception exception)
-                {
-                    if (exception.IsAcknowledgingOperationCancelledException(CancellationToken.None)) return;
-                    _log.Error($"One or more errors occurred while shutting down {nameof(HtmlRendererBlock)}.", exception);
-                }
-            }
-            void ShutdownJoinBlocks()
-            {
-                try
-                {
-                    _htmlRendererAndBrokenResourceJoinBlock.Complete();
-                    _htmlRendererAndValidResourceJoinBlock.Complete();
-
-                    _htmlRendererAndBrokenResourceJoinBlock.Completion.Wait();
-                    _htmlRendererAndValidResourceJoinBlock.Completion.Wait();
+                    _htmlRendererAndResourceJoinBlock.Complete();
+                    _htmlRendererAndResourceJoinBlock.Completion.Wait();
                 }
                 catch (Exception exception)
                 {
@@ -177,17 +133,43 @@ namespace Helix.Bot
                     _log.Error($"One or more errors occurred while shutting down {nameof(JoinBlock<IHtmlRenderer, Resource>)}.", exception);
                 }
             }
-            void ShutdownProcessingResultGeneratorBlock()
+            void ShutdownHtmlRendererBlock()
             {
                 try
                 {
-                    _processingResultGeneratorBlock.Complete();
-                    _processingResultGeneratorBlock.Completion.Wait();
+                    _htmlRendererBlock.Complete();
+                    _htmlRendererBlock.Completion.Wait();
                 }
                 catch (Exception exception)
                 {
                     if (exception.IsAcknowledgingOperationCancelledException(CancellationToken.None)) return;
-                    _log.Error($"One or more errors occurred while shutting down {nameof(ProcessingResultGeneratorBlock)}.", exception);
+                    _log.Error($"One or more errors occurred while shutting down {nameof(HtmlRendererBlock)}.", exception);
+                }
+            }
+            void ShutdownRendererPoolBlock()
+            {
+                try
+                {
+                    _rendererPoolBlock.Complete();
+                    _rendererPoolBlock.Completion.Wait();
+                }
+                catch (Exception exception)
+                {
+                    if (exception.IsAcknowledgingOperationCancelledException(CancellationToken.None)) return;
+                    _log.Error($"One or more errors occurred while shutting down {nameof(RendererPoolBlock)}.", exception);
+                }
+            }
+            void ShutdownPostProcessorBlock()
+            {
+                try
+                {
+                    _postProcessorBlock.Complete();
+                    _postProcessorBlock.Completion.Wait();
+                }
+                catch (Exception exception)
+                {
+                    if (exception.IsAcknowledgingOperationCancelledException(CancellationToken.None)) return;
+                    _log.Error($"One or more errors occurred while shutting down {nameof(PostProcessorBlock)}.", exception);
                 }
             }
             void ShutdownReportWriterBlock()

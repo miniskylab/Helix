@@ -7,9 +7,9 @@ using Newtonsoft.Json;
 
 namespace Helix.Bot
 {
-    public class ProcessingResultGeneratorBlock : TransformBlock<RenderingResult, ProcessingResult>, IProcessingResultGeneratorBlock
+    public class PostProcessorBlock : TransformBlock<RenderingResult, ProcessingResult>, IPostProcessorBlock
     {
-        public ProcessingResultGeneratorBlock(IResourceExtractor resourceExtractor, IResourceScope resourceScope, ILog log)
+        public PostProcessorBlock(IResourceExtractor resourceExtractor, IResourceScope resourceScope, ILog log)
         {
             _log = log;
             _resourceScope = resourceScope;
@@ -29,6 +29,7 @@ namespace Helix.Bot
 
                 return new SuccessfulProcessingResult
                 {
+                    MillisecondsPageLoadTime = renderingResult.MillisecondsPageLoadTime,
                     ProcessedResource = renderingResult.RenderedResource,
                     NewResources = newResources.Select(newResource =>
                     {

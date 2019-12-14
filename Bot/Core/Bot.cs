@@ -2,7 +2,6 @@ using System.Data;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using Autofac;
-using Bot.Business;
 using Helix.Bot.Abstractions;
 using Helix.Core;
 using Helix.WebBrowser;
@@ -57,7 +56,6 @@ namespace Helix.Bot
                 containerBuilder.RegisterType<ReportWriter>().As<IReportWriter>().SingleInstance();
                 containerBuilder.RegisterType<HardwareMonitor>().As<IHardwareMonitor>().SingleInstance();
                 containerBuilder.RegisterType<ResourceVerifier>().As<IResourceVerifier>().SingleInstance();
-                containerBuilder.RegisterType<ProcessedUrlRegister>().As<IProcessedUrlRegister>().SingleInstance();
                 containerBuilder.RegisterType<IncrementalIdGenerator>().As<IIncrementalIdGenerator>().SingleInstance();
                 containerBuilder.RegisterType<BrokenLinkCollectionWorkflow>().As<IBrokenLinkCollectionWorkflow>().SingleInstance();
 

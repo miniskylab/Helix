@@ -22,6 +22,6 @@ namespace Helix.Bot.Abstractions
         public string StatusMessage { [UsedImplicitly] get; set; }
 
         [Required]
-        public string VerifiedUrl { [UsedImplicitly] get; set; }
+        public string VerifiedUrl { get; set; }
     }
 }

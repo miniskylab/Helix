@@ -125,7 +125,7 @@ namespace Helix.Bot
         void Broadcast(Event @event)
         {
             OnEventBroadcast?.Invoke(@event);
-            if (!(@event is ResourceVerifiedEvent) && !(@event is ResourceRenderedEvent) && !string.IsNullOrWhiteSpace(@event.Message))
+            if (!(@event is ResourceProcessedEvent) && !string.IsNullOrWhiteSpace(@event.Message))
                 _log.Info(@event.Message);
         }
 
