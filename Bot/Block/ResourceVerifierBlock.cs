@@ -21,7 +21,7 @@ namespace Helix.Bot
         );
 
         public ResourceVerifierBlock(Configurations configurations, IResourceVerifier resourceVerifier, ILog log)
-            : base(maxDegreeOfParallelism: Configurations.MaxNetworkConnectionCount)
+            : base(false, Configurations.MaxNetworkConnectionCount)
         {
             _log = log;
             _configurations = configurations;

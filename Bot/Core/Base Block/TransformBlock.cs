@@ -15,7 +15,7 @@ namespace Helix.Bot
 
         public int OutputCount => _transformBlock.OutputCount;
 
-        protected TransformBlock(bool ensureOrdered = false, int maxDegreeOfParallelism = 1)
+        protected TransformBlock(bool ensureOrdered = true, int maxDegreeOfParallelism = 1)
         {
             _transformBlock = new System.Threading.Tasks.Dataflow.TransformBlock<TInput, TOutput>(
                 input => Transform(input),

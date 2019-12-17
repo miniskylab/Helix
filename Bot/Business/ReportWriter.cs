@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Helix.Bot.Abstractions;
 using JetBrains.Annotations;
 using Microsoft.Data.Sqlite;
@@ -25,10 +26,32 @@ namespace Helix.Bot
 
         public void Dispose() { FlushMemoryBufferToDisk(); }
 
-        public void WriteReport(params VerificationResult[] verificationResults)
+        public void Insert(params VerificationResult[] toBeInsertedVerificationResults)
         {
             if (_memoryBuffer.Count >= 300) FlushMemoryBufferToDisk();
-            _memoryBuffer.AddRange(verificationResults);
+            _memoryBuffer.AddRange(toBeInsertedVerificationResults);
+        }
+
+        public void Update(params VerificationResult[] verificationResults)
+        {
+            using var reportDatabaseContext = new SqLiteDbContext(_configurations.PathToReportFile);
+            foreach (var verificationResult in verificationResults)
+            {
+                var trackedVerificationResult = _memoryBuffer.SingleOrDefault(WhereVerifiedUrlMatch) ??
+                                                reportDatabaseContext.VerificationResults.Single(WhereVerifiedUrlMatch);
+
+                trackedVerificationResult.IsInternalResource = verificationResult.IsInternalResource;
+                trackedVerificationResult.StatusMessage = verificationResult.StatusMessage;
+                trackedVerificationResult.ResourceType = verificationResult.ResourceType;
+                trackedVerificationResult.StatusCode = verificationResult.StatusCode;
+
+                #region Local Functions
+
+                bool WhereVerifiedUrlMatch(VerificationResult v) => v.VerifiedUrl == verificationResult.VerifiedUrl;
+
+                #endregion
+            }
+            reportDatabaseContext.SaveChanges();
         }
 
         void FlushMemoryBufferToDisk()

@@ -16,7 +16,7 @@ namespace Helix.Bot
 
         public override Task Completion => Task.WhenAll(base.Completion, Events.Completion);
 
-        public RendererPoolBlock(IHardwareMonitor hardwareMonitor, Func<IHtmlRenderer> getHtmlRenderer, ILog log)
+        public RendererPoolBlock(IHardwareMonitor hardwareMonitor, Func<IHtmlRenderer> getHtmlRenderer, ILog log) : base(false)
         {
             _log = log;
             _hardwareMonitor = hardwareMonitor;

@@ -25,7 +25,7 @@ namespace Helix.Bot
             FailedProcessingResults.Completion
         );
 
-        public HtmlRendererBlock(ILog log) : base(maxDegreeOfParallelism: Configurations.MaxHtmlRendererCount)
+        public HtmlRendererBlock(ILog log) : base(false, Configurations.MaxHtmlRendererCount)
         {
             _log = log;
             _cancellationTokenSource = new CancellationTokenSource();

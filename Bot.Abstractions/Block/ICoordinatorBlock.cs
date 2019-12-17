@@ -11,7 +11,7 @@ namespace Helix.Bot.Abstractions
 
         int OutputCount { get; }
 
-        BufferBlock<VerificationResult> VerificationResults { get; }
+        BufferBlock<(ReportWritingAction, VerificationResult)> ReportWritingMessages { get; }
 
         bool TryActivateWorkflow(string startUrl);
     }

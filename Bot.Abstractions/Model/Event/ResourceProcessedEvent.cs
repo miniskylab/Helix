@@ -4,7 +4,7 @@
     {
         public int BrokenUrlCount { get; set; }
 
-        public double MillisecondsAveragePageLoadTime { get; set; }
+        public double? MillisecondsAveragePageLoadTime { get; set; }
 
         public int RemainingWorkload { get; set; }
 
