@@ -12,7 +12,7 @@ namespace Helix.Bot
 
         public int InputCount => _actionBlock.InputCount;
 
-        protected ActionBlock(bool ensureOrdered = true, int maxDegreeOfParallelism = 1)
+        protected ActionBlock(bool ensureOrdered = false, int maxDegreeOfParallelism = 1)
         {
             _actionBlock = new System.Threading.Tasks.Dataflow.ActionBlock<TInput>(
                 Act,

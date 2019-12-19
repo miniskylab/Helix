@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -12,7 +13,7 @@ namespace Helix.Bot
 {
     public class CoordinatorBlock : TransformManyBlock<ProcessingResult, Resource>, ICoordinatorBlock, IDisposable
     {
-        readonly HashSet<string> _processedUrls;
+        readonly ConcurrentDictionary<string, bool> _processedUrls;
         readonly StateMachine<WorkflowState, WorkflowCommand> _stateMachine;
 
         public BufferBlock<Event> Events { get; }
@@ -28,7 +29,7 @@ namespace Helix.Bot
             _statistics = statistics;
             _resourceScope = resourceScope;
             _incrementalIdGenerator = incrementalIdGenerator;
-            _processedUrls = new HashSet<string>();
+            _processedUrls = new ConcurrentDictionary<string, bool>();
 
             _stateMachine = NewStateMachine();
             Events = new BufferBlock<Event>(new DataflowBlockOptions { EnsureOrdered = true });
@@ -115,12 +116,12 @@ namespace Helix.Bot
                     throw new ArgumentNullException(nameof(processingResult));
 
                 var newlyDiscoveredResources = new List<Resource>();
+                var processedResourceIsNotQueuedForReprocessing = true;
                 var processedResource = processingResult.ProcessedResource;
                 var isNotActivationProcessingResult = processedResource != null;
-                var processedResourceIsNotQueuedForReprocessing = true;
                 if (isNotActivationProcessingResult)
                 {
-                    if (!_processedUrls.Contains(processedResource.OriginalUri.AbsoluteUri))
+                    if (!_processedUrls.ContainsKey(processedResource.OriginalUri.AbsoluteUri))
                         _log.Error($"Processed resource was not registered by {nameof(CoordinatorBlock)}: {processedResource.ToJson()}");
 
                     if (processedResource.StatusCode.IsWithinBrokenRange()) _statistics.IncrementBrokenUrlCount();
@@ -136,7 +137,11 @@ namespace Helix.Bot
                                 if (RedirectHappenedAtStartUrl()) return null;
                                 processedResourceIsNotQueuedForReprocessing = !TryQueueForReprocessing();
                             }
-                            else SendOutReportWritingMessage((ReportWritingAction.AddNew, processedResource.ToVerificationResult()));
+                            else
+                            {
+                                var verificationResult = processedResource.ToVerificationResult();
+                                SendOutReportWritingMessage((ReportWritingAction.AddNew, verificationResult));
+                            }
                             break;
                         }
                         case SuccessfulProcessingResult successfulProcessingResult:
@@ -146,10 +151,11 @@ namespace Helix.Bot
                                 _statistics.IncrementSuccessfullyRenderedPageCount(millisecondsPageLoadTime.Value);
 
                             var reportWritingAction = ReportWritingAction.AddNew;
-                            if (redirectHappened && !_processedUrls.Add(processedResource.Uri.AbsoluteUri))
+                            var verificationResult = processedResource.ToVerificationResult();
+                            if (redirectHappened && UriIsAlreadySavedToReport(verificationResult.VerifiedUrl))
                                 reportWritingAction = ReportWritingAction.Update;
 
-                            SendOutReportWritingMessage((reportWritingAction, processedResource.ToVerificationResult()));
+                            SendOutReportWritingMessage((reportWritingAction, verificationResult));
                             break;
                         }
                         default:
@@ -185,9 +191,17 @@ namespace Helix.Bot
 
                 #region Local Functions
 
+                bool UriIsAlreadySavedToReport(string url)
+                {
+                    if (_processedUrls.TryAdd(url, false))
+                        return false;
+
+                    _processedUrls.TryGetValue(url, out var urlIsAlreadySavedToReport);
+                    return urlIsAlreadySavedToReport;
+                }
                 bool TryQueueForReprocessing()
                 {
-                    if (!_processedUrls.Add(processedResource.Uri.AbsoluteUri))
+                    if (!_processedUrls.TryAdd(processedResource.Uri.AbsoluteUri, false))
                         return false;
 
                     newlyDiscoveredResources.Add(new Resource(
@@ -219,14 +233,21 @@ namespace Helix.Bot
                 void SendOutReportWritingMessage((ReportWritingAction, VerificationResult) reportWritingMessage)
                 {
                     if (!ReportWritingMessages.Post(reportWritingMessage) && !ReportWritingMessages.Completion.IsCompleted)
+                    {
                         _log.Error($"Failed to post data to buffer block named [{nameof(ReportWritingMessages)}].");
+                        return;
+                    }
+
+                    var (reportWritingAction, verificationResult) = reportWritingMessage;
+                    if (reportWritingAction == ReportWritingAction.AddNew)
+                        _processedUrls[verificationResult.VerifiedUrl] = true;
                 }
                 List<Resource> DiscoverNewResources()
                 {
                     if (!(processingResult is SuccessfulProcessingResult successfulProcessingResult)) return new List<Resource>();
                     return successfulProcessingResult.NewResources.Where(newResource =>
                     {
-                        var resourceWasNotProcessed = _processedUrls.Add(newResource.Uri.AbsoluteUri);
+                        var resourceWasNotProcessed = _processedUrls.TryAdd(newResource.Uri.AbsoluteUri, false);
                         if (resourceWasNotProcessed) _statistics.IncrementRemainingWorkload();
                         return resourceWasNotProcessed;
                     }).ToList();

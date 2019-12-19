@@ -9,7 +9,7 @@ namespace Helix.Bot
 {
     public class PostProcessorBlock : TransformBlock<RenderingResult, ProcessingResult>, IPostProcessorBlock
     {
-        public PostProcessorBlock(IResourceExtractor resourceExtractor, IResourceScope resourceScope, ILog log) : base(false)
+        public PostProcessorBlock(IResourceExtractor resourceExtractor, IResourceScope resourceScope, ILog log)
         {
             _log = log;
             _resourceScope = resourceScope;
