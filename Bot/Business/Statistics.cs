@@ -14,9 +14,19 @@ namespace Helix.Bot
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
         public Statistics() { }
 
+        public void DecrementBrokenUrlCount()
+        {
+            lock (_urlCountLock) _brokenUrlCount--;
+        }
+
         public void DecrementRemainingWorkload()
         {
             lock (_remainingWorkloadCalculationLock) _remainingWorkload--;
+        }
+
+        public void DecrementValidUrlCount()
+        {
+            lock (_urlCountLock) _validUrlCount--;
         }
 
         public void IncrementBrokenUrlCount()

@@ -83,7 +83,7 @@ namespace Helix.Bot
 
                 if (renderingFailed)
                     return FailedProcessingResult(
-                        $"Failed to render {nameof(Resource)} was discarded: {resource.ToJson()}",
+                        $"Failed to render {nameof(Resource)}: {resource.ToJson()}",
                         LogLevel.Information
                     );
 

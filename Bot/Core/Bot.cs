@@ -53,7 +53,6 @@ namespace Helix.Bot
                 containerBuilder.RegisterInstance(configurations).AsSelf();
 
                 containerBuilder.RegisterType<Statistics>().As<IStatistics>().SingleInstance();
-                containerBuilder.RegisterType<ReportWriter>().As<IReportWriter>().SingleInstance();
                 containerBuilder.RegisterType<HardwareMonitor>().As<IHardwareMonitor>().SingleInstance();
                 containerBuilder.RegisterType<ResourceVerifier>().As<IResourceVerifier>().SingleInstance();
                 containerBuilder.RegisterType<IncrementalIdGenerator>().As<IIncrementalIdGenerator>().SingleInstance();

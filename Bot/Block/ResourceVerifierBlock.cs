@@ -20,11 +20,10 @@ namespace Helix.Bot
             FailedProcessingResults.Completion
         );
 
-        public ResourceVerifierBlock(Configurations configurations, IResourceVerifier resourceVerifier, ILog log)
+        public ResourceVerifierBlock(IResourceVerifier resourceVerifier, ILog log)
             : base(maxDegreeOfParallelism: Configurations.MaxNetworkConnectionCount)
         {
             _log = log;
-            _configurations = configurations;
             _resourceVerifier = resourceVerifier;
             _cancellationTokenSource = new CancellationTokenSource();
 
@@ -58,9 +57,6 @@ namespace Helix.Bot
             {
                 if (resource == null)
                     throw new ArgumentNullException(nameof(resource));
-
-                if (resource.StatusCode == StatusCode.UriSchemeNotSupported && !_configurations.IncludeNonHttpUrlsInReport)
-                    return FailedProcessingResult(null, LogLevel.None);
 
                 var oldUri = resource.Uri;
                 if (resource.IsExtractedFromHtmlDocument)
@@ -121,7 +117,6 @@ namespace Helix.Bot
         #region Injected Services
 
         readonly ILog _log;
-        readonly Configurations _configurations;
         readonly IResourceVerifier _resourceVerifier;
 
         #endregion
