@@ -52,8 +52,7 @@ socket.connect(18880, "127.0.0.1", () => {
                 BrokenUrlCount: "-",
                 RemainingWorkload: "-",
                 MillisecondsAveragePageLoadTime: "-",
-                ElapsedTime: "-- : -- : --",
-                StatusText: "Setting up and configuring services ..."
+                ElapsedTime: "-- : -- : --"
             });
             socket.write(
                 attachEndOfTransmissionCharacter(

@@ -83,7 +83,7 @@ namespace Helix.Bot
 
                 void Initialize()
                 {
-                    Broadcast(new StartProgressReportEvent { Message = "Initializing ..." });
+                    Broadcast(new StartProgressReportEvent { Message = $"Initializing {nameof(BrokenLinkCollectionWorkflow)} ..." });
                     SetupServiceContainer(configurations);
 
                     _brokenLinkCollectionWorkflow = GetWorkflow<IBrokenLinkCollectionWorkflow>();
