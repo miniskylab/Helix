@@ -117,19 +117,19 @@ namespace Helix.Bot
                 if (processingResult == null)
                     throw new ArgumentNullException(nameof(processingResult));
 
-                var newlyDiscoveredResources = new List<Resource>();
+                var newResources = new List<Resource>();
                 var processedResourceIsQueuedForReprocessing = false;
                 var processedResource = processingResult.ProcessedResource;
                 if (!TryProcessInput()) return null;
 
-                newlyDiscoveredResources.AddRange(DiscoverNewResources());
+                newResources.AddRange(PreprocessNewResources());
                 _statistics.DecrementRemainingWorkload();
 
                 var statisticsSnapshot = _statistics.TakeSnapshot();
                 UpdateGui();
 
                 if (statisticsSnapshot.RemainingWorkload > 0)
-                    return newlyDiscoveredResources;
+                    return newResources;
 
                 SendOut(new NoMoreWorkToDoEvent());
                 return new List<Resource>();
@@ -175,7 +175,7 @@ namespace Helix.Bot
                                 if (RedirectHappenedAtStartUrl()) return false;
                                 processedResourceIsQueuedForReprocessing = TryQueueForReprocessing();
                             }
-                            else WriteToReportFile();
+                            else WriteToReportFile(reportWritingAction, verificationResult);
 
                             break;
                         }
@@ -185,8 +185,8 @@ namespace Helix.Bot
                             if (millisecondsPageLoadTime.HasValue)
                                 _statistics.IncrementSuccessfullyRenderedPageCount(millisecondsPageLoadTime.Value);
 
-                            if (VerifiedUrlIsAlreadySavedToReportFile()) reportWritingAction = ReportWritingAction.Update;
-                            WriteToReportFile();
+                            if (AlreadySavedToReportFile(verificationResult.VerifiedUrl)) reportWritingAction = ReportWritingAction.Update;
+                            WriteToReportFile(reportWritingAction, verificationResult);
 
                             break;
                         }
@@ -198,58 +198,12 @@ namespace Helix.Bot
 
                     #region Local Functions
 
-                    void WriteToReportFile()
-                    {
-                        var reportWritingMessage = (reportWritingAction, new[] { verificationResult });
-                        if (!ReportWritingMessages.Post(reportWritingMessage) && !ReportWritingMessages.Completion.IsCompleted)
-                        {
-                            _log.Error($"Failed to post data to buffer block named [{nameof(ReportWritingMessages)}].");
-                            return;
-                        }
-
-                        CountVerifiedUrl();
-                        _processedUrls[verificationResult.VerifiedUrl] = verificationResult.StatusCode;
-
-                        #region Local Functions
-
-                        void CountVerifiedUrl()
-                        {
-                            if (reportWritingAction == ReportWritingAction.Update)
-                            {
-                                _processedUrls.TryGetValue(verificationResult.VerifiedUrl, out var statusCodeFromReport);
-                                if (statusCodeFromReport == null)
-                                    throw new InvalidConstraintException("Could not retrieve status code of url from report");
-
-                                var oldStatusCode = statusCodeFromReport.Value;
-                                var newStatusCode = processedResource.StatusCode;
-                                if (newStatusCode == oldStatusCode) return;
-
-                                if (oldStatusCode.IsWithinBrokenRange() && !newStatusCode.IsWithinBrokenRange())
-                                {
-                                    _statistics.IncrementValidUrlCount();
-                                    _statistics.DecrementBrokenUrlCount();
-                                }
-                                else if (!oldStatusCode.IsWithinBrokenRange() && newStatusCode.IsWithinBrokenRange())
-                                {
-                                    _statistics.IncrementBrokenUrlCount();
-                                    _statistics.DecrementValidUrlCount();
-                                }
-                            }
-                            else
-                            {
-                                if (processedResource.StatusCode.IsWithinBrokenRange()) _statistics.IncrementBrokenUrlCount();
-                                else _statistics.IncrementValidUrlCount();
-                            }
-                        }
-
-                        #endregion
-                    }
                     bool TryQueueForReprocessing()
                     {
                         if (!_processedUrls.TryAdd(processedResource.Uri.AbsoluteUri, null))
                             return false;
 
-                        newlyDiscoveredResources.Add(new Resource(
+                        newResources.Add(new Resource(
                             processedResource.Id,
                             processedResource.Uri.AbsoluteUri,
                             processedResource.ParentUri,
@@ -270,14 +224,6 @@ namespace Helix.Bot
                         SendOut(new RedirectHappenedAtStartUrlEvent());
                         return true;
                     }
-                    bool VerifiedUrlIsAlreadySavedToReportFile()
-                    {
-                        if (_processedUrls.TryAdd(verificationResult.VerifiedUrl, null))
-                            return false;
-
-                        _processedUrls.TryGetValue(verificationResult.VerifiedUrl, out var statusCode);
-                        return statusCode != null;
-                    }
 
                     #endregion
                 }
@@ -286,18 +232,90 @@ namespace Helix.Bot
                     if (!Events.Post(@event) && !Events.Completion.IsCompleted)
                         _log.Error($"Failed to post data to buffer block named [{nameof(Events)}].");
                 }
-                List<Resource> DiscoverNewResources()
+                List<Resource> PreprocessNewResources()
                 {
                     if (!(processingResult is SuccessfulProcessingResult successfulProcessingResult)) return new List<Resource>();
                     return successfulProcessingResult.NewResources.Where(newResource =>
                     {
-                        if (newResource.StatusCode == StatusCode.UriSchemeNotSupported && !_configurations.IncludeNonHttpUrlsInReport)
-                            return false;
+                        switch (newResource.StatusCode)
+                        {
+                            case StatusCode.MalformedUri:
+                            case StatusCode.UriSchemeNotSupported when _configurations.IncludeNonHttpUrlsInReport:
+                            {
+                                var resourceWasProcessed = !_processedUrls.TryAdd(newResource.OriginalUrl, null);
+                                if (resourceWasProcessed) return false;
 
-                        var resourceWasNotProcessed = _processedUrls.TryAdd(newResource.Uri.AbsoluteUri, null);
-                        if (resourceWasNotProcessed) _statistics.IncrementRemainingWorkload();
-                        return resourceWasNotProcessed;
+                                var reportWritingAction = ReportWritingAction.AddNew;
+                                var verificationResult = newResource.ToVerificationResult();
+                                if (AlreadySavedToReportFile(newResource.OriginalUrl))
+                                    reportWritingAction = ReportWritingAction.Update;
+
+                                WriteToReportFile(reportWritingAction, verificationResult);
+                                return false;
+                            }
+                            case StatusCode.UriSchemeNotSupported when !_configurations.IncludeNonHttpUrlsInReport: return false;
+                            default:
+                            {
+                                var resourceWasNotProcessed = _processedUrls.TryAdd(newResource.Uri.AbsoluteUri, null);
+                                if (resourceWasNotProcessed) _statistics.IncrementRemainingWorkload();
+                                return resourceWasNotProcessed;
+                            }
+                        }
                     }).ToList();
+                }
+                bool AlreadySavedToReportFile(string verifiedUrl)
+                {
+                    if (_processedUrls.TryAdd(verifiedUrl, null))
+                        return false;
+
+                    _processedUrls.TryGetValue(verifiedUrl, out var statusCode);
+                    return statusCode != null;
+                }
+                void WriteToReportFile(ReportWritingAction reportWritingAction, VerificationResult verificationResult)
+                {
+                    var reportWritingMessage = (reportWritingAction, new[] { verificationResult });
+                    if (!ReportWritingMessages.Post(reportWritingMessage) && !ReportWritingMessages.Completion.IsCompleted)
+                    {
+                        _log.Error($"Failed to post data to buffer block named [{nameof(ReportWritingMessages)}].");
+                        return;
+                    }
+
+                    CountVerifiedUrl();
+                    _processedUrls[verificationResult.VerifiedUrl] = verificationResult.StatusCode;
+
+                    #region Local Functions
+
+                    void CountVerifiedUrl()
+                    {
+                        if (reportWritingAction == ReportWritingAction.Update)
+                        {
+                            _processedUrls.TryGetValue(verificationResult.VerifiedUrl, out var statusCodeFromReport);
+                            if (statusCodeFromReport == null)
+                                throw new InvalidConstraintException("Could not retrieve status code of url from report");
+
+                            var oldStatusCode = statusCodeFromReport.Value;
+                            var newStatusCode = processedResource.StatusCode;
+                            if (newStatusCode == oldStatusCode) return;
+
+                            if (oldStatusCode.IsWithinBrokenRange() && !newStatusCode.IsWithinBrokenRange())
+                            {
+                                _statistics.IncrementValidUrlCount();
+                                _statistics.DecrementBrokenUrlCount();
+                            }
+                            else if (!oldStatusCode.IsWithinBrokenRange() && newStatusCode.IsWithinBrokenRange())
+                            {
+                                _statistics.IncrementBrokenUrlCount();
+                                _statistics.DecrementValidUrlCount();
+                            }
+                        }
+                        else
+                        {
+                            if (processedResource.StatusCode.IsWithinBrokenRange()) _statistics.IncrementBrokenUrlCount();
+                            else _statistics.IncrementValidUrlCount();
+                        }
+                    }
+
+                    #endregion
                 }
 
                 #endregion

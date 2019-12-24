@@ -14,6 +14,8 @@ namespace Helix.Bot.Abstractions
 
         public Uri OriginalUri { get; }
 
+        public string OriginalUrl { get; }
+
         // TODO:
         // public bool Localized { get; set; }
 
@@ -35,6 +37,7 @@ namespace Helix.Bot.Abstractions
         {
             Id = id;
             ParentUri = parentUri;
+            OriginalUrl = originalUrl;
             IsExtractedFromHtmlDocument = isExtractedFromHtmlDocument;
 
             if (Uri.TryCreate(originalUrl, UriKind.RelativeOrAbsolute, out var relativeOrAbsoluteUri))

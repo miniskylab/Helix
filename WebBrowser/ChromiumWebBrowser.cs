@@ -211,7 +211,7 @@ namespace Helix.WebBrowser
                 _waitingForDisposal = true;
             }
 
-            _stateMachine.BlockingTransitNext(WebBrowserCommand.Dispose, CancellationToken.None, () =>
+            _stateMachine.AutoTransitNext(WebBrowserCommand.Dispose, CancellationToken.None, () =>
             {
                 Dispose(true);
                 GC.SuppressFinalize(this);

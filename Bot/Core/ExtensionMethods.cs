@@ -16,9 +16,9 @@ namespace Helix.Bot
             {
                 Id = resource.Id,
                 StatusCode = resource.StatusCode,
-                VerifiedUrl = resource.Uri.AbsoluteUri,
                 IsInternalResource = resource.IsInternal,
                 ParentUrl = resource.ParentUri?.AbsoluteUri,
+                VerifiedUrl = resource.Uri?.AbsoluteUri ?? resource.OriginalUrl,
                 StatusMessage = Enum.GetName(typeof(StatusCode), resource.StatusCode),
                 ResourceType = Enum.GetName(typeof(ResourceType), resource.ResourceType)
             };

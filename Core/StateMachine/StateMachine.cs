@@ -39,7 +39,7 @@ namespace Helix.Core
             CurrentState = initialState;
         }
 
-        public void BlockingTransitNext(TCommand command, CancellationToken cancellationToken, Action synchronizedAction = null)
+        public void AutoTransitNext(TCommand command, CancellationToken cancellationToken, Action synchronizedAction = null)
         {
             _activeStateTransitionCountdownEvent.AddCount();
             try
@@ -62,7 +62,7 @@ namespace Helix.Core
                 {
                     if (EqualityComparer<TState>.Default.Equals(nextState, CurrentState))
                     {
-                        var exceptionMessage = $"{nameof(BlockingTransitNext)} cannot be used to perform self-transition. " +
+                        var exceptionMessage = $"{nameof(AutoTransitNext)} cannot be used to perform self-transition. " +
                                                $"Current state: {CurrentState}.";
                         throw new InvalidConstraintException(exceptionMessage);
                     }

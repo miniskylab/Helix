@@ -78,9 +78,7 @@ namespace Helix.Gui
                 DisableCloseButton = true
             });
 
-            var working = _brokenLinkCollector != null && !BotState.Completed.HasFlag(_brokenLinkCollector.BotState);
-            if (working) StopWorking();
-
+            StopWorking();
             ManualResetEvent.Set();
             ManualResetEvent.Dispose();
         }
