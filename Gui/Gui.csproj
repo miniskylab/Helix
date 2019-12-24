@@ -5,6 +5,7 @@
         <LangVersion>latest</LangVersion>
         <OutputType>WinExe</OutputType>
         <AssemblyName>Helix</AssemblyName>
+        <NoWarn>NU1605</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>

@@ -5,7 +5,8 @@ RestoreNpmPackages();
 const path = require("path");
 const https = require("https");
 const url = require("url");
-const yauzl = require("yauzl");
+const sevenBin = require("7zip-bin");
+const sevenZip = require("node-7z");
 const rimraf = require("rimraf");
 const asar = require("asar");
 const Inliner = require("inliner");
@@ -62,7 +63,7 @@ async function DeploySqliteBrowser(pathToDestinationDirectory, version) {
 
     console.log(`Unzipping downloaded Sqlite Browser v${version} ...`);
     await Unzip(pathToTemporaryDownloadedZipFile, pathToDestinationDirectory);
-    TryRename(`${pathToDestinationDirectory}DB Browser for SQLite`, `${pathToDestinationDirectory}sqlite-browser`);
+    await TryRename(`${pathToDestinationDirectory}DB Browser for SQLite`, `${pathToDestinationDirectory}sqlite-browser`);
     fs.unlinkSync(pathToTemporaryDownloadedZipFile);
 }
 
@@ -70,13 +71,13 @@ async function DeployChromiumWebBrowser(pathToDestinationDirectory, version) {
     if (fs.existsSync(`${pathToDestinationDirectory}chromium`)) return;
 
     console.log(`Downloading Chromium Web Browser v${version} from the Internet ...`);
-    const pathToTemporaryDownloadedZipFile = "temp_chromium.zip";
-    const chromiumWebBrowserDownloadUrl = `https://github.com/henrypp/chromium/releases/download/v${version}-win64/chromium-sync.zip`;
+    const pathToTemporaryDownloadedZipFile = "temp_chromium.7z";
+    const chromiumWebBrowserDownloadUrl = `https://github.com/hibbiki/chromium-win64/releases/download/v${version}/chrome.sync.7z`;
     await DownloadFileFromTheInternet(chromiumWebBrowserDownloadUrl, pathToTemporaryDownloadedZipFile);
 
     console.log(`Unzipping downloaded Chromium Web Browser v${version} ...`);
     await Unzip(pathToTemporaryDownloadedZipFile, pathToDestinationDirectory);
-    TryRename(`${pathToDestinationDirectory}chrome-win32`, `${pathToDestinationDirectory}chromium`);
+    await TryRename(`${pathToDestinationDirectory}Chrome-bin`, `${pathToDestinationDirectory}chromium`);
     fs.unlinkSync(pathToTemporaryDownloadedZipFile);
 }
 
@@ -156,22 +157,15 @@ function DownloadFileFromTheInternet(downloadUrl, pathToDestinationFileOnDisk) {
 }
 
 function Unzip(pathToZipFile, pathToDestinationDirectory) {
-    const isDirectory = entry => /\/$/.test(entry.fileName);
     return new Promise((resolve, reject) => {
-        yauzl.open(pathToZipFile, {lazyEntries: true}, (error, zipFile) => {
-            if (error) reject(error.message);
-            zipFile.readEntry();
-            zipFile.on("entry", entry => {
-                if (isDirectory(entry)) zipFile.readEntry();
-                else zipFile.openReadStream(entry, (error, readStream) => {
-                    if (error) throw error;
-                    const pathToUnzippedDestinationFile = `${pathToDestinationDirectory}/${entry.fileName}`;
-                    EnsureParentDirectoryExistence(pathToUnzippedDestinationFile);
-                    readStream.pipe(fs.createWriteStream(pathToUnzippedDestinationFile));
-                    readStream.on("end", () => zipFile.readEntry());
-                });
-            });
-            zipFile.on("close", resolve);
+        const unzipStream = sevenZip.extractFull(pathToZipFile, pathToDestinationDirectory, {
+            recursive: true,
+            $bin: sevenBin.path7za
+        });
+        unzipStream.on("end", resolve);
+        unzipStream.on("error", error => {
+            console.log(error);
+            reject();
         });
     });
 }
