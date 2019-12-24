@@ -12,9 +12,9 @@ const Inliner = require("inliner");
 const babelMinifier = require("babel-minify");
 
 const sqliteVersion = "3.11.2";
-const electronVersion = "5.0.6";
-const chromiumVersion = "75.0.3770.100-r652427";
-const chromeDriverVersion = "75.0.3770.90";
+const electronVersion = "7.1.2";
+const chromiumVersion = "79.0.3945.88-r706915";
+const chromeDriverVersion = "79.0.3945.36";
 
 (async () => {
     const commandLineArguments = process.argv.slice(2);
