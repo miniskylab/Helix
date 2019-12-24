@@ -3,9 +3,9 @@
   "version": "0.0.0",
   "dependencies": {
     "yauzl": "2.10.0",
-    "rimraf": "2.6.3",
-    "asar": "2.0.1",
+    "rimraf": "3.0.0",
+    "asar": "2.0.3",
     "inliner": "1.13.1",
-    "babel-minify": "0.5.0"
+    "babel-minify": "0.5.1"
   }
 }
