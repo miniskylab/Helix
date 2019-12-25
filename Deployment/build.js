@@ -4,7 +4,6 @@ RestoreNpmPackages();
 
 const path = require("path");
 const https = require("https");
-const url = require("url");
 const yauzl = require("yauzl");
 const rimraf = require("rimraf");
 const asar = require("asar");
