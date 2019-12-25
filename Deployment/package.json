@@ -2,8 +2,7 @@
   "name": "build",
   "version": "0.0.0",
   "dependencies": {
-    "7zip-bin": "5.0.3",
-    "node-7z": "2.0.5",
+    "yauzl": "2.10.0",
     "rimraf": "3.0.0",
     "asar": "2.0.3",
     "inliner": "1.13.1",

@@ -5,8 +5,7 @@ RestoreNpmPackages();
 const path = require("path");
 const https = require("https");
 const url = require("url");
-const sevenBin = require("7zip-bin");
-const sevenZip = require("node-7z");
+const yauzl = require("yauzl");
 const rimraf = require("rimraf");
 const asar = require("asar");
 const Inliner = require("inliner");
@@ -14,8 +13,8 @@ const babelMinifier = require("babel-minify");
 
 const sqliteVersion = "3.11.2";
 const electronVersion = "7.1.2";
-const chromiumVersion = "79.0.3945.88-r706915";
-const chromeDriverVersion = "79.0.3945.36";
+const chromiumVersion = "75.0.3770.142-r652427";
+const chromeDriverVersion = "75.0.3770.140";
 
 (async () => {
     const commandLineArguments = process.argv.slice(2);
@@ -71,13 +70,13 @@ async function DeployChromiumWebBrowser(pathToDestinationDirectory, version) {
     if (fs.existsSync(`${pathToDestinationDirectory}chromium`)) return;
 
     console.log(`Downloading Chromium Web Browser v${version} from the Internet ...`);
-    const pathToTemporaryDownloadedZipFile = "temp_chromium.7z";
-    const chromiumWebBrowserDownloadUrl = `https://github.com/hibbiki/chromium-win64/releases/download/v${version}/chrome.sync.7z`;
+    const pathToTemporaryDownloadedZipFile = "temp_chromium.zip";
+    const chromiumWebBrowserDownloadUrl = `https://github.com/henrypp/chromium/releases/download/v${version}-win64/chromium-sync.zip`;
     await DownloadFileFromTheInternet(chromiumWebBrowserDownloadUrl, pathToTemporaryDownloadedZipFile);
 
     console.log(`Unzipping downloaded Chromium Web Browser v${version} ...`);
     await Unzip(pathToTemporaryDownloadedZipFile, pathToDestinationDirectory);
-    await TryRename(`${pathToDestinationDirectory}Chrome-bin`, `${pathToDestinationDirectory}chromium`);
+    await TryRename(`${pathToDestinationDirectory}chrome-win32`, `${pathToDestinationDirectory}chromium`);
     fs.unlinkSync(pathToTemporaryDownloadedZipFile);
 }
 
@@ -157,15 +156,22 @@ function DownloadFileFromTheInternet(downloadUrl, pathToDestinationFileOnDisk) {
 }
 
 function Unzip(pathToZipFile, pathToDestinationDirectory) {
+    const isDirectory = entry => /\/$/.test(entry.fileName);
     return new Promise((resolve, reject) => {
-        const unzipStream = sevenZip.extractFull(pathToZipFile, pathToDestinationDirectory, {
-            recursive: true,
-            $bin: sevenBin.path7za
-        });
-        unzipStream.on("end", resolve);
-        unzipStream.on("error", error => {
-            console.log(error);
-            reject();
+        yauzl.open(pathToZipFile, {lazyEntries: true}, (error, zipFile) => {
+            if (error) reject(error.message);
+            zipFile.readEntry();
+            zipFile.on("entry", entry => {
+                if (isDirectory(entry)) zipFile.readEntry();
+                else zipFile.openReadStream(entry, (error, readStream) => {
+                    if (error) throw error;
+                    const pathToUnzippedDestinationFile = `${pathToDestinationDirectory}/${entry.fileName}`;
+                    EnsureParentDirectoryExistence(pathToUnzippedDestinationFile);
+                    readStream.pipe(fs.createWriteStream(pathToUnzippedDestinationFile));
+                    readStream.on("end", () => zipFile.readEntry());
+                });
+            });
+            zipFile.on("close", resolve);
         });
     });
 }
@@ -184,11 +190,13 @@ async function TryRename(oldPath, newPath, attemptCount = 10) {
     while (attemptCount > 0) {
         try {
             fs.renameSync(oldPath, newPath);
-            break;
+            return Promise.resolve();
         } catch (_) {
             await new Promise(resolve => { setTimeout(resolve, 500); });
             attemptCount--;
         }
     }
-    if (attemptCount <= 0) process.exit(-1);
+
+    if (attemptCount <= 0)
+        return Promise.reject("Try rename failed!");
 }
