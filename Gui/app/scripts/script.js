@@ -33,6 +33,7 @@ const btnMain = document.getElementById("btn-main");
 const btnStop = document.getElementById("btn-stop");
 const btnClose = document.getElementById("btn-close");
 const btnPreview = document.getElementById("btn-preview");
+const btnOpenOutputDirectory = document.getElementById("btn-open-output-directory");
 const btnCloseAboutMeOverlay = document.getElementById("btn-close-about-me-overlay");
 
 let waitingCountdownTimer = null;
@@ -91,9 +92,8 @@ socket.connect(18880, "127.0.0.1", () => {
         socket.write(attachEndOfTransmissionCharacter(JSON.stringify({text: "Preview"})));
     });
 
-    document.addEventListener("click", e => {
-        if (e.target && e.target.id === "btn-view-log")
-            socket.write(attachEndOfTransmissionCharacter(JSON.stringify({text: "ViewLog"})));
+    btnOpenOutputDirectory.addEventListener("click", () => {
+        socket.write(attachEndOfTransmissionCharacter(JSON.stringify({text: "OpenOutputDirectory"})));
     });
 
     socket.on("data", byteStream => {
@@ -139,6 +139,9 @@ function redraw(frame) {
 
     if (frame.DisablePreviewButton === true && !btnPreview.hasAttribute("disabled")) btnPreview.setAttribute("disabled", "");
     else if (frame.DisablePreviewButton === false && btnPreview.hasAttribute("disabled")) btnPreview.removeAttribute("disabled");
+
+    if (frame.DisableOpenOutputDirectoryButton === true && !btnOpenOutputDirectory.hasAttribute("disabled")) btnOpenOutputDirectory.setAttribute("disabled", "");
+    else if (frame.DisableOpenOutputDirectoryButton === false && btnOpenOutputDirectory.hasAttribute("disabled")) btnOpenOutputDirectory.removeAttribute("disabled");
 
     if (frame.DisableConfigurationPanel === true && !configurationPanel.hasAttribute("disabled")) configurationPanel.setAttribute("disabled", "");
     else if (frame.DisableConfigurationPanel === false && configurationPanel.hasAttribute("disabled")) configurationPanel.removeAttribute("disabled");

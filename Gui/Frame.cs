@@ -19,6 +19,8 @@ namespace Helix.Gui
 
         public bool? DisablePreviewButton { get; set; }
 
+        public bool? DisableOpenOutputDirectoryButton { get; set; }
+
         public bool? DisableStopButton { get; set; }
 
         public string ElapsedTime { get; set; }

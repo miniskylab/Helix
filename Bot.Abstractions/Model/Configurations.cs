@@ -34,13 +34,13 @@ namespace Helix.Bot.Abstractions
 
         public static string PathToChromiumExecutable => Path.Combine(WorkingDirectory, "chromium/chrome.exe");
 
-        public string PathToDirectoryContainsScreenshotFiles => Path.Combine(OutputDirectory, $"{_id}/Screenshots");
+        public string PathToDirectoryContainsScreenshotFiles => Path.Combine(OutputDirectory, "Screenshots");
 
         public static string PathToElectronJsExecutable => Path.Combine(WorkingDirectory, "ui/electron.exe");
 
-        public string PathToLogFile => Path.Combine(OutputDirectory, $"{_id}/Helix.log");
+        public string PathToLogFile => Path.Combine(OutputDirectory, "Helix.log");
 
-        public string PathToReportFile => Path.Combine(OutputDirectory, $"{_id}/Report.sqlite3");
+        public string PathToReportFile => Path.Combine(OutputDirectory, "Report.sqlite3");
 
         public static string PathToSqLiteBrowserExecutable => Path.Combine(WorkingDirectory, "sqlite-browser/DB Browser for SQLite.exe");
 
@@ -48,7 +48,7 @@ namespace Helix.Bot.Abstractions
 
         public static string WorkingDirectory => Path.GetDirectoryName(Assembly.GetEntryAssembly()?.Location);
 
-        static string OutputDirectory => Path.Combine(WorkingDirectory, "_outputs");
+        public string OutputDirectory => Path.Combine(WorkingDirectory, $"_outputs\\{_id}");
 
         public Configurations() { }
 
@@ -64,9 +64,8 @@ namespace Helix.Bot.Abstractions
 
             _id = $"{StartUri.Host}-{StartUri.Port}-{DateTime.Now:yyyyMMdd-HHmmss}";
 
-            if (Directory.Exists(Path.Combine(OutputDirectory, $"{_id}")))
-                throw new InvalidConstraintException($"{nameof(Configurations)} ID collision detected.");
-            Directory.CreateDirectory(Path.Combine(OutputDirectory, $"{_id}"));
+            if (Directory.Exists(OutputDirectory)) throw new InvalidConstraintException($"{nameof(Configurations)} ID collision detected.");
+            Directory.CreateDirectory(OutputDirectory);
         }
 
         static Uri ValidateStartUri(string startUrl)
