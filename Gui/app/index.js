@@ -18,5 +18,9 @@ app.on("ready", () => {
         event.preventDefault();
         shell.openExternal(url);
     });
+    mainWindow.on("close", event => {
+        event.preventDefault();
+        mainWindow.webContents.executeJavaScript("document.getElementById('btn-close').click()");
+    });
 });
-ipcMain.on("btn-close-clicked", () => { app.quit(); });
+ipcMain.on("btn-close-clicked", () => { app.exit(0); });

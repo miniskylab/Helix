@@ -23,6 +23,7 @@ namespace Helix.Gui
         static Task _elapsedTimeUpdateTask;
         static bool _isClosing;
         static Process _logViewerProcess;
+        static bool _openOutputDirectoryActionIsOnCooldown;
         static Process _reportViewerProcess;
         static readonly ISynchronousServerSocket CommunicationSocketToGui;
         static readonly Stopwatch ElapsedTimeStopwatch;
@@ -35,11 +36,12 @@ namespace Helix.Gui
         {
             Log4NetModule.ConfigureLog4Net();
 
-            Log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-            GuiProcess = new Process { StartInfo = { FileName = Configurations.PathToElectronJsExecutable } };
-            ManualResetEvent = new ManualResetEvent(false);
             OperationLock = new object();
             ElapsedTimeStopwatch = new Stopwatch();
+            _openOutputDirectoryActionIsOnCooldown = false;
+            ManualResetEvent = new ManualResetEvent(false);
+            Log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+            GuiProcess = new Process { StartInfo = { FileName = Configurations.PathToElectronJsExecutable } };
             CommunicationSocketToGui = new SynchronousServerSocket(IPAddress.Loopback.ToString(), Configurations.GuiControllerPort);
         }
 
@@ -121,6 +123,8 @@ namespace Helix.Gui
         static void OpenOutputDirectory()
         {
             if (!Monitor.TryEnter(OperationLock)) return;
+            if (_openOutputDirectoryActionIsOnCooldown) return;
+
             try
             {
                 if (_configurations == null)
@@ -128,9 +132,20 @@ namespace Helix.Gui
                     Log.Error("Cannot open output directory because there is no configurations provided.");
                     return;
                 }
+
+                _openOutputDirectoryActionIsOnCooldown = true;
+                Task.Run(() =>
+                {
+                    Thread.Sleep(2000);
+                    _openOutputDirectoryActionIsOnCooldown = false;
+                });
+
                 Process.Start("explorer.exe", _configurations.OutputDirectory);
             }
-            finally { Monitor.Exit(OperationLock); }
+            finally
+            {
+                Monitor.Exit(OperationLock);
+            }
         }
 
         [UsedImplicitly]
