@@ -75,7 +75,6 @@ namespace Helix.Bot
                     if (!_stateMachine.TryTransitNext(BotCommand.Abort))
                         _log.StateTransitionFailureEvent(_stateMachine.CurrentState, BotCommand.Abort);
 
-                    _brokenLinkCollectionWorkflow.Shutdown();
                     Shutdown(BotCommand.MarkAsFaulted);
                 }
 
@@ -156,7 +155,7 @@ namespace Helix.Bot
                     try
                     {
                         Broadcast(StopProgressReportEvent("Waiting for background tasks to complete ..."));
-                        _brokenLinkCollectionWorkflow.Shutdown();
+                        _brokenLinkCollectionWorkflow?.Shutdown();
                     }
                     catch (Exception exception)
                     {

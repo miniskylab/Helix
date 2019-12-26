@@ -92,6 +92,11 @@ socket.connect(18880, "127.0.0.1", () => {
         socket.write(attachEndOfTransmissionCharacter(JSON.stringify({text: "Preview"})));
     });
 
+    document.addEventListener("click", e => {
+        if (e.target && e.target.id === "btn-view-log")
+            socket.write(attachEndOfTransmissionCharacter(JSON.stringify({ text: "ViewLog" })));
+    });
+
     btnOpenOutputDirectory.addEventListener("click", () => {
         socket.write(attachEndOfTransmissionCharacter(JSON.stringify({text: "OpenOutputDirectory"})));
     });

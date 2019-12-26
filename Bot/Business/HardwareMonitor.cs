@@ -62,9 +62,16 @@ namespace Helix.Bot
                 var highMemoryUsage = memoryUsage >= highMemoryUsageThreshold;
                 var lowMemoryUsage = memoryUsage < lowMemoryUsageThreshold;
 
-                if (highCpuUsage) OnHighCpuOrMemoryUsage?.Invoke(averageCpuUsage, null);
-                else if (highMemoryUsage) OnHighCpuOrMemoryUsage?.Invoke(null, memoryUsage);
-                else if (lowCpuUsage && lowMemoryUsage) OnLowCpuAndMemoryUsage?.Invoke(averageCpuUsage, memoryUsage);
+                try
+                {
+                    if (highCpuUsage) OnHighCpuOrMemoryUsage?.Invoke(averageCpuUsage, null);
+                    else if (highMemoryUsage) OnHighCpuOrMemoryUsage?.Invoke(null, memoryUsage);
+                    else if (lowCpuUsage && lowMemoryUsage) OnLowCpuAndMemoryUsage?.Invoke(averageCpuUsage, memoryUsage);
+                }
+                catch (Exception exception)
+                {
+                    _log.Error("One or more errors occurred in the sampling task.", exception);
+                }
             }
         }
 

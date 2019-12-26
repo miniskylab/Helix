@@ -41,16 +41,24 @@ namespace Helix.Bot
                 hardwareMonitor.OnLowCpuAndMemoryUsage += (averageCpuUsage, memoryUsage) =>
                 {
                     if (OutputCount > 0 || _counter.CreatedHtmlRenderCount == Configurations.MaxHtmlRendererCount) return;
-                    CreateHtmlRenderer();
-
-                    log.Info(
-                        $"Low CPU usage ({averageCpuUsage}%) and low memory usage ({memoryUsage}%) detected. " +
-                        $"Browser count increased from {_counter.CreatedHtmlRenderCount - 1} to {_counter.CreatedHtmlRenderCount}."
-                    );
+                    try
+                    {
+                        CreateHtmlRenderer();
+                        log.Info(
+                            $"Low CPU usage ({averageCpuUsage}%) and low memory usage ({memoryUsage}%) detected. " +
+                            $"Browser count increased from {_counter.CreatedHtmlRenderCount - 1} to {_counter.CreatedHtmlRenderCount}."
+                        );
+                    }
+                    catch (Exception exception)
+                    {
+                        log.Error($"Failed to create {nameof(HtmlRenderer)}.", exception);
+                    }
                 };
                 hardwareMonitor.OnHighCpuOrMemoryUsage += (averageCpuUsage, memoryUsage) =>
                 {
-                    if (_counter.CreatedHtmlRenderCount == 1) return;
+                    if (_counter.CreatedHtmlRenderCount == 1)
+                        return;
+
                     this.Receive().Dispose();
                     _counter.CreatedHtmlRenderCount--;
 
@@ -58,20 +66,26 @@ namespace Helix.Bot
                         throw new ArgumentException(nameof(averageCpuUsage), nameof(memoryUsage));
 
                     if (averageCpuUsage != null && memoryUsage != null)
+                    {
                         log.Info(
                             $"High CPU usage ({averageCpuUsage}%) and high memory usage ({memoryUsage}%) detected. " +
                             $"Browser count decreased from {_counter.CreatedHtmlRenderCount + 1} to {_counter.CreatedHtmlRenderCount}."
                         );
+                    }
                     else if (averageCpuUsage != null)
+                    {
                         log.Info(
                             $"High CPU usage ({averageCpuUsage}%) detected. " +
                             $"Browser count decreased from {_counter.CreatedHtmlRenderCount + 1} to {_counter.CreatedHtmlRenderCount}."
                         );
+                    }
                     else
+                    {
                         log.Info(
                             $"High memory usage ({memoryUsage}%) detected. " +
                             $"Browser count decreased from {_counter.CreatedHtmlRenderCount + 1} to {_counter.CreatedHtmlRenderCount}."
                         );
+                    }
                 };
             }
 

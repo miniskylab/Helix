@@ -22,6 +22,7 @@ namespace Helix.Gui
         static Configurations _configurations;
         static Task _elapsedTimeUpdateTask;
         static bool _isClosing;
+        static Process _logViewerProcess;
         static Process _reportViewerProcess;
         static readonly ISynchronousServerSocket CommunicationSocketToGui;
         static readonly Stopwatch ElapsedTimeStopwatch;
@@ -52,6 +53,9 @@ namespace Helix.Gui
 
             GuiProcess.Start();
             ManualResetEvent.WaitOne();
+
+            _logViewerProcess?.CloseMainWindow();
+            _logViewerProcess?.Close();
 
             _reportViewerProcess?.CloseMainWindow();
             _reportViewerProcess?.Close();
@@ -113,6 +117,7 @@ namespace Helix.Gui
             finally { Monitor.Exit(OperationLock); }
         }
 
+        [UsedImplicitly]
         static void OpenOutputDirectory()
         {
             if (!Monitor.TryEnter(OperationLock)) return;
@@ -129,12 +134,44 @@ namespace Helix.Gui
         }
 
         [UsedImplicitly]
+        static void ViewLog()
+        {
+            if (!Monitor.TryEnter(OperationLock)) return;
+            try
+            {
+                if (_logViewerProcess != null) RestoreOrSetForegroundWindow(_logViewerProcess);
+                else
+                {
+                    if (_configurations == null)
+                    {
+                        Log.Error("Cannot view log because there is no configurations provided.");
+                        return;
+                    }
+
+                    _logViewerProcess = Process.Start("notepad.exe", _configurations.PathToLogFile);
+
+                    /* Wait for MainWindowHandle to be available.
+                     * TODO: Waiting for a fixed amount of time is not a good idea. Need to find another solution. */
+                    // Thread.Sleep(2000);
+
+                    Task.Run(() =>
+                    {
+                        _logViewerProcess.WaitForExit();
+                        _logViewerProcess = null;
+                    });
+                }
+            }
+            finally { Monitor.Exit(OperationLock); }
+        }
+
+        [UsedImplicitly]
         static void Start(string configurationJsonString)
         {
             _configurations = new Configurations(configurationJsonString);
 
             CreateNewLogFile();
             CloseReportViewerIfOpen();
+            CloseLogViewerIfOpen();
             CreateAndConfigureBot();
             DisableGui();
             TryStartBot();
@@ -150,6 +187,11 @@ namespace Helix.Gui
             {
                 _reportViewerProcess?.CloseMainWindow();
                 _reportViewerProcess?.Close();
+            }
+            void CloseLogViewerIfOpen()
+            {
+                _logViewerProcess?.CloseMainWindow();
+                _logViewerProcess?.Close();
             }
             void CreateAndConfigureBot()
             {
