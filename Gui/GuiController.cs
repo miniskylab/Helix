@@ -38,7 +38,6 @@ namespace Helix.Gui
 
             OperationLock = new object();
             ElapsedTimeStopwatch = new Stopwatch();
-            _openOutputDirectoryActionIsOnCooldown = false;
             ManualResetEvent = new ManualResetEvent(false);
             Log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
             GuiProcess = new Process { StartInfo = { FileName = Configurations.PathToElectronJsExecutable } };
@@ -182,7 +181,8 @@ namespace Helix.Gui
         [UsedImplicitly]
         static void Start(string configurationJsonString)
         {
-            _configurations = new Configurations(configurationJsonString);
+            if (!TryCreateConfigurations())
+                return;
 
             CreateNewLogFile();
             CloseReportViewerIfOpen();
@@ -193,6 +193,38 @@ namespace Helix.Gui
 
             #region Local Functions
 
+            bool TryCreateConfigurations()
+            {
+                try
+                {
+                    _configurations = new Configurations(configurationJsonString);
+                    return true;
+                }
+                catch (UriFormatException)
+                {
+                    Redraw(new Frame
+                    {
+                        DisableMainButton = false,
+                        DisableCloseButton = false,
+                        BorderColor = BorderColor.Error,
+                        DisableConfigurationPanel = false,
+                        StatusText = "Invalid [Start URL]."
+                    });
+                    return false;
+                }
+                catch (Exception exception)
+                {
+                    Redraw(new Frame
+                    {
+                        DisableMainButton = false,
+                        DisableCloseButton = false,
+                        StatusText = exception.Message,
+                        BorderColor = BorderColor.Error,
+                        DisableConfigurationPanel = false
+                    });
+                    return false;
+                }
+            }
             void CreateNewLogFile()
             {
                 Log4NetModule.CreateNewLogFile(_configurations.PathToLogFile);

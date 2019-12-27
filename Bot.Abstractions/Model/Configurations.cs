@@ -32,6 +32,8 @@ namespace Helix.Bot.Abstractions
 
         public static int MaxNetworkConnectionCount => 300;
 
+        public string OutputDirectory => Path.Combine(WorkingDirectory, $"_outputs\\{_id}");
+
         public static string PathToChromiumExecutable => Path.Combine(WorkingDirectory, "chromium/chrome.exe");
 
         public string PathToDirectoryContainsScreenshotFiles => Path.Combine(OutputDirectory, "Screenshots");
@@ -48,14 +50,13 @@ namespace Helix.Bot.Abstractions
 
         public static string WorkingDirectory => Path.GetDirectoryName(Assembly.GetEntryAssembly()?.Location);
 
-        public string OutputDirectory => Path.Combine(WorkingDirectory, $"_outputs\\{_id}");
-
         public Configurations() { }
 
         public Configurations(string configurationJsonString)
         {
             var tokens = JObject.Parse(configurationJsonString);
-            StartUri = ValidateStartUri((string) tokens.SelectToken(nameof(StartUri)) ?? string.Empty);
+
+            StartUri = CreateStartUri();
             IncludeNonHttpUrlsInReport = (bool) (tokens.SelectToken(nameof(IncludeNonHttpUrlsInReport)) ?? false);
             IncludeRedirectUrlsInReport = (bool) (tokens.SelectToken(nameof(IncludeRedirectUrlsInReport)) ?? false);
 
@@ -66,13 +67,20 @@ namespace Helix.Bot.Abstractions
 
             if (Directory.Exists(OutputDirectory)) throw new InvalidConstraintException($"{nameof(Configurations)} ID collision detected.");
             Directory.CreateDirectory(OutputDirectory);
-        }
 
-        static Uri ValidateStartUri(string startUrl)
-        {
-            if (!Uri.TryCreate(startUrl, UriKind.Absolute, out var startUri))
-                throw new UriFormatException("Invalid URI: The format of the [Start Uri] could not be determined.");
-            return startUri;
+            #region Local Functions
+
+            Uri CreateStartUri()
+            {
+                var startUri = new Uri((string) tokens.SelectToken(nameof(StartUri)) ?? string.Empty, UriKind.Absolute);
+                var startUriScheme = startUri.Scheme.ToLowerInvariant();
+                if (startUriScheme != "http" && startUriScheme != "https")
+                    throw new InvalidOperationException($"Uri scheme [{startUriScheme}] is not supported.");
+
+                return startUri;
+            }
+
+            #endregion
         }
     }
 }
