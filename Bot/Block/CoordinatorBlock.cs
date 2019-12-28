@@ -39,7 +39,7 @@ namespace Helix.Bot
 
             #region Local Functions
 
-            StateMachine<WorkflowState, WorkflowCommand> NewStateMachine()
+            static StateMachine<WorkflowState, WorkflowCommand> NewStateMachine()
             {
                 return new StateMachine<WorkflowState, WorkflowCommand>(
                     new Dictionary<Transition<WorkflowState, WorkflowCommand>, WorkflowState>
@@ -52,7 +52,7 @@ namespace Helix.Bot
 
                 #region Local Functions
 
-                Transition<WorkflowState, WorkflowCommand> Transition(WorkflowState fromState, WorkflowCommand command)
+                static Transition<WorkflowState, WorkflowCommand> Transition(WorkflowState fromState, WorkflowCommand command)
                 {
                     return new Transition<WorkflowState, WorkflowCommand>(fromState, command);
                 }

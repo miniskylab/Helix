@@ -194,7 +194,7 @@ namespace Helix.WebBrowser
                     WebBrowserState.WaitingForOpening
                 );
 
-                Transition<WebBrowserState, WebBrowserCommand> Transition(WebBrowserState fromState, WebBrowserCommand command)
+                static Transition<WebBrowserState, WebBrowserCommand> Transition(WebBrowserState fromState, WebBrowserCommand command)
                 {
                     return new Transition<WebBrowserState, WebBrowserCommand>(fromState, command);
                 }

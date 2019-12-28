@@ -24,7 +24,7 @@ namespace Helix.Bot
 
             #region Local Functions
 
-            Dictionary<Transition<BotState, BotCommand>, BotState> PossibleTransitions()
+            static Dictionary<Transition<BotState, BotCommand>, BotState> PossibleTransitions()
             {
                 return new Dictionary<Transition<BotState, BotCommand>, BotState>
                 {
@@ -39,7 +39,7 @@ namespace Helix.Bot
                     { Transition(BotState.Completed, BotCommand.MarkAsFaulted), BotState.Faulted }
                 };
 
-                Transition<BotState, BotCommand> Transition(BotState fromState, BotCommand command)
+                static Transition<BotState, BotCommand> Transition(BotState fromState, BotCommand command)
                 {
                     return new Transition<BotState, BotCommand>(fromState, command);
                 }
@@ -176,7 +176,7 @@ namespace Helix.Bot
                         _log.Error("One or more errors occurred when releasing resources.", exception);
                     }
                 }
-                Event StopProgressReportEvent(string message) { return new StopProgressReportEvent { Message = message }; }
+                static Event StopProgressReportEvent(string message) { return new StopProgressReportEvent { Message = message }; }
 
                 #endregion
             });

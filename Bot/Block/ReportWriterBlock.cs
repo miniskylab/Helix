@@ -59,10 +59,19 @@ namespace Helix.Bot
             void Insert(params VerificationResult[] toBeInsertedVerificationResults)
             {
                 _memoryBuffer.AddRange(toBeInsertedVerificationResults);
-
-                bool BrokenInternalVerificationResult(VerificationResult v) => v.IsInternalResource && v.StatusCode.IsWithinBrokenRange();
-                if (_memoryBuffer.Count >= 300 || toBeInsertedVerificationResults.Any(BrokenInternalVerificationResult))
+                if (_memoryBuffer.Count >= 300 || toBeInsertedVerificationResults.Any(InternalAndBroken))
                     FlushMemoryBufferToDisk();
+
+                #region Local Function
+
+                static bool InternalAndBroken(VerificationResult verificationResult)
+                {
+                    var @internal = verificationResult.IsInternalResource;
+                    var broken = verificationResult.StatusCode.IsWithinBrokenRange();
+                    return @internal && broken;
+                }
+
+                #endregion
             }
             void Update(params VerificationResult[] toBeUpdatedVerificationResults)
             {

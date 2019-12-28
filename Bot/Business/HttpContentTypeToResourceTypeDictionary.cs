@@ -34,7 +34,7 @@ namespace Helix.Bot.Abstractions
                 _("application/", ResourceType.Blob)
             };
 
-            KeyValuePair<string, ResourceType> _(string httpContentTypePrefix, ResourceType resourceType)
+            static KeyValuePair<string, ResourceType> _(string httpContentTypePrefix, ResourceType resourceType)
             {
                 return new KeyValuePair<string, ResourceType>(httpContentTypePrefix, resourceType);
             }

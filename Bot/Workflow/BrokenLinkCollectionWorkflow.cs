@@ -69,8 +69,8 @@ namespace Helix.Bot
 
                 #region Local Functions
 
-                Predicate<T> PropagateNullObjectsOnly<T>() { return @object => @object == null; }
-                ITargetBlock<T> NullTarget<T>() { return DataflowBlock.NullTarget<T>(); }
+                static Predicate<T> PropagateNullObjectsOnly<T>() { return @object => @object == null; }
+                static ITargetBlock<T> NullTarget<T>() { return DataflowBlock.NullTarget<T>(); }
 
                 #endregion
             }

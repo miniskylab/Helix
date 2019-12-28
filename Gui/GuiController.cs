@@ -225,17 +225,17 @@ namespace Helix.Gui
                     return false;
                 }
             }
-            void CreateNewLogFile()
+            static void CreateNewLogFile()
             {
                 Log4NetModule.CreateNewLogFile(_configurations.PathToLogFile);
                 Log.Info($"Accepted: {_configurations.StartUri}");
             }
-            void CloseReportViewerIfOpen()
+            static void CloseReportViewerIfOpen()
             {
                 _reportViewerProcess?.CloseMainWindow();
                 _reportViewerProcess?.Close();
             }
-            void CloseLogViewerIfOpen()
+            static void CloseLogViewerIfOpen()
             {
                 _logViewerProcess?.CloseMainWindow();
                 _logViewerProcess?.Close();
@@ -248,7 +248,7 @@ namespace Helix.Gui
                 _brokenLinkCollector.OnEventBroadcast += OnResourceProcessed;
                 _brokenLinkCollector.OnEventBroadcast += OnWorkflowCompleted;
             }
-            void DisableGui()
+            static void DisableGui()
             {
                 Redraw(new Frame
                 {
@@ -281,7 +281,7 @@ namespace Helix.Gui
                     });
                 }
             }
-            void OnStartProgressUpdated(Event @event)
+            static void OnStartProgressUpdated(Event @event)
             {
                 if (@event is StartProgressReportEvent)
                 {
@@ -290,7 +290,7 @@ namespace Helix.Gui
                 }
                 _brokenLinkCollector.OnEventBroadcast -= OnStartProgressUpdated;
             }
-            void OnWorkflowActivated(Event @event)
+            static void OnWorkflowActivated(Event @event)
             {
                 if (!(@event is WorkflowActivatedEvent)) return;
 
@@ -336,7 +336,7 @@ namespace Helix.Gui
                     }
                 });
             }
-            void UpdateElapsedTimeOnGuiEvery(TimeSpan timeSpan)
+            static void UpdateElapsedTimeOnGuiEvery(TimeSpan timeSpan)
             {
                 _elapsedTimeUpdateTask = Task.Run(() =>
                 {
@@ -406,7 +406,7 @@ namespace Helix.Gui
 
             #region Local Functions
 
-            void OnStopProgressUpdated(Event @event)
+            static void OnStopProgressUpdated(Event @event)
             {
                 if (!(@event is StopProgressReportEvent)) return;
                 Redraw(new Frame { WaitingOverlayProgressText = @event.Message });

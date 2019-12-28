@@ -14,12 +14,12 @@ namespace Helix.Bot
     public class HardwareMonitor : IHardwareMonitor
     {
         CancellationTokenSource _cancellationTokenSource;
+        bool _isRunning;
         readonly ILog _log;
         Task _samplingTask;
 
-        public bool IsRunning { get; private set; }
-
         public event Action<int?, int?> OnHighCpuOrMemoryUsage;
+
         public event Action<int, int> OnLowCpuAndMemoryUsage;
 
         [Obsolete(ErrorMessage.UseDependencyInjection, true)]
@@ -28,8 +28,8 @@ namespace Helix.Bot
         public void StartMonitoring(double millisecondSampleDuration, float highCpuUsageThreshold, float lowCpuUsageThreshold,
             float highMemoryUsageThreshold, float lowMemoryUsageThreshold)
         {
-            if (IsRunning) throw new Exception($"{nameof(HardwareMonitor)} is already running.");
-            IsRunning = true;
+            if (_isRunning) throw new Exception($"{nameof(HardwareMonitor)} is already running.");
+            _isRunning = true;
 
             var cpuUsageSamples = new List<int>();
             _cancellationTokenSource = new CancellationTokenSource();
@@ -77,8 +77,8 @@ namespace Helix.Bot
 
         public void StopMonitoring()
         {
-            if (!IsRunning) throw new Exception($"{nameof(HardwareMonitor)} is not running.");
-            IsRunning = false;
+            if (!_isRunning) throw new Exception($"{nameof(HardwareMonitor)} is not running.");
+            _isRunning = false;
 
             _cancellationTokenSource.Cancel();
             _samplingTask.Wait();
