@@ -13,6 +13,12 @@
         <ProjectReference Include="..\IPC\IPC.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <None Update="assets\icon.png">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
+
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
         <Exec Command="pushd ..\deployment&#xD;&#xA;node build.js -o $(TargetDir)&#xD;&#xA;popd ..\deployment" />
     </Target>

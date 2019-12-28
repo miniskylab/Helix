@@ -180,8 +180,7 @@ namespace Helix.Bot
                 if (!_uriBeingRenderedWasFoundInCapturedNetworkTraffic)
                     _log.Error(
                         $"Uri being rendered was not found in captured network traffic while rendering: {resource.ToJson()}\n" +
-                        $"{nameof(_takeScreenshot)}: {_takeScreenshot}.\n" +
-                        $"Captured resources are: {_capturedResources.ToJson()}"
+                        "-----> The url being rendered may contains unicode characters which causes this issue."
                     );
 
                 if (resource.StatusCode.IsWithinBrokenRange()) millisecondsPageLoadTime = null;

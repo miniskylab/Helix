@@ -10,6 +10,7 @@ app.on("ready", () => {
         maximizable: false,
         resizable: false,
         frame: false,
+        icon: "assets/icon.png",
         webPreferences: {nodeIntegration: true}
     });
     mainWindow.loadURL(`file://${__dirname}/index.html`);
