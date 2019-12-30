@@ -3,6 +3,7 @@
 Helix is a free, GPL licensed website crawler. It systematically and recursively browses a website using a web browser to fully render each URL it visits and capture all the resources (videos, audios, pdf ...) which are downloaded in the rendering process. Helix is built using .NET Core framework and, right now, only supports Windows.
 
 **Download**: *(coming soon)*
+
 **Demo video**: [https://youtu.be/0RWHfZj5sZA](https://www.youtube.com/watch?v=0RWHfZj5sZA)
 
 # Screenshots
