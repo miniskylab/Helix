@@ -1,6 +1,6 @@
 # Helix
 
-Helix is a free, GPL licensed website crawler. It systematically and recursively browses a website using a web browser to fully render each URL it visits and capture all the resources (videos, audios, pdf ...) which are downloaded in the rendering process. Helix is built using .NET Core framework and, right now, only supports Windows.
+Helix is a free, Apache licensed website crawler. It systematically and recursively browses a website using a web browser to fully render each URL it visits and capture all the resources (videos, audios, pdf ...) which are downloaded in the rendering process. Helix is built using .NET Core framework and, right now, only supports Windows.
 
 **Download**: *(coming soon)*  
 **Demo video**: [https://youtu.be/0RWHfZj5sZA](https://www.youtube.com/watch?v=0RWHfZj5sZA)
@@ -13,13 +13,13 @@ Helix is a free, GPL licensed website crawler. It systematically and recursively
 
 Helix can provide support in various scenarios:
 
- - **Estimate how big a website is**
+ - **Estimate how big a website is**  
 Use Helix to scan the website then count the number of `internal URLs` in the report. That number will give you an estimate of how big a website is.
- - **Locate broken URLs in a website**
+ - **Locate broken URLs in a website**  
 Use Helix to scan the website then filter out URLs having status code greater than or equal to 400, or less than 0.
- - **List out redirects**
+ - **List out redirects**  
 Use Helix to scan the website then filter out 3xx URLs.
- - **Estimate average page load time of a website**
+ - **Estimate average page load time of a website**  
 Use Helix to scan the website then look at the `Avg. Page Load Time` number.
 
 # Features
