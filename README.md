@@ -8,9 +8,9 @@ Helix is a free, Apache licensed website crawler. It systematically and recursiv
 # Screenshots
 
 <span align="center">
-  <img src="https://user-images.githubusercontent.com/26107905/71593434-97b37300-2b66-11ea-978d-285954e377f4.png" width="31%" />
-  <img src="https://user-images.githubusercontent.com/26107905/71592949-adc03400-2b64-11ea-8d24-16ed16235245.png" width="31%" /> 
-  <img src="https://user-images.githubusercontent.com/26107905/71592948-ad279d80-2b64-11ea-8d4f-2667d6d5a1e4.png" width="31%" />
+  <img src="https://user-images.githubusercontent.com/26107905/71593434-97b37300-2b66-11ea-978d-285954e377f4.png" width="33%" />
+  <img src="https://user-images.githubusercontent.com/26107905/71592949-adc03400-2b64-11ea-8d24-16ed16235245.png" width="33%" /> 
+  <img src="https://user-images.githubusercontent.com/26107905/71592948-ad279d80-2b64-11ea-8d4f-2667d6d5a1e4.png" width="33%" />
 </span>
 
 ![report](https://user-images.githubusercontent.com/26107905/71593486-e7923a00-2b66-11ea-94a1-3ee6b5e865f2.png)
