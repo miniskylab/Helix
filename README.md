@@ -41,4 +41,7 @@ Helix can provide support in various scenarios:
 
 # Usage
 
-Just download the latest release of Helix and watch the [demo video](https://youtu.be/0RWHfZj5sZA). Currently, Helix can only run on Windows.
+Just download the latest release of Helix and watch the demo video. Currently, Helix can only run on Windows.
+
+**Download**: *(coming soon)*  
+**Demo video**: [https://youtu.be/0RWHfZj5sZA](https://www.youtube.com/watch?v=0RWHfZj5sZA)
