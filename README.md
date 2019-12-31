@@ -2,7 +2,7 @@
 
 Helix is a free, Apache licensed website crawler. It systematically and recursively browses website using web browser to fully render each URL it visits and capture all the resources (images, videos, audios ...) which are downloaded in the rendering process. Helix is built using .NET Core framework and, right now, only supports Windows.
 
-**Download**: *(coming soon)*  
+**Download**: https://github.com/hieucd04/Helix/releases/download/v2.1/Helix.2.1.zip  
 **Demo video**: [https://youtu.be/0RWHfZj5sZA](https://www.youtube.com/watch?v=0RWHfZj5sZA)
 
 # Screenshots
@@ -43,5 +43,5 @@ Helix can provide support in various scenarios:
 
 Just download the latest release of Helix and watch the demo video. Currently, Helix can only run on Windows.
 
-**Download**: *(coming soon)*  
+**Download**: https://github.com/hieucd04/Helix/releases/download/v2.1/Helix.2.1.zip  
 **Demo video**: [https://youtu.be/0RWHfZj5sZA](https://www.youtube.com/watch?v=0RWHfZj5sZA)
